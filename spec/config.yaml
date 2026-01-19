@@ -1,0 +1,33 @@
+version: 0.1.0
+
+workspace:
+  root: "~/llm_workspace"
+
+models:
+  - id: "openrouter/openai/gpt-4o"
+    provider: "openrouter"
+    group: "OpenAI via OpenRouter"
+    display_name: "GPT-4o"
+    max_context_tokens: 128000
+    supports:
+      response_format_json: true
+
+  - id: "openrouter/anthropic/claude-3-opus"
+    provider: "openrouter"
+    group: "Anthropic via OpenRouter"
+    display_name: "Claude 3 Opus"
+    max_context_tokens: 200000
+    supports:
+      response_format_json: false
+
+git:
+  auto_init_project_repos: true
+  default_commit_policy: auto_batch
+
+logging:
+  format: "jsonl"
+  keep_project_logs_with_project: true
+
+security:
+  local_shell_full_access: true
+  server_shell_disabled_by_default: true

@@ -1,0 +1,209 @@
+version: 0.1.0
+
+entities:
+
+  Project:
+    id: { type: uuid, required: true }
+    name: { type: string, required: true }
+    slug: { type: string, required: true }
+    description: { type: string }
+    status: { type: enum, values: [active, archived, deleted], default: active }
+    created_at: { type: datetime, required: true }
+    updated_at: { type: datetime, required: true }
+
+    default_model: { type: string, required: true } # model id from config
+    settings:
+      type: object
+      properties:
+        max_context_tokens: { type: integer, default: 32000 }
+        context_truncation_strategy:
+          type: enum
+          values: [drop_oldest_non_pinned]
+          default: drop_oldest_non_pinned
+        git_commit_policy:
+          type: enum
+          values: [auto_batch, manual_only]
+          default: auto_batch
+
+    # Filesystem-level attributes:
+    paths:
+      type: object
+      properties:
+        root: { type: string, description: "Absolute path to project root" }
+        chats_dir: { type: string }
+        data_dir: { type: string }
+        logs_dir: { type: string }
+        public_dir: { type: string }
+
+    relations:
+      chats:
+        type: list
+        items: { $ref: Chat.id }
+      data_entities:
+        type: list
+        items: { $ref: DataEntity.id }
+
+  Chat:
+    id: { type: uuid, required: true }
+    project_id: { $ref: Project.id, required: true }
+    name: { type: string, required: true }  # derived but editable
+    created_at: { type: datetime, required: true }
+    updated_at: { type: datetime, required: true }
+
+    forked_from_chat_id: { type: uuid, nullable: true }
+    forked_at_message_id: { type: uuid, nullable: true }
+
+    # System prelude for this chat (snapshot)
+    system_prelude:
+      type: object
+      properties:
+        source_type: { type: enum, values: [inline, template], default: inline }
+        template_id: { type: string, nullable: true }
+        content: { type: string, required: true }
+
+    # Path to JSONL log file
+    storage_path: { type: string, required: true }
+
+  Message:
+    id: { type: uuid, required: true }
+    chat_id: { $ref: Chat.id, required: true }
+    project_id: { $ref: Project.id, required: true }
+
+    role:
+      type: enum
+      values: [system, user, assistant, tool]
+      required: true
+
+    content: { type: string, required: true } # fully resolved text
+    raw_template:
+      type: object
+      nullable: true
+      properties:
+        template_id: { type: string }
+        template_text: { type: string }
+        variables_used: { type: object } # name -> value
+
+    created_at: { type: datetime, required: true }
+
+    # Context & behavior flags
+    include_in_context: { type: boolean, default: true }
+    is_aside: { type: boolean, default: false }
+    pure_aside: { type: boolean, default: false }  # ignore all previous history
+    is_pinned: { type: boolean, default: false }
+    is_discarded: { type: boolean, default: false } # e.g., from requery
+
+    parent_message_id: { type: uuid, nullable: true } # for threading / requery branches
+
+    # LLM/tool metadata for assistant/tool messages
+    llm_info:
+      type: object
+      nullable: true
+      properties:
+        model: { type: string }
+        request_id: { type: uuid }
+        output_format_hint:
+          type: enum
+          values: [text, markdown, json]
+          default: text
+        usage:
+          type: object
+          properties:
+            prompt_tokens: { type: integer }
+            completion_tokens: { type: integer }
+            total_tokens: { type: integer }
+        timings:
+          type: object
+          properties:
+            latency_ms: { type: integer }
+            duration_ms: { type: integer }
+
+    related_entity_ids:
+      type: list
+      items: { $ref: DataEntity.id }
+
+  DataEntity:
+    id: { type: uuid, required: true }
+    project_id: { $ref: Project.id, required: true }
+    name: { type: string, required: true }
+    type:
+      type: enum
+      values: [object, file, directory, db_table, env_var_set]
+      required: true
+
+    path: { type: string, required: true } # relative to project root
+    created_at: { type: datetime, required: true }
+    updated_at: { type: datetime, required: true }
+    created_by:
+      type: enum
+      values: [user, llm]
+      default: user
+
+    properties:
+      type: object
+      additionalProperties: true
+
+    tags:
+      type: list
+      items: { type: string }
+
+  LLMRequestLogEntry:
+    id: { type: uuid, required: true }
+    project_id: { $ref: Project.id, required: true }
+    chat_id: { $ref: Chat.id, required: true }
+    timestamp_start: { type: datetime, required: true }
+    timestamp_end: { type: datetime, required: true }
+
+    model: { type: string, required: true }
+    request_type:
+      type: enum
+      values: [chat, tool, workflow]
+      default: chat
+
+    messages_included:
+      type: list
+      items: { $ref: Message.id }
+
+    usage:
+      type: object
+      properties:
+        prompt_tokens: { type: integer }
+        completion_tokens: { type: integer }
+        total_tokens: { type: integer }
+
+    timings:
+      type: object
+      properties:
+        latency_ms: { type: integer }
+        total_duration_ms: { type: integer }
+
+    output_format_hint:
+      type: enum
+      values: [text, markdown, json]
+      default: text
+
+    touched_files:
+      type: list
+      items: { type: string }
+    touched_entities:
+      type: list
+      items: { $ref: DataEntity.id }
+
+    http_status: { type: integer }
+    error:
+      type: object
+      nullable: true
+      properties:
+        code: { type: string }
+        message: { type: string }
+
+  User:
+    # used later with Supabase
+    id: { type: uuid, required: true }
+    email: { type: string, required: true }
+    display_name: { type: string }
+    created_at: { type: datetime, required: true }
+    updated_at: { type: datetime, required: true }
+    role:
+      type: enum
+      values: [admin, user, read_only]
+      default: user

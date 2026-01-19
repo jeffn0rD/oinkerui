@@ -1,0 +1,100 @@
+version: 0.1.0
+
+layout:
+
+  theme:
+    default: dark
+    impl: tailwind
+    tokens:
+      primary: "indigo-400"
+      background: "slate-900"
+      text: "slate-100"
+      accent: "emerald-400"
+
+  panes:
+    left_sidebar:
+      width: "20rem"
+      sections:
+        - id: projects
+          label: "Projects"
+          collapsible: true
+          contents:
+            - tree: # Projects -> Chats, Data, Workflows
+        - id: global
+          label: "Global"
+          collapsible: true
+
+    main_area:
+      views:
+        - id: chat_view
+          components:
+            - message_list
+            - prompt_input
+            - context_info_bar
+
+    right_sidebar:
+      width: "18rem"
+      sections:
+        - id: stats
+          tabs:
+            - per_turn
+            - per_chat
+            - per_project
+
+components:
+
+  message_list:
+    description: "Scrollable list of messages with context controls."
+    features:
+      - collapse_long_messages
+      - markers:
+          - aside: { icon: "⊂", color: "yellow-400" }
+          - pure_aside: { icon: "Ø", color: "orange-400" }
+          - pinned: { icon: "📌", color: "blue-400" }
+          - discarded: { style: "italic", color: "slate-500" }
+      - per_message_stats_line:
+          shows: [tokens, latency_ms, model]
+          style: "small, dim, under message bubble"
+
+  prompt_input:
+    description: "Text area with model selector, format selector, template insertion."
+    controls:
+      - model_selector:
+          source: "config.models"
+      - output_format_selector:
+          options: [text, markdown, json]
+      - template_picker: true
+      - context_overrides:
+          - checkbox_ignore_history_for_this_prompt (pure_aside)
+    behaviors:
+      - detect_slash_command_on_submit: true
+
+  context_info_bar:
+    description: "Live context size and model info."
+    displays:
+      - current_model
+      - estimated_tokens
+      - context_limit
+      - ratio: "estimated / limit"
+    updates_on:
+      - message_flag_change
+      - model_change
+      - prompt_text_change
+
+  terminal_view:
+    phase: 3
+    description: "Pseudo-terminal executing commands in project root."
+    behavior:
+      - input_line
+      - output_log
+      - send_command_on_enter
+      - local_only_flag: true
+
+  diff_view:
+    phase: 3
+    description: "Inline diff for text files/entities."
+    modes:
+      - inline
+    sources:
+      - git_commits
+      - working_tree_vs_head

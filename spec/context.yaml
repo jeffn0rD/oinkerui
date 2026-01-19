@@ -1,0 +1,103 @@
+version: 0.1.0
+
+context_construction:
+
+  description: >
+    Defines how the model input context is built from project, chat configuration
+    and message flags (include_in_context, is_aside, pure_aside, is_pinned, is_discarded).
+
+  inputs:
+    - name: project
+      ref: Project
+    - name: chat
+      ref: Chat
+    - name: messages
+      ref: Message[]
+    - name: current_prompt
+      ref: Message  # unsaved user message being sent
+    - name: model
+      type: string
+    - name: model_context_limit
+      type: integer
+
+  outputs:
+    - name: ordered_messages
+      type: list
+      description: Messages to send to the model, in order.
+
+  steps:
+    - step: 1
+      name: prepare_system_prelude
+      description: >
+        Start with chat.system_prelude as the first message.
+      result:
+        - system_message
+
+    - step: 2
+      name: handle_pure_aside
+      condition: current_prompt.pure_aside == true
+      description: >
+        If pure_aside is true, ignore all prior messages; context is only system
+        prelude + current prompt.
+      result:
+        - ordered_messages = [system_message, current_prompt]
+      terminates: true
+
+    - step: 3
+      name: filter_prior_messages
+      description: >
+        Consider all messages in this chat with created_at < current_prompt.created_at.
+        Exclude messages where:
+          - is_discarded == true, OR
+          - include_in_context == false, OR
+          - is_aside == true (aside messages are not included in future contexts).
+        Include pinned messages regardless of recency, if not discarded.
+      result:
+        - prior_candidates: list of messages passing filter
+
+    - step: 4
+      name: order_prior_messages
+      description: >
+        Sort prior_candidates by created_at ascending. Pinned messages remain in
+        that chronological position but are marked as priority for retention during
+        truncation.
+      result:
+        - prior_ordered: sorted list
+
+    - step: 5
+      name: assemble_initial_context
+      description: >
+        Construct initial context list: [system_message] + prior_ordered + [current_prompt]
+      result:
+        - context_list
+
+    - step: 6
+      name: estimate_tokens
+      description: >
+        Estimate total tokens used by context_list for the selected model.
+        Compare with min(project.settings.max_context_tokens, model_context_limit).
+      result:
+        - estimated_tokens
+        - context_limit
+
+    - step: 7
+      name: truncate_if_needed
+      condition: estimated_tokens > context_limit
+      description: >
+        If over the limit, apply truncation:
+          1. Always keep system_message.
+          2. Always keep pinned messages if possible.
+          3. Remove oldest non-pinned messages first until under limit.
+      result:
+        - truncated_context_list
+
+  invariants:
+    - name: system_first
+      description: "First message in ordered_messages is always the system prelude."
+    - name: current_prompt_last
+      description: "Last message in ordered_messages is always the current prompt."
+    - name: no_discarded
+      description: "No message with is_discarded==true is included."
+    - name: pure_aside_no_history
+      description: >
+        If current_prompt.pure_aside==true, no prior messages appear in ordered_messages.

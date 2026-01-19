@@ -1,0 +1,145 @@
+version: 0.1.0
+
+services:
+
+  node_api:
+    base_path: "/api"
+    endpoints:
+
+      - name: list_projects
+        method: GET
+        path: "/projects"
+        request:
+          query: {}
+        response:
+          status: 200
+          body:
+            type: array
+            items: { $ref: Project }
+
+      - name: create_project
+        method: POST
+        path: "/projects"
+        request:
+          body:
+            type: object
+            properties:
+              name: { type: string }
+              slug: { type: string, nullable: true }
+              default_model: { type: string }
+        response:
+          status: 201
+          body: { $ref: Project }
+
+      - name: list_chats
+        method: GET
+        path: "/projects/{project_id}/chats"
+        response:
+          status: 200
+          body:
+            type: array
+            items: { $ref: Chat }
+
+      - name: create_chat
+        method: POST
+        path: "/projects/{project_id}/chats"
+        request:
+          body:
+            type: object
+            properties:
+              name: { type: string, nullable: true }
+              system_prelude: { type: string, nullable: true }
+        response:
+          status: 201
+          body: { $ref: Chat }
+
+      - name: send_message
+        method: POST
+        path: "/projects/{project_id}/chats/{chat_id}/messages"
+        description: "Submit a new user message (incl. slash command parsing and LLM call if applicable)."
+        request:
+          body:
+            type: object
+            properties:
+              raw_text: { type: string }   # includes potential slash commands
+              model_id: { type: string, nullable: true }
+              output_format_hint:
+                type: enum
+                values: [text, markdown, json]
+                default: text
+        response:
+          status: 200
+          body:
+            type: object
+            properties:
+              messages:
+                type: array
+                items: { $ref: Message } # includes new user + assistant messages if LLM was called
+              request_log:
+                $ref: LLMRequestLogEntry
+
+      - name: get_context_preview
+        method: POST
+        path: "/projects/{project_id}/chats/{chat_id}/context-preview"
+        description: "Return computed context messages + token counts without sending to LLM."
+        request:
+          body:
+            type: object
+            properties:
+              model_id: { type: string }
+              current_prompt_text: { type: string }
+        response:
+          status: 200
+          body:
+            type: object
+            properties:
+              messages:
+                type: array
+                items: { $ref: Message }
+              estimated_tokens: { type: integer }
+              context_limit: { type: integer }
+
+      - name: fork_chat
+        method: POST
+        path: "/projects/{project_id}/chats/{chat_id}/fork"
+        request:
+          body:
+            type: object
+            properties:
+              from_message_id: { type: uuid, nullable: true }
+              prune_excluded: { type: boolean, default: false }
+        response:
+          status: 201
+          body: { $ref: Chat }
+
+  python_tools:
+    base_path: "/tools"
+    endpoints:
+
+      - name: execute_command
+        method: POST
+        path: "/projects/{project_id}/execute"
+        request:
+          body:
+            type: object
+            properties:
+              language: { type: string } # "bash", "python"
+              code: { type: string }
+              args: { type: array, items: { type: string }, nullable: true }
+              files_to_read:
+                type: array
+                items: { type: string }
+              files_to_write:
+                type: array
+                items: { type: string }
+        response:
+          status: 200
+          body:
+            type: object
+            properties:
+              stdout: { type: string }
+              stderr: { type: string }
+              exit_code: { type: integer }
+              written_files:
+                type: array
+                items: { type: string }

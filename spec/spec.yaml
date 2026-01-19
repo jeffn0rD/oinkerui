@@ -1,0 +1,789 @@
+spec_version: 0.1.0
+title: "Local LLM Project Workbench – Formal Specification"
+summary: >
+  A local-first, project-oriented LLM workbench with hierarchical projects,
+  chats, data entities, tools, workflows, and Git-backed versioning. The system
+  starts as a single-user local application and evolves into a multi-user,
+  workflow-driven, partially cloud-backed environment. This specification
+  defines phases, architecture, data model, state and interactions at a formal
+  level, referencing separate schema/config documents for implementation detail.
+
+description: |
+  This specification defines the high-level architecture, behavior, and
+  constraints of an LLM-powered project workbench application. It is designed
+  to be:
+
+    - Local-first (desktop/server running on localhost initially).
+    - Project-centric, with each project as a Git repository containing data
+      entities, chats, workflows, and logs.
+    - LLM-centric, with structured context management, prompt templates, and
+      logging of LLM interactions.
+    - Extensible, via a declarative slash command registry, templates, tools
+      (Python/Node), and workflows (DAG-style).
+    - Specification-driven, where this document and referenced YAML specs
+      (domain, commands, context, apis, ui, workflows, config) serve as the
+      single source of truth for automated code generation, documentation, and
+      testing.
+
+  This document is intentionally high-level and formal (behavioral, structural,
+  and logical) rather than a low-level schema or API spec. Detailed schemas and
+  module definitions are expected to be derived from:
+
+    - /spec/domain.yaml
+    - /spec/context.yaml
+    - /spec/commands.yaml
+    - /spec/apis.yaml
+    - /spec/ui.yaml
+    - /spec/workflows.yaml
+    - /spec/config.yaml
+
+  The system is developed in phases, each with a clear feature set, constraints,
+  and extension points, to support incremental implementation and agentic
+  development.
+
+references:
+  domain_spec: "./domain.yaml"
+  context_spec: "./context.yaml"
+  commands_spec: "./commands.yaml"
+  apis_spec: "./apis.yaml"
+  ui_spec: "./ui.yaml"
+  workflows_spec: "./workflows.yaml"
+  config_spec: "./config.yaml"
+
+tags:
+  - llm
+  - local-first
+  - git
+  - workflows
+  - tools
+  - svelte
+  - node
+  - python
+  - supabase
+  - specification-driven
+
+###############################################################################
+# 1. STACK AND RUNTIME ENVIRONMENT
+###############################################################################
+
+stack:
+  overview: |
+    The system is a local-first web application with a Svelte front-end,
+    a Node.js (Fastify) primary backend, and a Python (FastAPI) tools backend.
+    OpenRouter is used as the primary LLM gateway. Git is used for versioning
+    each project. Supabase is introduced in later phases for multi-user
+    metadata and authentication.
+
+  frontend:
+    framework: "Svelte"
+    styling: "Tailwind CSS"
+    rendering_model: "SPA served from Node backend"
+    theme:
+      default: "dark"
+      extensible: true
+
+  backend_primary:
+    language: "Node.js"
+    framework: "Fastify"
+    responsibilities:
+      - Serve front-end assets
+      - Provide REST/JSON APIs (/spec/apis.yaml, node_api)
+      - Manage projects, chats, messages, data entities
+      - Coordinate with Git (init, commit, push)
+      - Integrate with OpenRouter (LLM requests)
+      - Implement slash command parsing and dispatch
+      - Manage logging (project/global/system)
+      - Perform context construction per /spec/context.yaml
+
+  backend_tools:
+    language: "Python"
+    framework: "FastAPI"
+    responsibilities:
+      - Execute code/shell commands in per-project workspace environments
+      - Perform safe Jinja2 template rendering (for prompts)
+      - Provide extensible tools for workflows and data manipulation
+      - Later: web-search, HTTP fetch, MCP integration
+
+  llm_gateway:
+    provider: "OpenRouter"
+    role: |
+      Abstract models and provider details behind a unified model
+      configuration defined in /spec/config.yaml. The Node backend is the
+      single integration point with OpenRouter, handling streaming, request
+      logging, and response postprocessing.
+
+  database:
+    phase: "later phases (Supabase)"
+    role: |
+      Initially, all persistent state (projects, chats, entities, logs) is
+      file-based under a workspace root. Later, Supabase will store multi-user
+      metadata and optionally some conversation indexes, with private content
+      still potentially local.
+
+  workspace_root:
+    description: "Single root directory for all projects and global configuration."
+    path_default: "~/llm_workspace"
+    structure:
+      - "projects/<project_id>/..."
+      - "global/..."
+      - "venvs/<project_id>/..."
+      - "temp/..."
+
+  git:
+    per_project_repo: true
+    default_policy: "auto_init"  # see /spec/config.yaml
+
+  security_notes: |
+    - For local-only usage (Phase 1–3), shell and file access is allowed within
+      the workspace root, with per-project scoping.
+    - For later remote/multi-user deployment, shell/terminal features must be
+      disabled or tightly secured as per configuration.
+
+###############################################################################
+# 2. PHASES
+###############################################################################
+
+phases:
+
+  - id: phase_1
+    name: "MVP – Local Single User, Projects & Basic Chat"
+    description: |
+      Establish a local single-user workbench with project management, basic
+      chat, OpenRouter integration, file-based data entities, and Git-backed
+      projects. UI is dark-themed with Tailwind, markdown and code highlighting,
+      but context management features are minimal.
+
+    features:
+      - Single local user, no auth.
+      - Project creation/open/delete.
+      - Each project = Git repo (auto init) under workspace_root.
+      - Basic chat per project:
+        - System prelude (per chat or project default).
+        - Linear message history; no asides/pinning yet.
+      - OpenRouter LLM calls with:
+        - Model selection from config.
+        - Logging of LLM requests.
+      - Data entities:
+        - object (JSON/YAML)
+        - file (any type)
+      - Global + project-level prompt templates (simple substitution).
+      - Logging:
+        - Chat logs per chat (JSONL).
+        - LLM request logs per project.
+        - System/global logs.
+      - UI:
+        - Dark theme via Tailwind.
+        - Left sidebar: projects & chats.
+        - Main chat pane.
+        - Markdown rendering + syntax highlighting for code blocks.
+
+    important_notes: |
+      - Context is effectively "all previous messages plus system prelude" in
+        Phase 1; no explicit include/exclude flags are exposed, though the
+        context algorithm in /spec/context.yaml is already defined for future
+        use.
+      - Prompt templates can be basic substitution only; the Jinja2-style
+        filters are introduced in Phase 2.
+      - All state modifications to project content should be Git-tracked, but
+        auto-commit policies can be coarse at this stage.
+
+    references:
+      - "./domain.yaml"
+      - "./apis.yaml"
+      - "./ui.yaml"
+      - "./config.yaml"
+
+    todos:
+      - Define minimal Node/Fastify routes for projects, chats, messages.
+      - Implement OpenRouter integration with basic usage logging.
+      - Implement Tailwind-based dark theme and markdown rendering with syntax
+        highlighting.
+      - Define file structure for projects and global config under workspace_root.
+
+    tags:
+      - mvp
+      - local
+      - git
+      - chat
+      - tailwind
+      - markdown
+
+  - id: phase_2
+    name: "Advanced Chat Context Management & Templates"
+    description: |
+      Introduce advanced chat features: asides, pure-asides (no history),
+      pinned messages, requery, chat forking with pruning, live context size,
+      and Jinja2-style templates. Slash commands become a central mechanism
+      for manipulating chat behavior and project data.
+
+    features:
+      - Context control flags per message:
+        - include_in_context (boolean)
+        - is_aside (boolean)
+        - pure_aside (boolean)
+        - is_pinned (boolean)
+        - is_discarded (boolean)
+      - Asides:
+        - Normal aside: excluded from future context, but context for that
+          turn includes history.
+        - Pure aside: context for that turn ignores all prior chat messages
+          (system prelude + current prompt only).
+      - Chat fork:
+        - Manual fork UI.
+        - `/chat-fork` command (with optional `--from <message_id>` and
+          `--prune|--no-prune`).
+        - Optional pruning of excluded messages when forking.
+      - Live context size display:
+        - Estimated tokens vs model max for current model.
+        - Updates on message flag changes, model changes, and prompt edits.
+      - Requery:
+        - Requery last prompt/response pair.
+        - Exclude last pair from context for new request.
+        - Allow user to choose which response(s) to keep in context; discarded
+          responses are logged with `is_discarded=true`.
+      - Prompt templates (v2):
+        - Back-end Jinja2 (Python) rendering with safe filters.
+        - Support filters for JSON pretty-print, trimming, etc.
+        - Overlay UI asks for variable values, allows overrides, and previews
+          resolved template.
+      - Slash commands v1:
+        - `/aside`, `/aside-pure`, `/pin`, `/save_entity`, `/execute`,
+          `/commit`, `/chat-fork`, `/requery`.
+        - Defined in /spec/commands.yaml, parsed by Node backend.
+
+    important_notes: |
+      - The formal context construction algorithm is defined in /spec/context.yaml
+        and MUST be treated as the normative source for context-related logic.
+      - Message flags and invariants are defined in /spec/domain.yaml and must
+        be enforced consistently in both persistent storage and in-memory
+        operations.
+      - Chat forking behavior, especially with pruning, must preserve the
+        invariants on message flags and ensure that forked chats are logically
+        independent histories.
+
+    references:
+      - "./domain.yaml"
+      - "./context.yaml"
+      - "./commands.yaml"
+      - "./ui.yaml"
+
+    todos:
+      - Implement message flag UI controls (aside, pure aside, pinned, discard).
+      - Implement `/chat-fork` and respect prune option (including slash flag).
+      - Integrate Jinja2 rendering service (Python) for templates and document
+        allowed filters and syntax.
+      - Implement live token estimate based on current model’s context limit.
+      - Implement requery workflow and branch-like storage of alternative
+        responses.
+
+    tags:
+      - context
+      - asides
+      - pinning
+      - templates
+      - commands
+
+  - id: phase_3
+    name: "Tools, Terminal Mode, Streaming, Diffs"
+    description: |
+      Introduce tools (code execution, streaming to file), terminal mode,
+      Git push, and basic diffs. This phase builds the foundation for more
+      advanced workflows and causal tracking.
+
+    features:
+      - Python tools backend:
+        - `/execute` command mapped to FastAPI endpoint for code/shell execution.
+        - Project-scoped execution, working directory locked to project root.
+      - Streaming to file:
+        - `/stream-to-file {json}` command specifying a path under project root.
+        - Next LLM response is streamed directly to file in addition to minimal
+          UI status.
+        - Later exposed as an agent tool.
+      - Terminal mode:
+        - Pseudo-terminal view for command-by-command execution in project root.
+        - Full shell access allowed for local builds (configurable).
+      - Git enhancements:
+        - `/push` command: push current branch to configured remote.
+        - Improved Git error handling and UI feedback.
+      - Diffs:
+        - Inline diffs for text-based objects/files (JSON/YAML/code/Markdown).
+        - Metadata-only indication for binary files.
+      - Causal tracking foundation:
+        - LLM requests and tools log touched_files and touched_entities fields
+          in LLMRequestLogEntry (see /spec/domain.yaml).
+
+    important_notes: |
+      - Shell and code execution must be sandboxed at minimum by enforcing the
+        project root as the working directory and rejecting paths outside it.
+      - The `/stream-to-file` command should be carefully constrained so that
+        paths cannot escape the project directory (e.g., by resolving and
+        validating paths).
+      - Diffs should rely on Git where available but can fall back to pure
+        text diff for non-committed comparisons.
+
+    references:
+      - "./domain.yaml"
+      - "./commands.yaml"
+      - "./apis.yaml"   # python_tools section
+      - "./ui.yaml"
+
+    todos:
+      - Implement Python tools FastAPI server with project-aware venvs.
+      - Implement `/execute`, `/stream-to-file`, `/push`, and terminal view.
+      - Implement diff UI and corresponding Git interactions.
+      - Ensure logs capture touched_files and touched_entities for all tools
+        and LLM-invoked changes.
+
+    tags:
+      - tools
+      - terminal
+      - streaming
+      - diffs
+      - git
+
+  - id: phase_4
+    name: "Multi-user, Supabase, Workflows UI, Causal Flow"
+    description: |
+      Add multi-user support via Supabase, build a visual workflows UI, and
+      render causal pipelines linking LLM prompts, tools, file changes, and
+      Git commits. This phase surfaces the system as a multi-user environment
+      suitable for controlled server deployments.
+
+    features:
+      - Multi-user support:
+        - Supabase auth.
+        - User entity with roles (admin, user, read_only).
+        - Project ownership and permission model.
+      - Supabase integration:
+        - Central metadata (users, projects, access).
+        - Optional indexing of chats/entities (text indices, not necessarily all content).
+      - Agentic workflows (v2):
+        - Visual DAG builder for workflows (see /spec/workflows.yaml).
+        - Nodes: prompts, tool steps, file operations.
+        - UI-based editing with YAML synchronization.
+      - Causal flow/pipeline visualization:
+        - Graph view connecting LLMRequestLogEntry, tools, file changes,
+          data entities, and Git commits.
+        - Potential use of mermaid-like graph descriptions for view rendering.
+      - Remote deployment hardening:
+        - Restrict or disable terminal mode and full shell access by default.
+        - Configure email notifications (SMTP) for workflow results.
+
+    important_notes: |
+      - User and project permissions must be well-defined and enforced at the
+        API level; these are specified in the extended domain and apis specs.
+      - The causal graph uses LLMRequestLogEntry.touched_files and
+        touched_entities to link requests to file/entity changes, combined with
+        Git commit history.
+      - Workflow definitions and their UI representation must remain
+        synchronized via /spec/workflows.yaml so that agentic systems can
+        reason about and modify workflows.
+
+    references:
+      - "./domain.yaml"
+      - "./workflows.yaml"
+      - "./apis.yaml"
+      - "./ui.yaml"
+
+    todos:
+      - Integrate Supabase auth and project/user metadata.
+      - Implement workflow DAG engine and UI builder.
+      - Implement causal graph generation and visualization.
+      - Harden shell/tools configuration for shared/server deployments.
+      - Implement basic email notification support for scheduled or workflow
+        completions (when on VPS).
+
+    tags:
+      - multi-user
+      - workflows
+      - causal-graph
+      - supabase
+      - security
+
+###############################################################################
+# 3. DATA MODEL (HIGH-LEVEL)
+###############################################################################
+
+data_model:
+  description: |
+    The data model is fully defined at the schema level in /spec/domain.yaml.
+    This section provides a conceptual overview of key entities and their
+    relationships and invariants, including some first-order logic (FOL)
+    annotations for critical constraints.
+
+  entities:
+    Project:
+      summary: "Top-level workspace unit. Backed by a Git repository."
+      key_properties:
+        - id: uuid
+        - name: string
+        - default_model: model_id from config
+        - settings: context + git commit policies
+      relations:
+        - has_many: Chats
+        - has_many: DataEntities
+      invariants:
+        - "Each Project has a unique id and slug."
+        - "Each Project's root directory is unique under workspace_root."
+        - FOL: ∀p1,p2 (Project(p1) ∧ Project(p2) ∧ p1.id = p2.id → p1 = p2)
+
+    Chat:
+      summary: "A named conversation within a Project."
+      key_properties:
+        - id: uuid
+        - project_id: Project.id
+        - name: string (derived but editable)
+        - system_prelude: inline or template snapshot
+        - forked_from_chat_id: optional
+        - forked_at_message_id: optional
+      relations:
+        - belongs_to: Project
+        - has_many: Messages
+
+    Message:
+      summary: "One role-tagged piece of a conversation."
+      key_properties:
+        - id: uuid
+        - chat_id: Chat.id
+        - project_id: Project.id
+        - role: {system, user, assistant, tool}
+        - content: string
+        - flags:
+            include_in_context: bool
+            is_aside: bool
+            pure_aside: bool
+            is_pinned: bool
+            is_discarded: bool
+      invariants:
+        - "System prelude is the first message in the effective context."
+        - "Discarded messages must never be included in context."
+        - FOL: ∀m (Message(m) ∧ m.is_discarded = true → m.include_in_context = false)
+        - FOL: ∀m (Message(m) ∧ m.pure_aside = true → ¬∃m' (m'.chat_id = m.chat_id ∧ m'.created_at < m.created_at ∧ IncludedInContext(m', m)))
+
+    DataEntity:
+      summary: "Project-scoped data object, file, directory, db_table or env_var_set."
+      key_properties:
+        - id: uuid
+        - project_id: Project.id
+        - type: {object, file, directory, db_table, env_var_set}
+        - path: relative to project root
+      invariants:
+        - "Paths must be under project root and must not escape via '..'."
+        - FOL: ∀e (DataEntity(e) → PathUnderProjectRoot(e.path, e.project_id))
+
+    LLMRequestLogEntry:
+      summary: "One LLM request/response cycle with performance and context info."
+      key_properties:
+        - id: uuid
+        - project_id: Project.id
+        - chat_id: Chat.id
+        - messages_included: list<Message.id>
+        - usage: token counts
+        - timings: latency, duration
+        - touched_files: list<path>
+        - touched_entities: list<DataEntity.id>
+
+    User (Phase 4+):
+      summary: "Authenticated user account via Supabase."
+      key_properties:
+        - id: uuid
+        - email: string
+        - role: {admin, user, read_only}
+
+  logical_relations:
+    - name: MessageBelongsToChatAndProject
+      formula: |
+        ∀m (Message(m) → ∃c,p (Chat(c) ∧ Project(p) ∧ m.chat_id = c.id ∧ m.project_id = p.id ∧ c.project_id = p.id))
+
+    - name: ContextInclusionRespectsFlags
+      formula: |
+        ∀req, m (IncludedInContextForRequest(m, req) →
+          Message(m) ∧
+          m.is_discarded = false ∧
+          m.include_in_context = true ∧
+          m.is_aside = false)
+
+###############################################################################
+# 4. WORKFLOWS (HIGH-LEVEL)
+###############################################################################
+
+workflows:
+  description: |
+    Workflows are defined as DAGs of steps (nodes) with dependencies. Each step
+    represents an action: a prompt to an LLM, a tool invocation, a file
+    operation, or a composite sub-workflow. The detailed schema lives in
+    /spec/workflows.yaml, but conceptually:
+
+  model:
+    workflow:
+      - id: workflow_id
+      - project_id: Project.id or "global"
+      - name: string
+      - nodes: list of Step
+      - edges: list of (from_step_id, to_step_id)
+      - schedule: optional (Phase 4+)
+
+    step:
+      - id: step_id
+      - type: {prompt, tool, file_op, sub_workflow}
+      - config:
+          # type-specific configuration, including references to templates,
+          # tools, entities, etc.
+      - inputs: references to outputs of previous steps or data entities
+      - outputs: references for downstream steps or data entities
+
+  invariants:
+    - "Workflows are acyclic."
+    - FOL: ∀w (Workflow(w) → ¬∃cycle (CycleInGraph(w.nodes, w.edges)))
+
+  phases:
+    - Phase 3: Text-based YAML workflows without UI builder.
+    - Phase 4: Visual DAG builder and synchronized YAML representation.
+
+###############################################################################
+# 5. MODULE SPLITS AND RESPONSIBILITIES
+###############################################################################
+
+modules:
+  frontend_svelte:
+    description: |
+      Svelte SPA implementing UI as specified in /spec/ui.yaml, with Tailwind
+      styling. Responsible for rendering projects, chats, messages, stats,
+      diffs, terminal, and workflow views. It communicates with Node and Python
+      backends via JSON APIs.
+    main_concerns:
+      - UI state & navigation (projects, chats, entities)
+      - Message rendering & context flag controls
+      - Prompt templates overlay & variable resolution UI
+      - Slash command initiation (but not parsing semantics)
+      - Context size display & per-turn stats
+      - Terminal view, diff view, workflow visualization
+
+  backend_node:
+    description: |
+      Fastify-based API server implementing the primary business logic and
+      bridging to external services (OpenRouter, Git, Supabase later).
+    main_concerns:
+      - Project, chat, message CRUD
+      - Context construction (per /spec/context.yaml)
+      - Integration with OpenRouter (LLM calls, streaming, logging)
+      - Slash command parsing and dispatch (per /spec/commands.yaml)
+      - Git operations (init, status, commit, push)
+      - Watch/detect changes for auto-commit batching
+      - Logging of events and linking them to LLMRequestLogEntry
+      - Authentication and RBAC (Phase 4+ with Supabase)
+
+  backend_python_tools:
+    description: |
+      FastAPI-based tools backend providing Python-centric capabilities:
+      safe Jinja2 template rendering, code/shell execution, and eventually
+      data processing and external tools (web search, MCP).
+    main_concerns:
+      - Jinja2-based template rendering with safe filter set
+      - Code/shell execution within project venvs
+      - Tool endpoints callable directly (slash commands) or indirectly (LLM tools)
+      - Future: advanced tools such as web search, HTTP fetch, MCP adapters
+
+  git_integration:
+    description: |
+      Logical module (primarily within Node) responsible for interacting with
+      Git for each project repo.
+    primary_operations:
+      - init_project_repo
+      - detect_dirty_files
+      - auto_batched_commit (with generated messages)
+      - manual_commit (via /commit)
+      - push (via /push)
+      - retrieve_history & diffs
+
+  logging_and_metrics:
+    description: |
+      Cross-cutting concern: all major actions result in structured logs:
+      LLMRequestLogEntry, system logs, project logs. These logs feed both user
+      UI (stats) and causal graph construction.
+
+###############################################################################
+# 6. STATE MODELING AND USER INTERACTIONS
+###############################################################################
+
+state_model:
+  description: |
+    The system maintains state across multiple dimensions:
+    - Persistent project state (files/entities, chats, logs, Git history).
+    - Session/UI state (active project, active chat, message selection).
+    - Derived state (context selection, token counts).
+
+  core_states:
+    - ProjectState:
+        current_project_id
+        open_chats
+        dirty_files
+        git_status
+    - ChatState:
+        current_chat_id
+        messages (with flags)
+        pending_prompt_text
+        selected_model
+        output_format_hint
+        context_preview (Phase 2+)
+    - UIState:
+        active_view (chat, terminal, diff, workflows)
+        expanded_collapsed_messages
+        selected_message_for_stats
+        terminal_session_state
+
+user_interactions:
+  description: |
+    High-level user flows that LLMs and implementers must support. Many of
+    these map closely to API endpoints, slash commands, and context rules.
+
+  flows:
+
+    - name: OpenProjectAndChat
+      description: "User selects a project, then a chat, and views its history."
+      steps:
+        - User selects project from sidebar.
+        - Frontend loads project metadata & chat list.
+        - User selects chat; frontend loads chat messages.
+        - Frontend renders messages with markdown, code highlighting and flags.
+      invariants:
+        - "Only messages belonging to the selected chat are shown."
+        - FOL: ∀m (DisplayedInChatView(m, c) → m.chat_id = c.id)
+
+    - name: SendPromptBasic
+      description: "User sends a prompt, gets a response, Phase 1 behavior."
+      steps:
+        - User types prompt (no slash commands).
+        - Frontend sends raw_text, model_id to Node API.
+        - Node constructs context from all prior messages + system prelude.
+        - Node calls OpenRouter; receives response.
+        - Node logs LLMRequestLogEntry and appends user & assistant messages.
+        - Frontend updates view and stats line.
+      LLM_guidance: |
+        LLM responses should respect the requested output format hint if any,
+        but Phase 1 does not enforce strict JSON parsing.
+
+    - name: SendPromptWithAsidesAndPinning
+      phase: "Phase 2+"
+      description: "User uses asides, pure-asides, and pinning to control context."
+      steps:
+        - User toggles flags on previous messages (pin/unpin, include/exclude).
+        - User optionally uses `/aside` or `/aside-pure` on current prompt.
+        - Frontend shows updated context size.
+        - Node applies context algorithm from /spec/context.yaml.
+        - LLM call executed and logged with messages_included.
+      invariants:
+        - "pure_aside prompts never include prior chat messages in context."
+        - See FOL invariants in /spec/context.yaml.
+
+    - name: RequeryLastTurn
+      phase: "Phase 2+"
+      description: "User re-asks the last prompt with variations and chooses a response."
+      steps:
+        - User clicks “Requery” on last user+assistant pair or issues `/requery`.
+        - System excludes last pair from context for the new request.
+        - Original prompt is loaded into input area.
+        - User edits and sends new request; new response arrives.
+        - UI presents choice: keep old response, new response, or both.
+        - Discarded responses flagged `is_discarded=true`, `include_in_context=false`.
+      invariants:
+        - "Discarded responses are never included in future contexts."
+
+    - name: ChatForkAndPrune
+      phase: "Phase 2+"
+      description: "User forks a chat and optionally prunes excluded history."
+      steps:
+        - User triggers fork via UI or `/chat-fork`.
+        - Dialog: ask for fork point (optional) and prune option (unless slash
+          command specifies).
+        - If prune=true:
+          - New chat copies only messages that would be included in context
+            (incl. pinned and system), up to fork point.
+        - If prune=false:
+          - New chat copies all messages up to fork point.
+      invariants:
+        - "Forked chats have their own independent history and flags."
+        - FOL: ∀c' (ForkedFrom(c', c) → c'.id ≠ c.id)
+
+    - name: TerminalCommand
+      phase: "Phase 3+"
+      description: "User executes a shell command in the project workspace."
+      steps:
+        - User enters command in terminal view.
+        - Frontend sends command to Node or Python tools endpoint.
+        - Backend executes in project root, returns stdout/stderr/exit code.
+        - UI displays results in terminal pane.
+      security_note: |
+        Commands must not execute outside the project root; path resolution and
+        environment restrictions must be configured accordingly.
+
+    - name: StreamToFile
+      phase: "Phase 3+"
+      description: "User streams LLM output directly to a project file."
+      steps:
+        - User issues `/stream-to-file { "path": "data/files/output.txt" }`
+          before sending a prompt.
+        - Backend records that the next LLM response should be streamed to file.
+        - LLM tokens arrive, backend appends them to the file.
+        - UI shows minimal preview/status popup.
+      invariants:
+        - "Streamed file must be under project root."
+        - FOL: ∀req (HasStreamToFile(req, path) → PathUnderProjectRoot(path, req.project_id))
+
+###############################################################################
+# 7. LLM-SPECIFIC GUIDANCE
+###############################################################################
+
+llm_guidance:
+  description: |
+    This section provides instructions for LLMs generating code, tests, or
+    docs from this specification and the referenced YAML files.
+
+  principles:
+    - Always treat /spec/*.yaml files as the authoritative source of structure,
+      fields, and behaviors.
+    - Do not introduce new fields, flags, or commands that are not declared or
+      clearly implied by this spec, unless explicitly requested.
+    - For any context-related logic, consult /spec/context.yaml and respect its
+      invariants and FOL annotations.
+
+  patterns:
+    - When generating backend code (Node/Fastify, Python/FastAPI), derive:
+      - Route signatures and payload schemas from /spec/apis.yaml.
+      - Entity structures from /spec/domain.yaml.
+      - Command dispatch logic from /spec/commands.yaml.
+    - When generating frontend code (Svelte components):
+      - Follow layout and component structure from /spec/ui.yaml.
+      - Use Tailwind classes consistent with the dark theme tokens.
+
+  safety:
+    - For template rendering:
+      - Use Jinja2 with disabled code execution (no arbitrary Python).
+      - Support only whitelisted filters defined in the template spec.
+    - For file and shell access:
+      - Enforce path constraints (under project root).
+      - Disable or strictly limit shell features when deploying beyond local.
+
+  testing:
+    - Generate tests that:
+      - Verify context construction matches /spec/context.yaml given various
+        combinations of message flags (include, aside, pure_aside, pinned, discarded).
+      - Verify that messages marked `is_discarded=true` are never included in
+        context.
+      - Verify invariants linking Projects, Chats, Messages (foreign key-like
+        relationships) are preserved.
+
+###############################################################################
+# 8. TAGS AND METADATA
+###############################################################################
+
+metadata:
+  owner: "You (the system designer)"
+  intended_consumers:
+    - human_developers
+    - LLM_agents
+  usage: |
+    This document is the base-level formal spec. Schemas in the referenced
+    YAML files expand on it. Combined, they allow an agentic system to derive
+    detailed schemas, modules, functions, and eventually to build and test
+    the full system according to the phased plan.

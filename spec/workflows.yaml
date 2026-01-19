@@ -1,0 +1,585 @@
+version: 0.1.0
+title: "Workflows Specification"
+summary: >
+  Formal model for agentic workflows as DAGs of steps (prompts, tools, file
+  operations, sub-workflows), including configuration, data flow, execution
+  semantics, and future scheduling. This spec is referenced by the main
+  application spec and is intended to guide implementation of workflow storage,
+  execution engines, and UI builders.
+
+description: |
+  This document defines the workflow model used by the Local LLM Project
+  Workbench. Workflows are:
+
+    - Project-scoped or global.
+    - Represented as Directed Acyclic Graphs (DAGs) of steps.
+    - Steps represent individual operations (LLM prompts, tool calls, file
+      operations, or nested workflows).
+    - Edges represent data or control dependencies between steps.
+
+  The model is designed to:
+
+    - Be fully declarative and stored as YAML/JSON files under project/global
+      directories.
+    - Be machine-readable and suitable for LLM-based generation and editing.
+    - Support a basic text-only representation in early phases and a visual
+      DAG builder in later phases.
+    - Integrate with project data entities, tools, and prompt templates.
+
+  This specification is high-level and behavioral. Low-level schemas and
+  function signatures for workflow engines and UI components should be derived
+  from this document and the global /spec/domain.yaml and /spec/apis.yaml.
+
+references:
+  domain_spec: "./domain.yaml"
+  config_spec: "./config.yaml"
+  ui_spec: "./ui.yaml"
+
+tags:
+  - workflows
+  - dag
+  - automation
+  - agentic
+  - yaml
+
+###############################################################################
+# 1. CONCEPTUAL MODEL
+###############################################################################
+
+model:
+  overview: |
+    A workflow W is a structured object with:
+      - A unique id and name.
+      - A scope (global or specific project).
+      - A set of steps (nodes).
+      - A set of edges (directed dependencies).
+      - Optional scheduling information (Phase 4+).
+      - Optional metadata for UI layout and visualization.
+
+    Steps are typed units of work. Supported step types:
+
+      - prompt: send a prompt to an LLM model, optionally using templates and
+        data entities, and store the result in a variable or entity.
+
+      - tool: invoke a tool (e.g., /execute, stream-to-file, custom data tools)
+        with parameters that may depend on prior steps' outputs.
+
+      - file_op: perform filesystem-related operations on project data
+        entities or files (copy, move, transform, etc.).
+
+      - sub_workflow: invoke another workflow as a reusable component.
+
+  workflow_entity:
+    fields:
+      id:
+        type: string
+        description: "Unique workflow identifier (within global or project scope)."
+      name:
+        type: string
+        description: "Human-readable workflow name."
+      description:
+        type: string
+        description: "Optional long-form description."
+      scope:
+        type: enum
+        values: [global, project]
+        description: "Where the workflow is defined and applicable."
+      project_id:
+        type: uuid
+        nullable: true
+        description: "Required when scope=project; refers to Project.id."
+      version:
+        type: string
+        description: "Semantic version or simple integer for workflow evolution."
+      nodes:
+        type: list
+        items: "Step"
+      edges:
+        type: list
+        items: "Edge"
+      schedule:
+        type: object
+        nullable: true
+        description: "Scheduling configuration (Phase 4+)."
+      metadata:
+        type: object
+        description: "UI layout hints, tags, authorship, etc."
+
+  step_entity:
+    fields:
+      id:
+        type: string
+        description: "Unique step id within this workflow."
+      name:
+        type: string
+        description: "Human-readable step name."
+      type:
+        type: enum
+        values: [prompt, tool, file_op, sub_workflow]
+      description:
+        type: string
+      config:
+        type: object
+        description: "Type-specific configuration (see step_types)."
+      inputs:
+        type: list
+        items: "InputBinding"
+        description: "Logical inputs from previous steps or entities."
+      outputs:
+        type: list
+        items: "OutputBinding"
+        description: "Logical outputs to be made available to other steps."
+      on_error:
+        type: object
+        nullable: true
+        description: "Error handling strategy for the step (e.g., stop, continue, branch)."
+      metadata:
+        type: object
+        description: "Visual or organizational hints (position, grouping)."
+
+  edge_entity:
+    fields:
+      from:
+        type: string
+        description: "Source step id."
+      to:
+        type: string
+        description: "Target step id."
+      type:
+        type: enum
+        values: [data, control]
+        description: "Distinguish data vs pure control dependencies."
+      condition:
+        type: string
+        nullable: true
+        description: "Optional condition for control edges (Phase 4+)."
+
+  input_binding_entity:
+    fields:
+      name:
+        type: string
+        description: "Logical name used inside the step config."
+      source:
+        type: string
+        description: >
+          Expression referencing a prior step's output, a workflow input, or
+          a data entity. Example:
+            - step:step_id.output:var_name
+            - entity:data_entity_id
+            - workflow_input:input_name
+
+  output_binding_entity:
+    fields:
+      name:
+        type: string
+        description: "Logical name for the output."
+      target:
+        type: string
+        description: >
+          Expression referencing a workflow variable, a data entity, or a
+          transient variable used by later steps. Example:
+            - var:var_name
+            - entity:data_entity_id
+            - file:path/relative/to/project
+
+###############################################################################
+# 2. STEP TYPES AND CONFIGURATION
+###############################################################################
+
+step_types:
+  prompt:
+    description: |
+      A step that sends a prompt to an LLM model. It may reference a prompt
+      template, variables from previous steps, and data entities. The result
+      can be stored in variables, data entities, or files.
+
+    config_fields:
+      model_id:
+        type: string
+        description: "Model identifier from /spec/config.yaml."
+      system_prelude:
+        type: string
+        nullable: true
+        description: "Optional system message specific to this step."
+      template_id:
+        type: string
+        nullable: true
+        description: "Reference to a global or project prompt template."
+      inline_prompt:
+        type: string
+        nullable: true
+        description: "Raw prompt text (if no template is used)."
+      variables:
+        type: object
+        description: >
+          Key: variable name used within template.
+          Value: expression referencing workflow/state (e.g., previous outputs).
+      output_format_hint:
+        type: enum
+        values: [text, markdown, json]
+        default: text
+      store_output:
+        type: list
+        items: "OutputBinding"
+        description: "Bindings specifying where the LLM result is stored."
+
+    llm_behavior_notes: |
+      - Steps may be configured to prefer JSON output (output_format_hint=json).
+      - Short system prompts can instruct the model to strictly adhere to
+        JSON format; however, enforcement and recovery must be done outside
+        the model (best-effort parsing, retries).
+
+  tool:
+    description: |
+      A step that invokes a tool, which may be:
+        - a Python FastAPI endpoint (e.g., execute code, stream to file),
+        - a Node builtin (e.g., git operations),
+        - or a custom extension registered in the global tools registry.
+
+    config_fields:
+      tool_id:
+        type: string
+        description: "Identifier mapping to a tool definition."
+      args:
+        type: object
+        description: "Arguments for the tool; values may be expressions."
+      store_output:
+        type: list
+        items: "OutputBinding"
+
+    examples:
+      - name: "Execute Python Script"
+        config_example:
+          tool_id: "python_execute"
+          args:
+            language: "python"
+            code: "{{ inputs.script_code }}"
+          store_output:
+            - name: "stdout"
+              target: "var:script_stdout"
+
+  file_op:
+    description: |
+      A step that manipulates files or data entities: copy, move, transform,
+      serialize, deserialize, etc. It acts as a bridge between workflow
+      variables and persistent project data.
+
+    config_fields:
+      operation:
+        type: enum
+        values: [copy, move, delete, transform, serialize, deserialize]
+      source:
+        type: string
+        description: "Path or entity reference (may be expression-based)."
+      destination:
+        type: string
+        nullable: true
+        description: "Path or entity reference; depending on operation."
+      transform:
+        type: string
+        nullable: true
+        description: "Optional named transform (e.g., format conversion)."
+      options:
+        type: object
+        description: "Additional operation-specific options."
+      store_output:
+        type: list
+        items: "OutputBinding"
+
+  sub_workflow:
+    description: |
+      A step that invokes another workflow as a callable unit. This supports
+      reuse of common patterns or complex sequences.
+
+    config_fields:
+      workflow_ref:
+        type: string
+        description: "Workflow id being invoked."
+      inputs:
+        type: object
+        description: "Mapping from current workflow context to sub-workflow inputs."
+      propagate_outputs:
+        type: boolean
+        default: true
+        description: "Whether to merge sub-workflow outputs back into parent."
+
+###############################################################################
+# 3. EXECUTION SEMANTICS
+###############################################################################
+
+execution:
+  overview: |
+    Workflows are executed by interpreting the DAG in topological order
+    subject to edge constraints. Each step is attempted once its predecessors
+    on incoming edges are completed (and any edge conditions are satisfied).
+
+  engine_model:
+    phases:
+      - parse_and_validate
+      - topological_sort
+      - execute_steps
+      - collect_results
+
+    parse_and_validate:
+      description: |
+        Validate workflow structure and configs before execution.
+      checks:
+        - Workflow is acyclic.
+        - All step ids are unique.
+        - All edges reference existing steps.
+        - All referenced tools, templates, entities, and workflows exist.
+        - Step configs are well-formed (required fields present).
+
+      invariants:
+        - "Workflows must be DAGs."
+        - FOL: ∀w (Workflow(w) → ¬∃cycle (CycleInGraph(w.nodes, w.edges)))
+
+    topological_sort:
+      description: |
+        Perform a topological sort of steps based on edges. For equal-rank
+        nodes, any deterministic ordering is acceptable.
+
+    execute_steps:
+      description: |
+        Traverse steps in topological order; execute each step when all
+        incoming dependencies are satisfied.
+
+      step_lifecycle:
+        - pending
+        - running
+        - success
+        - failed
+        - skipped (if downstream and on_error says skip)
+
+      error_handling:
+        default: "stop_on_error"
+        options:
+          - stop_on_error
+          - continue_on_error
+          - branch_on_error  # Phase 4+ (conditional edges)
+
+      state_updates:
+        - On success:
+          - Record step outputs (variables, entity updates, files).
+        - On failure:
+          - Record error.
+          - Apply on_error strategy (stop/continue/branch).
+
+    collect_results:
+      description: |
+        At the end of execution, the engine returns:
+          - Per-step status and outputs.
+          - Aggregated workflow outputs (if defined).
+          - Logs for causal linking (e.g., which steps touched which files).
+
+  causal_integration:
+    description: |
+      Each step that invokes LLMs or tools must be logged in a way that can
+      be integrated into the broader causal flow of the system.
+
+    requirements:
+      - For prompt steps:
+        - Create an LLMRequestLogEntry with:
+          - step id in metadata.
+          - messages_included (if mapped to a chat context).
+          - touched_files/entities if applicable.
+      - For tool steps:
+        - Log touched_files and touched_entities in LLMRequestLogEntry or an
+          equivalent tool log structure.
+
+###############################################################################
+# 4. SCHEDULING (PHASE 4+)
+###############################################################################
+
+scheduling:
+  description: |
+    Workflows may be scheduled to run automatically at specified times or
+    intervals. Scheduling is introduced in Phase 4+ and should be designed
+    to be compatible with both local and server deployments.
+
+  schedule_entity:
+    fields:
+      enabled:
+        type: boolean
+        default: false
+      type:
+        type: enum
+        values: [cron, interval, once]
+      cron:
+        type: string
+        nullable: true
+        description: "Standard cron expression if type=cron."
+      interval_seconds:
+        type: integer
+        nullable: true
+        description: "Interval in seconds if type=interval."
+      run_at:
+        type: datetime
+        nullable: true
+        description: "Specific run timestamp if type=once."
+      timezone:
+        type: string
+        default: "UTC"
+      notification:
+        type: object
+        nullable: true
+        description: "Notification configuration (e.g., email)."
+
+  engine_requirements:
+    - Maintain a registry of workflows with schedules.
+    - Trigger workflow executions accordingly.
+    - Log scheduled executions distinct from user-triggered runs.
+
+###############################################################################
+# 5. STORAGE AND FILE LAYOUT
+###############################################################################
+
+storage:
+  description: |
+    Workflows are stored as files under the workspace root. There are global
+    workflows and per-project workflows.
+
+  layout:
+    global:
+      path: "global/workflows/"
+      pattern: "<workflow_id>.yaml"
+    project:
+      path: "projects/<project_id>/data/workflows/"
+      pattern: "<workflow_id>.yaml"
+
+  file_structure:
+    example_workflow_file:
+      description: "A minimal example of a workflow file."
+      example: |
+        id: build_and_test_project
+        name: "Build and Test Project"
+        description: "Run build and tests for the current project."
+        scope: project
+        project_id: <uuid>
+        version: "1.0.0"
+        nodes:
+          - id: step1
+            name: "Install Dependencies"
+            type: tool
+            config:
+              tool_id: "python_execute"
+              args:
+                language: "bash"
+                code: "pip install -r requirements.txt"
+              store_output:
+                - name: stdout
+                  target: "var:pip_output"
+          - id: step2
+            name: "Run Tests"
+            type: tool
+            config:
+              tool_id: "python_execute"
+              args:
+                language: "bash"
+                code: "pytest"
+              store_output:
+                - name: stdout
+                  target: "var:test_output"
+        edges:
+          - from: step1
+            to: step2
+            type: control
+
+###############################################################################
+# 6. UI AND INTERACTION NOTES
+###############################################################################
+
+ui_integration:
+  description: |
+    The UI, as specified in /spec/ui.yaml, must support both a text-based
+    view and a visual DAG builder (Phase 4+).
+
+  phase_3_ui:
+    features:
+      - List workflows per project/global.
+      - Show basic structured view of nodes and edges (textual).
+      - Allow manual editing of workflow YAML files from the UI, with a
+        "Validate" action invoking workflow parse_and_validate.
+
+  phase_4_ui:
+    features:
+      - Visual DAG builder:
+        - Drag-and-drop creation and reordering of steps.
+        - Connect steps with edges.
+        - Edit step configs in side panels.
+      - Synchronization with YAML:
+        - Any change in the visual builder should update the YAML file.
+        - Any change to YAML should refresh the graph representation.
+
+  llm_guidance_for_ui_generation: |
+    - When generating UI code for workflow editors:
+      - Use a declarative representation derived from this workflows.yaml.
+      - Ensure editor prevents creation of cycles (e.g., disallow edges that
+        would create cycles).
+      - Provide clear feedback on validation errors (missing tool_id, invalid
+        references, etc.).
+
+###############################################################################
+# 7. LOGICAL INVARIANTS (FIRST-ORDER LOGIC)
+###############################################################################
+
+invariants:
+  description: |
+    These FOL annotations formalize critical properties that must hold for
+    all valid workflows.
+
+  list:
+    - name: WorkflowIsAcyclic
+      formula: |
+        ∀w (Workflow(w) → ¬∃cycle (CycleInGraph(w.nodes, w.edges)))
+      comment: "No workflow may contain a cycle in its step dependency graph."
+
+    - name: AllEdgesReferenceExistingSteps
+      formula: |
+        ∀w,e (Workflow(w) ∧ Edge(e) ∧ e ∈ w.edges →
+          ∃s1,s2 (Step(s1) ∧ Step(s2) ∧ s1 ∈ w.nodes ∧ s2 ∈ w.nodes ∧
+                  e.from = s1.id ∧ e.to = s2.id))
+      comment: "Every edge in a workflow must reference existing steps."
+
+    - name: StepIdsUniqueWithinWorkflow
+      formula: |
+        ∀w,s1,s2 (Workflow(w) ∧ Step(s1) ∧ Step(s2) ∧
+                  s1 ∈ w.nodes ∧ s2 ∈ w.nodes ∧ s1.id = s2.id → s1 = s2)
+      comment: "Each step id within a workflow must be unique."
+
+    - name: NoDanglingSubWorkflowRefs
+      formula: |
+        ∀w,s (Workflow(w) ∧ Step(s) ∧ s ∈ w.nodes ∧ s.type = sub_workflow →
+          ∃w' (Workflow(w') ∧ w'.id = s.config.workflow_ref))
+      comment: "Every sub_workflow step must reference an existing workflow."
+
+###############################################################################
+# 8. LLM-SPECIFIC GUIDANCE
+###############################################################################
+
+llm_guidance:
+  description: |
+    Guidance for LLM-based agents that generate or modify workflows based
+    on this specification.
+
+  rules:
+    - "When generating workflows, always ensure the DAG remains acyclic."
+    - "Use only step types defined in this spec (prompt, tool, file_op, sub_workflow)."
+    - "Validate references to tools, templates, and data entities against the
+       relevant specs (/spec/commands.yaml, /spec/domain.yaml, /spec/config.yaml)."
+    - "Prefer expressing conditional logic as future extension via conditions
+       on edges, but do not rely on them until Phase 4+."
+
+  patterns:
+    - For simple linear workflows, generate steps with edges in sequence,
+      avoiding unnecessary complexity.
+    - When referencing prompt templates, store template_id and variable mapping
+      explicitly in the step config.
+    - When referencing tools, use tool_id corresponding to registered tools
+      (potentially from a tools registry spec).
+
+  testing:
+    - Generate tests that:
+      - Construct example workflows and verify all invariants.
+      - Perform topological sort and ensure no back-edges.
+      - Execute mock workflows to ensure step execution ordering respects edges.

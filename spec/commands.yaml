@@ -1,0 +1,122 @@
+version: 0.1.0
+
+schema:
+  command:
+    type: object
+    properties:
+      name: { type: string }
+      aliases:
+        type: list
+        items: { type: string }
+      description: { type: string }
+      syntax: { type: string }
+      parser:
+        type: enum
+        values: [none, free_text, json_payload, key_value]
+      scope:
+        type: enum
+        values: [project, global]
+      handler_type:
+        type: enum
+        values: [node_builtin, python_tool, workflow, meta]
+      handler_ref:
+        type: string
+      preview_supported: { type: boolean, default: false }
+      permissions:
+        type: list
+        items: { type: string }
+
+commands:
+
+  - name: aside
+    aliases: []
+    description: "Mark the current prompt as an aside (excluded from future context)."
+    syntax: "/aside"
+    parser: none
+    scope: project
+    handler_type: meta
+    handler_ref: "set_current_prompt_flag_is_aside"
+
+  - name: aside-pure
+    aliases: []
+    description: "Send prompt with no prior history (system + prompt only)."
+    syntax: "/aside-pure"
+    parser: none
+    scope: project
+    handler_type: meta
+    handler_ref: "set_current_prompt_flags_pure_aside"
+
+  - name: pin
+    aliases: []
+    description: "Pin the current message in context."
+    syntax: "/pin"
+    parser: none
+    scope: project
+    handler_type: meta
+    handler_ref: "set_current_message_flag_is_pinned"
+
+  - name: save_entity
+    aliases: []
+    description: "Create or update a data entity from JSON payload."
+    syntax: "/save_entity {json}"
+    parser: json_payload
+    scope: project
+    handler_type: node_builtin
+    handler_ref: "handle_save_entity"
+    preview_supported: true
+
+  - name: execute
+    aliases: [run]
+    description: "Execute code or shell commands in the project workspace."
+    syntax: "/execute {json}"
+    parser: json_payload
+    scope: project
+    handler_type: python_tool
+    handler_ref: "tool_execute_command"
+    preview_supported: true
+
+  - name: stream-to-file
+    aliases: []
+    description: "Stream the next LLM response directly to a file."
+    syntax: "/stream-to-file {json}"
+    parser: json_payload
+    scope: project
+    handler_type: node_builtin
+    handler_ref: "set_stream_output_destination"
+    preview_supported: true
+
+  - name: chat-fork
+    aliases: []
+    description: "Fork current chat, optionally from a specific message."
+    syntax: "/chat-fork [--from <message_id>] [--prune|--no-prune]"
+    parser: free_text
+    scope: project
+    handler_type: node_builtin
+    handler_ref: "handle_chat_fork"
+
+  - name: commit
+    aliases: []
+    description: "Create a Git commit with a custom message."
+    syntax: "/commit \"message text\""
+    parser: free_text
+    scope: project
+    handler_type: node_builtin
+    handler_ref: "handle_git_commit"
+
+  - name: push
+    aliases: []
+    description: "Push current branch to its configured remote."
+    syntax: "/push"
+    parser: none
+    scope: project
+    handler_type: node_builtin
+    handler_ref: "handle_git_push"
+
+  - name: requery
+    aliases: []
+    description: "Requery the last prompt/response pair."
+    syntax: "/requery"
+    parser: none
+    scope: project
+    handler_type: meta
+    handler_ref: "handle_requery_last_turn"
