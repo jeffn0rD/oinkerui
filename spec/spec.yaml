@@ -145,6 +145,161 @@ stack:
 
 phases:
 
+  - id: phase_0
+    name: "Preparation & Project Bootstrapping"
+    description: |
+      Establish the foundational project structure, development environment,
+      and tooling required for Phase 1 implementation. This phase focuses on
+      creating the skeleton of the application without implementing business
+      logic, ensuring all developers and automated agents have a consistent
+      starting point.
+
+    features:
+      - Project folder structure creation
+      - Node.js project initialization with package.json
+      - Python project initialization with requirements.txt
+      - Development environment configuration (.env, config loading)
+      - Basic build and development scripts
+      - Testing infrastructure setup (Jest, pytest)
+      - Documentation templates (README, CONTRIBUTING)
+      - Git repository initialization with .gitignore
+      - Workspace directory structure templates
+      - Specification verification tooling
+
+    important_notes: |
+      - This phase produces no runnable application features; it creates the
+        scaffolding for development.
+      - All paths and imports should be established to match the architecture
+        defined in the main specification.
+      - Configuration files should reference the schemas in /spec/config.yaml.
+      - The folder structure must accommodate both frontend (Svelte) and
+        backend (Node/Python) components as separate but integrated modules.
+
+    references:
+      - "./domain.yaml"
+      - "./config.yaml"
+      - "./apis.yaml"
+
+    todos:
+      - |
+        Create root project structure:
+        - frontend/ - Svelte application source
+        - backend/node/ - Fastify server source
+        - backend/python/ - FastAPI tools server source
+        - shared/ - Shared types and utilities
+        - tests/ - Test suites (unit, integration)
+        - docs/ - Additional documentation
+        - scripts/ - Build and utility scripts
+      
+      - |
+        Initialize Node.js project:
+        - Create package.json with dependencies:
+          - fastify (web framework)
+          - @fastify/cors, @fastify/static
+          - openrouter SDK or axios for API calls
+          - simple-git (Git operations)
+          - uuid, date-fns (utilities)
+        - Add dev dependencies:
+          - typescript, @types/node
+          - jest, @types/jest (testing)
+          - eslint, prettier (code quality)
+          - nodemon (development)
+        - Define npm scripts: dev, build, test, lint
+      
+      - |
+        Initialize Python project:
+        - Create requirements.txt with dependencies:
+          - fastapi (web framework)
+          - uvicorn (ASGI server)
+          - jinja2 (template rendering)
+          - pydantic (data validation)
+          - pytest (testing)
+        - Create requirements-dev.txt:
+          - black, flake8, mypy (code quality)
+          - pytest-cov (test coverage)
+      
+      - |
+        Initialize Svelte frontend:
+        - Create package.json for frontend with dependencies:
+          - svelte, vite (build tooling)
+          - tailwindcss, postcss, autoprefixer
+          - marked (markdown rendering)
+          - highlight.js (syntax highlighting)
+        - Configure Vite for Svelte
+        - Configure Tailwind with dark theme
+      
+      - |
+        Create development environment configuration:
+        - .env.example with required variables:
+          - WORKSPACE_ROOT
+          - OPENROUTER_API_KEY
+          - NODE_PORT
+          - PYTHON_TOOLS_PORT
+        - Config loading utilities in both Node and Python
+      
+      - |
+        Set up workspace directory structure:
+        - Create initialization script that sets up:
+          - workspace_root/projects/
+          - workspace_root/global/
+          - workspace_root/venvs/
+          - workspace_root/temp/
+        - Create project template structure
+      
+      - |
+        Create build and development scripts:
+        - scripts/dev.sh - Start all services in development mode
+        - scripts/build.sh - Build production artifacts
+        - scripts/test.sh - Run all tests
+        - scripts/init-workspace.sh - Initialize workspace directory
+      
+      - |
+        Set up testing infrastructure:
+        - Configure Jest for Node backend tests
+        - Configure pytest for Python backend tests
+        - Create test directory structure matching source
+        - Add example test files demonstrating patterns
+      
+      - |
+        Create documentation:
+        - README.md with:
+          - Project overview
+          - Prerequisites
+          - Installation instructions
+          - Development workflow
+          - Project structure explanation
+        - CONTRIBUTING.md with:
+          - Code style guidelines
+          - Testing requirements
+          - Pull request process
+        - docs/ARCHITECTURE.md referencing spec files
+      
+      - |
+        Initialize Git repository:
+        - Create .gitignore for:
+          - node_modules/, __pycache__/, .venv/
+          - .env (but not .env.example)
+          - build artifacts, logs
+          - workspace_root/ (user data)
+        - Initial commit with project skeleton
+      
+      - |
+        Create specification verification script:
+        - Python script: verify/check_spec_refs.py
+        - Parse all YAML files in /spec/
+        - Verify cross-references between specs
+        - Check that referenced files exist
+        - Validate YAML structure
+        - Report inconsistencies
+
+    tags:
+      - setup
+      - bootstrapping
+      - infrastructure
+      - tooling
+
+
+
   - id: phase_1
     name: "MVP – Local Single User, Projects & Basic Chat"
     description: |

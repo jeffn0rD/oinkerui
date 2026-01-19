@@ -1,0 +1,257 @@
+version: 0.1.0
+title: "Local LLM Project Workbench - User Manual"
+description: |
+  This manual provides user-facing documentation for working with the Local LLM
+  Project Workbench. It covers basic usage, features, workflows, and best
+  practices for end users.
+
+last_updated: 2024-01-19
+
+sections:
+
+  - id: introduction
+    title: "Introduction"
+    content: |
+      Welcome to the Local LLM Project Workbench!
+      
+      This application helps you work with Large Language Models (LLMs) in a
+      structured, project-oriented way. You can:
+      - Organize conversations into projects
+      - Manage context and conversation history
+      - Execute code and tools
+      - Track changes with Git
+      - Build automated workflows
+
+  - id: getting_started
+    title: "Getting Started"
+    subsections:
+      
+      - id: first_launch
+        title: "First Launch"
+        content: |
+          On first launch, the application will:
+          1. Create a workspace directory (default: ~/llm_workspace)
+          2. Initialize global configuration
+          3. Present the main interface
+      
+      - id: creating_project
+        title: "Creating Your First Project"
+        content: |
+          To create a project:
+          1. Click "New Project" in the left sidebar
+          2. Enter a project name
+          3. Select a default model
+          4. Click "Create"
+          
+          Each project is automatically initialized as a Git repository.
+      
+      - id: starting_chat
+        title: "Starting a Chat"
+        content: |
+          To start a conversation:
+          1. Select a project from the sidebar
+          2. Click "New Chat"
+          3. Optionally customize the system prelude
+          4. Start typing your prompts
+
+  - id: features_by_phase
+    title: "Features by Phase"
+    subsections:
+      
+      - id: phase_1_features
+        title: "Phase 1 - MVP Features"
+        content: |
+          Available features:
+          - Project creation and management
+          - Basic chat with LLM models
+          - OpenRouter integration
+          - File-based data entities
+          - Git-backed projects
+          - Dark theme UI
+          - Markdown rendering
+          - Code syntax highlighting
+      
+      - id: phase_2_features
+        title: "Phase 2 - Advanced Context Management"
+        content: |
+          Additional features:
+          - Asides (excluded from future context)
+          - Pure asides (no history in context)
+          - Pinned messages
+          - Chat forking
+          - Requery functionality
+          - Live context size display
+          - Jinja2 prompt templates
+          - Slash commands
+      
+      - id: phase_3_features
+        title: "Phase 3 - Tools and Terminal"
+        content: |
+          Additional features:
+          - Code execution
+          - Terminal mode
+          - Stream to file
+          - Git push
+          - Inline diffs
+          - Causal tracking
+      
+      - id: phase_4_features
+        title: "Phase 4 - Multi-user and Workflows"
+        content: |
+          Additional features:
+          - Multi-user support
+          - Supabase authentication
+          - Visual workflow builder
+          - Causal flow visualization
+          - Scheduled workflows
+          - Email notifications
+
+  - id: working_with_context
+    title: "Working with Context"
+    content: |
+      Context management is a key feature of this workbench.
+      
+      Understanding context:
+      - Context is what the LLM "sees" when generating a response
+      - By default, all previous messages are included
+      - You can control what's included using message flags
+      
+      Context controls:
+      - Include/exclude messages from context
+      - Pin important messages (always included)
+      - Use asides for one-off questions
+      - Use pure asides to ignore all history
+      
+      See Phase 2 features for detailed context management capabilities.
+
+  - id: slash_commands
+    title: "Slash Commands"
+    content: |
+      Slash commands provide quick access to special features.
+      
+      Available commands (Phase 2+):
+      - /aside - Mark prompt as aside
+      - /aside-pure - Send prompt with no history
+      - /pin - Pin current message
+      - /save_entity - Save data entity
+      - /execute - Run code/shell commands
+      - /stream-to-file - Stream output to file
+      - /chat-fork - Fork current chat
+      - /commit - Create Git commit
+      - /push - Push to remote
+      - /requery - Requery last turn
+      
+      See /spec/commands.yaml for complete command reference.
+
+  - id: data_entities
+    title: "Working with Data Entities"
+    content: |
+      Data entities are project-scoped data objects.
+      
+      Entity types:
+      - object - JSON/YAML data
+      - file - Any file type
+      - directory - Folder structure
+      - db_table - Database table (future)
+      - env_var_set - Environment variables (future)
+      
+      Entities can be:
+      - Created manually or by LLM
+      - Referenced in prompts and workflows
+      - Tracked in Git
+      - Linked to conversations
+
+  - id: workflows
+    title: "Workflows"
+    content: |
+      Workflows (Phase 3+) allow you to automate sequences of operations.
+      
+      Workflow capabilities:
+      - Define multi-step processes
+      - Chain LLM prompts with tools
+      - Process data entities
+      - Schedule automated runs (Phase 4+)
+      
+      See /spec/workflows.yaml for workflow specification.
+
+  - id: git_integration
+    title: "Git Integration"
+    content: |
+      Every project is a Git repository.
+      
+      Git features:
+      - Automatic initialization
+      - Auto-commit (configurable)
+      - Manual commits via /commit
+      - Push to remote via /push
+      - View diffs (Phase 3+)
+      - Track causal history (Phase 3+)
+
+  - id: best_practices
+    title: "Best Practices"
+    content: |
+      Tips for effective use:
+      
+      1. Project organization:
+         - Create separate projects for different domains
+         - Use descriptive project names
+         - Keep related chats in the same project
+      
+      2. Context management:
+         - Pin important reference information
+         - Use asides for tangential questions
+         - Fork chats when exploring alternatives
+      
+      3. Data entities:
+         - Store reusable data as entities
+         - Use descriptive names and tags
+         - Keep entities organized
+      
+      4. Git workflow:
+         - Commit meaningful milestones
+         - Use descriptive commit messages
+         - Push regularly if using remote
+
+  - id: troubleshooting
+    title: "Troubleshooting"
+    content: |
+      Common issues and solutions:
+      
+      Issue: Context too large
+      Solution: Use asides, exclude old messages, or fork chat
+      
+      Issue: LLM not responding as expected
+      Solution: Check system prelude, try different model, adjust context
+      
+      Issue: Command execution fails
+      Solution: Check paths are within project root, verify permissions
+      
+      For technical issues, see the System Manual.
+
+  - id: keyboard_shortcuts
+    title: "Keyboard Shortcuts"
+    content: |
+      Keyboard shortcuts to be documented as UI is implemented.
+
+  - id: faq
+    title: "Frequently Asked Questions"
+    content: |
+      Q: Where is my data stored?
+      A: All data is stored in the workspace directory (default: ~/llm_workspace)
+      
+      Q: Can I use my own LLM models?
+      A: Phase 1-3 use OpenRouter. Local model support may be added later.
+      
+      Q: Is my data private?
+      A: Phase 1-3 is fully local. Phase 4+ adds optional cloud features.
+      
+      Q: Can I export my projects?
+      A: Yes, projects are Git repositories and can be cloned/exported.
+
+references:
+  - title: "Main Specification"
+    path: "../spec/spec.yaml"
+  - title: "Commands Reference"
+    path: "../spec/commands.yaml"
+  - title: "System Manual"
+    path: "./system_manual.yaml"

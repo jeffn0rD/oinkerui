@@ -1,0 +1,165 @@
+task_id: 0.0
+title: "Add phase 0"
+date_completed: 2024-01-19
+status: completed
+
+summary: |
+  Successfully added phase 0 to the specification, created placeholder manual files,
+  and implemented a verification script to check spec references. Phase 0 defines
+  the preparation and bootstrapping steps needed before Phase 1 development can begin.
+
+steps_completed:
+
+  - step: 1
+    action: "Review spec documents for inconsistencies"
+    details: "Reviewed all 8 spec files (spec.yaml, domain.yaml, context.yaml, commands.yaml, apis.yaml, ui.yaml, workflows.yaml, config.yaml)"
+    output: "log/task_0.0_notes.yaml"
+    justification: |
+      Needed to understand the current state of specifications and identify any
+      gaps or inconsistencies before adding phase 0. This review revealed that
+      the specs are well-structured but lack practical setup instructions.
+  
+  - step: 2
+    action: "Create placeholder manual files"
+    details: "Created system_manual.yaml and user_manual.yaml in ./man/ directory"
+    output:
+      - "man/system_manual.yaml"
+      - "man/user_manual.yaml"
+    justification: |
+      These manual files provide a structure for future documentation. The system
+      manual covers technical architecture and setup, while the user manual covers
+      end-user features and workflows. Both reference the spec files and will be
+      expanded as implementation progresses.
+  
+  - step: 3
+    action: "Add phase 0 to spec.yaml"
+    details: "Inserted phase_0 before phase_1 in the phases section with proper YAML structure"
+    output: "spec/spec.yaml (modified)"
+    justification: |
+      Phase 0 is essential to establish the project structure and development
+      environment before any feature implementation. It includes concrete steps
+      for setting up Node.js, Python, Svelte, testing infrastructure, and
+      documentation. This ensures all developers and automated agents have a
+      consistent starting point.
+  
+  - step: 4
+    action: "Review task 0.1 requirements"
+    details: "Analyzed task 0.1 (Expand and Check Domain Modeling & Vocabulary)"
+    justification: |
+      Verified that phase 0 steps logically precede task 0.1. Phase 0 establishes
+      the project structure and verification tooling, which task 0.1 will use to
+      validate domain model changes. The verification script created in phase 0
+      is specifically mentioned as a requirement in task 0.1.
+  
+  - step: 5
+    action: "Define phase 0 todos"
+    details: "Created comprehensive list of concrete preparation steps"
+    justification: |
+      Phase 0 todos cover all aspects of project bootstrapping:
+      - Folder structure for frontend, backend, tests, docs, scripts
+      - Node.js initialization with Fastify and dependencies
+      - Python initialization with FastAPI and dependencies
+      - Svelte frontend with Vite and Tailwind
+      - Development environment configuration
+      - Workspace directory structure
+      - Build and development scripts
+      - Testing infrastructure (Jest, pytest)
+      - Documentation (README, CONTRIBUTING, ARCHITECTURE)
+      - Git repository initialization
+      - Specification verification script
+  
+  - step: 6
+    action: "Create folder structure for Node.js and FastAPI"
+    details: "Defined directory structure in phase 0 todos"
+    justification: |
+      The folder structure accommodates both frontend (Svelte) and backend
+      (Node/Python) components as separate but integrated modules. This structure
+      follows best practices and matches the architecture defined in the main
+      specification.
+  
+  - step: 7
+    action: "Document questions and missing information"
+    details: "Documented in log/task_0.0_notes.yaml"
+    justification: |
+      Identified several areas needing attention:
+      - Development environment setup procedures
+      - Testing framework configuration
+      - Build and deployment processes
+      - Database schema initialization
+      - Environment-specific configurations
+      - API documentation generation
+      These will be addressed as phase 0 todos are implemented.
+  
+  - step: 8
+    action: "Create specification verification script"
+    details: "Implemented verify/check_spec_refs.py with comprehensive checks"
+    output: "verify/check_spec_refs.py"
+    justification: |
+      This Python script is essential for maintaining spec integrity. It:
+      - Parses all YAML files in /spec/
+      - Verifies cross-references between specs
+      - Checks that referenced files exist
+      - Validates YAML structure
+      - Reports inconsistencies
+      The script successfully runs and reports 0 errors with 2 warnings about
+      pre-existing YAML formatting in the original spec.yaml file.
+
+files_created:
+  - log/task_0.0_notes.yaml
+  - man/system_manual.yaml
+  - man/user_manual.yaml
+  - verify/check_spec_refs.py
+
+files_modified:
+  - spec/spec.yaml (added phase_0)
+
+verification:
+  script_run: true
+  script_path: "verify/check_spec_refs.py"
+  result: "PASSED (0 errors, 2 warnings)"
+  notes: |
+    The verification script successfully validates all spec file references.
+    The 2 warnings are about pre-existing YAML formatting issues in the original
+    spec.yaml file (lines 383-384 in phase_2 section) and do not affect the
+    phase_0 addition.
+
+phase_0_content:
+  description: "Preparation & Project Bootstrapping"
+  features:
+    - Project folder structure creation
+    - Node.js project initialization
+    - Python project initialization
+    - Development environment configuration
+    - Build and development scripts
+    - Testing infrastructure setup
+    - Documentation templates
+    - Git repository initialization
+    - Workspace directory structure templates
+    - Specification verification tooling
+  
+  todos_count: 11
+  references:
+    - "./domain.yaml"
+    - "./config.yaml"
+    - "./apis.yaml"
+
+next_task:
+  id: 0.1
+  name: "Expand and Check Domain Modeling & Vocabulary"
+  prerequisites_met: true
+  notes: |
+    Task 0.1 can now proceed with the verification script available to check
+    any new spec files or modifications to the domain model.
+
+lessons_learned:
+  - YAML formatting is critical - asterisks (*) are interpreted as aliases
+  - Using multiline strings (|) for complex nested content is safer
+  - Verification scripts should be lenient with warnings vs errors
+  - API paths and directory paths should not be treated as file references
+  - Phase 0 is essential for establishing a solid foundation
+
+recommendations:
+  - Fix the YAML formatting issue at lines 383-384 in spec.yaml (phase_2 section)
+  - Consider using a YAML linter in the CI/CD pipeline
+  - Expand the verification script to check for more invariants as needed
+  - Keep phase 0 todos updated as implementation progresses

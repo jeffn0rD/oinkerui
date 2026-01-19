@@ -1,0 +1,142 @@
+version: 0.1.0
+title: "Local LLM Project Workbench - System Manual"
+description: |
+  This manual provides technical documentation for developers and system
+  administrators working with the Local LLM Project Workbench. It covers
+  architecture, setup, configuration, deployment, and maintenance.
+
+last_updated: 2024-01-19
+
+sections:
+
+  - id: overview
+    title: "System Overview"
+    content: |
+      The Local LLM Project Workbench is a local-first, project-oriented LLM
+      application with hierarchical projects, chats, data entities, tools,
+      workflows, and Git-backed versioning.
+      
+      Key components:
+      - Svelte frontend (SPA)
+      - Node.js/Fastify backend (primary API)
+      - Python/FastAPI backend (tools and execution)
+      - OpenRouter integration (LLM gateway)
+      - Git-based project versioning
+      - File-based data storage (Phase 1-3)
+      - Supabase integration (Phase 4+)
+
+  - id: architecture
+    title: "Architecture"
+    subsections:
+      
+      - id: stack
+        title: "Technology Stack"
+        content: |
+          Frontend:
+          - Svelte with Tailwind CSS
+          - Dark theme by default
+          - Markdown rendering with syntax highlighting
+          
+          Backend (Node):
+          - Fastify web framework
+          - REST/JSON APIs
+          - OpenRouter integration
+          - Git operations
+          - Context management
+          
+          Backend (Python):
+          - FastAPI framework
+          - Code/shell execution
+          - Jinja2 template rendering
+          - Tool implementations
+          
+          Storage:
+          - File-based (JSONL for logs, YAML for configs)
+          - Git repositories per project
+          - Workspace root directory structure
+      
+      - id: modules
+        title: "Module Organization"
+        content: |
+          To be documented as implementation progresses.
+          Expected structure:
+          - frontend/ - Svelte application
+          - backend/node/ - Fastify server
+          - backend/python/ - FastAPI tools server
+          - shared/ - Shared types and utilities
+          - tests/ - Test suites
+
+  - id: setup
+    title: "Development Setup"
+    content: |
+      Prerequisites:
+      - Node.js 18+ and npm
+      - Python 3.9+
+      - Git
+      
+      Setup steps will be documented in phase 0.
+
+  - id: configuration
+    title: "Configuration"
+    content: |
+      Configuration is managed through:
+      - config.yaml (global settings)
+      - .env files (environment-specific)
+      - Per-project settings
+      
+      See /spec/config.yaml for configuration schema.
+
+  - id: deployment
+    title: "Deployment"
+    content: |
+      Phase 1-3: Local deployment only
+      Phase 4+: Server deployment with Supabase
+      
+      Deployment procedures to be documented as implementation progresses.
+
+  - id: maintenance
+    title: "Maintenance"
+    content: |
+      Maintenance procedures to be documented.
+
+  - id: troubleshooting
+    title: "Troubleshooting"
+    content: |
+      Common issues and solutions to be documented.
+
+  - id: api_reference
+    title: "API Reference"
+    content: |
+      See /spec/apis.yaml for complete API specification.
+      
+      Node API endpoints:
+      - /api/projects - Project management
+      - /api/projects/{id}/chats - Chat management
+      - /api/projects/{id}/chats/{id}/messages - Message operations
+      
+      Python Tools API endpoints:
+      - /tools/projects/{id}/execute - Code execution
+
+  - id: security
+    title: "Security Considerations"
+    content: |
+      Local deployment (Phase 1-3):
+      - Full shell access within workspace root
+      - Path constraints enforced
+      - No authentication required
+      
+      Server deployment (Phase 4+):
+      - Supabase authentication
+      - Role-based access control
+      - Shell access disabled by default
+      - Strict path validation
+
+references:
+  - title: "Main Specification"
+    path: "../spec/spec.yaml"
+  - title: "Domain Model"
+    path: "../spec/domain.yaml"
+  - title: "API Specification"
+    path: "../spec/apis.yaml"
+  - title: "User Manual"
+    path: "./user_manual.yaml"
