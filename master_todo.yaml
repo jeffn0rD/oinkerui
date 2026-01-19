@@ -11,6 +11,7 @@ prompt_guidance: |
   * If the task is complete mark it complete by removing the task from the list in this document and appending it to ./log/tasks_completed.yaml
   * Tasks should be verified before considered complete, when possible use a small python script (save to ./verify/task_<id>_<descriptor>.py). The script should be well commented as to what it does and why.
   * Always make sure system documentation is up to date with work just done! manuals go in ./man/*.yaml
+  * NOTE: All spec files need to have consistent references to each other.  This needs to be verified whenever spec files are changed.
   **** You can create temporary files to assist with task completion but they should be removed when task is complete.  Use the files outlined here for project tracking. ****
   **** It is important to keep the repository clean of uneccessary files. ****
   **** Follow the task instructions closely and carefully.  Constrain work and scope to the task.  Return with questions if needed and confirm any extra work if it is outside the scope. ****
@@ -34,6 +35,7 @@ current:
         - "add todo steps for phase 0.  These need to be concrete steps that will prepare for phase 1 development."
         - "one step needed will be to create the folder structure in preparation for node.js and fastapi framework."
         - "any questions and details needed to complete the specification for further development."
+        - "Create a python script (./verify/check_spec_refs.py) to parse the specifications and check file references.  Create that now and test."
         
   - task: 
       - id: 0.1
@@ -48,12 +50,12 @@ current:
           - "Entities (User, Order, Invoice, Workflow, Task, etc.)."
           - "Relationships (owns, approves, contains, depends_on, etc.)."
         notes:
-          - "begin mapping to data_models/types if possible, can be verified and completed at later step."
+          - "develop mapping to data_models/types."
         steps:
           - "Review spec documents and determine details that need to be added for a complete domain model."
           - "If more information is needed update ./open_questions.yaml"
-          - "New spec files can be created if appropriate. NOTE: All spec files need to have consistent references to each other."
-          - "Create a python script (./verify/check_spec_refs.py) to parse the specifications and check file references.  Create that now and test."
+          - "New spec files can be created if appropriate.  Use verification script to verify new files are referenced correctly."
+          
 
 future: 
   - "add context re-ordering feature; prompt/responses in chat history can be re-ordered in the left side list, drag and drop and/or buttons move up/down.  Need a reset button as well."
