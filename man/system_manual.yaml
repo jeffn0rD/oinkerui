@@ -5,7 +5,7 @@ description: |
   administrators working with the Local LLM Project Workbench. It covers
   architecture, setup, configuration, deployment, and maintenance.
 
-last_updated: 2024-01-19
+last_updated: 2025-01-19
 
 sections:
 
@@ -24,6 +24,12 @@ sections:
       - Git-based project versioning
       - File-based data storage (Phase 1-3)
       - Supabase integration (Phase 4+)
+      
+      Development Tools:
+      - YAML validator (verify/validate_yaml.py) for project file validation
+      - Task cleanup automation (tools/task_cleanup.py) for task finalization
+      - Task executor (tools/task_executor.py) with prompt generation
+      - Document query tool (tools/doc_query.py) for context retrieval
 
   - id: architecture
     title: "Architecture"
@@ -131,6 +137,41 @@ sections:
       - Shell access disabled by default
       - Strict path validation
 
+- id: development_tools
+    title: "Development Tools"
+    content: |
+      The project includes several automation tools for development workflow:
+      
+      YAML Validator (verify/validate_yaml.py):
+      - Validates all YAML files in the project
+      - Provides LLM-friendly error messages with repair hints
+      - Checks syntax, schema, and required fields
+      - Usage: python3 verify/validate_yaml.py --all
+      
+      Task Cleanup Tool (tools/task_cleanup.py):
+      - Automates task finalization per prompt_guidance
+      - Verifies task moved to tasks_completed.yaml
+      - Checks log files exist (summary and notes)
+      - Runs validations and tests
+      - Generates repair prompts if issues found
+      - Commits and pushes repository
+      - Usage: python3 tools/task_cleanup.py --task-id X.Y
+      
+      Task Executor (tools/task_executor.py):
+      - Orchestrates task execution
+      - Generates comprehensive prompts with context
+      - Includes full prompt_guidance
+      - Integrates with task cleanup
+      - Usage: python3 tools/task_executor.py --next --generate-only
+      
+      Document Query Tool (tools/doc_query.py):
+      - Retrieves contextual information from specs/logs/todos
+      - Multiple query modes: text, key, file, related
+      - JSON output for LLM consumption
+      - Usage: python3 tools/doc_query.py --query "term" --mode text
+      
+      For detailed documentation, see docs/TOOLS.md
+
 references:
   - title: "Main Specification"
     path: "../spec/spec.yaml"
@@ -140,3 +181,5 @@ references:
     path: "../spec/apis.yaml"
   - title: "User Manual"
     path: "./user_manual.yaml"
+  - title: "Tools Documentation"
+    path: "../docs/TOOLS.md"
