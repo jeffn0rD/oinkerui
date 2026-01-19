@@ -124,9 +124,3 @@ notes:
       - step: 10
         action: "Verify all spec references"
         details: "Run verification script to ensure all cross-references are valid"
-
-  next_steps:
-    - "Create placeholder manual files (system_manual.yaml, user_manual.yaml)"
-    - "Add phase 0 to spec.yaml with concrete preparation steps"
-    - "Create verification script to check spec references"
-    - "Review task 0.1 to ensure phase 0 steps logically precede it"

@@ -6,6 +6,7 @@ prompt_guidance: |
   Always follow these guidelines and update project documentation:
   **** When possible and practical use deterministic methods (python code) to accomplish tasks.  ****
   * When processing tasks always creae a brief summary of steps and actions in log/task_<id>_summary.yaml .
+  * when processing a task review the last task notes (log/task_<id>_notes.yaml).  There may be information needed or remaining work that needs to be completed first.
   * In the task_<id>_summary.yaml file always provide 'justification:' for each step/action.  It is important to track the decisions made and reasoning behind them.
   * If there are errors, inconsistencies, or inadequate information to accomplish all goals of a task append questions to ./open_questions.yaml
   * If the task is complete mark it complete by removing the task from the list in this document and appending it to ./log/tasks_completed.yaml
@@ -20,6 +21,26 @@ prompt_guidance: |
 current:
   - task:
       - id: 0.1
+      name: "Phase 0 preparation"
+      goal: "Create tasks and tooling in preparation for phase 0 implementation."
+      files:
+        - "spec/spec.yaml"
+        - "spec/master_todo.yaml"
+        - "spec/*.yaml"
+        - "log/task_0_0_notes.yaml"
+      details:
+        focus:
+          - "Creation of tasks for phase 0, materials and tooling needed for LLM based generation."
+        notes:
+          - "Tools needed will provide means for searching specifications and other files so LLM's can be provided with scoped context for each step/task."
+        steps:         
+          - "Create python tool that can retrieve contextual excerpts from specifications, logs, todos.  It will take a simple query as input and output the relevant context as JSON structures with linking/references so the text and references can be reasoned over in a logical manner."
+          - "Create a test script for the doc query script -> ./verify; run and log test."
+          - "Build a set of LLM prompt files (markdown).  Place them in a new directory ./prompts/dev/prompt_<task_id>_<step_number>.md; These prompts will be used to complete phase 0, limit the scope of each prompt to a specific narrow task so the complexity is minimal, trivial tasks can be combined.  The prompts will need to be executed in order (<step_number>).  Instruct the LLM to use the query tool (provide commands to run in terminal) to build a context for each prompt with the relevant documentation."
+          - "Create a new task or tasks (starting at 0.2) with the steps needed to implement phase 0, this should include a step for each LLM prompt that will need to be executed with the path to the prompt."
+          
+  - task:
+      - id: 2.0
       name: "Expand and Check Domain Modeling & Vocabulary"
       goal: "Identify core domain concepts (nouns, verbs) and relationships in NL."
       files:
