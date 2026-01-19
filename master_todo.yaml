@@ -1,0 +1,64 @@
+title: oinkerui master todo list
+description: |
+  This is a master development todo list for human and machine interaction.
+  
+prompt_guidance: |
+  Always follow these guidelines and update project documentation:
+  **** When possible and practical use deterministic methods (python code) to accomplish tasks.  ****
+  * When processing tasks always creae a brief summary of steps and actions in log/task_<id>_summary.yaml .
+  * In the task_<id>_summary.yaml file always provide 'justification:' for each step/action.  It is important to track the decisions made and reasoning behind them.
+  * If there are errors, inconsistencies, or inadequate information to accomplish all goals of a task append questions to ./open_questions.yaml
+  * If the task is complete mark it complete by removing the task from the list in this document and appending it to ./log/tasks_completed.yaml
+  * Tasks should be verified before considered complete, when possible use a small python script (save to ./verify/task_<id>_<descriptor>.py). The script should be well commented as to what it does and why.
+  * Always make sure system documentation is up to date with work just done! manuals go in ./man/*.yaml
+  **** You can create temporary files to assist with task completion but they should be removed when task is complete.  Use the files outlined here for project tracking. ****
+  **** It is important to keep the repository clean of uneccessary files. ****
+  **** Follow the task instructions closely and carefully.  Constrain work and scope to the task.  Return with questions if needed and confirm any extra work if it is outside the scope. ****
+  **** ALWAYS COMMIT AND PUSH the repository after a task. ****
+  
+current:
+  - task:
+    - id: 0.0
+    name: "Add phase 0"
+    goal: "Add a phase 0 to the main specification document (./spec/spec.yaml); it needs to outline any steps to prepare for phase 1 development."
+    files:
+      - "spec/*.yaml"
+      - "man/system_manual.yaml"
+      - "man/user_manual.yaml"
+    details:
+      steps:
+        - "make a pass through the spec documents ./spec/*.yaml; note any inconsistencies or missing information -> ./log/task_0.0_notes.yaml"
+        - "create a placeholder yaml files (system, user) in ./man/ for future system documentation, create an appropriate basic structure."
+        - "add 'phase 0' phase to ./spec/spec.yaml before phase 1, keeping the current yaml structural pattern."
+        - "review goals for next task (id 0.1) steps created in this task need to logically precede work for the next task." 
+        - "add todo steps for phase 0.  These need to be concrete steps that will prepare for phase 1 development."
+        - "one step needed will be to create the folder structure in preparation for node.js and fastapi framework."
+        - "any questions and details needed to complete the specification for further development."
+        
+  - task: 
+      - id: 0.1
+      name: "Expand and Check Domain Modeling & Vocabulary"
+      goal: "Identify core domain concepts (nouns, verbs) and relationships in NL."
+      files:
+        - "spec/spec.yaml"
+        - "spec/domain.yaml"
+        - "spec/*.yaml"
+      details:
+        focus:
+          - "Entities (User, Order, Invoice, Workflow, Task, etc.)."
+          - "Relationships (owns, approves, contains, depends_on, etc.)."
+        notes:
+          - "begin mapping to data_models/types if possible, can be verified and completed at later step."
+        steps:
+          - "Review spec documents and determine details that need to be added for a complete domain model."
+          - "If more information is needed update ./open_questions.yaml"
+          - "New spec files can be created if appropriate. NOTE: All spec files need to have consistent references to each other."
+          - "Create a python script (./verify/check_spec_refs.py) to parse the specifications and check file references.  Create that now and test."
+
+future: 
+  - "add context re-ordering feature; prompt/responses in chat history can be re-ordered in the left side list, drag and drop and/or buttons move up/down.  Need a reset button as well."
+  - "(LLM) crawl the spec files and look for inconsistencies and areas that need elaboration, create document of questions to be addressed."
+  - "repository bootstrapping with node/fastapi"
+      
+open_questions: 
+  -
