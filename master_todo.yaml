@@ -19,25 +19,6 @@ prompt_guidance: |
   
 current:
   - task:
-    - id: 0.0
-    name: "Add phase 0"
-    goal: "Add a phase 0 to the main specification document (./spec/spec.yaml); it needs to outline any steps to prepare for phase 1 development."
-    files:
-      - "spec/*.yaml"
-      - "man/system_manual.yaml"
-      - "man/user_manual.yaml"
-    details:
-      steps:
-        - "make a pass through the spec documents ./spec/*.yaml; note any inconsistencies or missing information -> ./log/task_0.0_notes.yaml"
-        - "create a placeholder yaml files (system, user) in ./man/ for future system documentation, create an appropriate basic structure."
-        - "add 'phase 0' phase to ./spec/spec.yaml before phase 1, keeping the current yaml structural pattern."
-        - "review goals for next task (id 0.1) steps created in this task need to logically precede work for the next task." 
-        - "add todo steps for phase 0.  These need to be concrete steps that will prepare for phase 1 development."
-        - "one step needed will be to create the folder structure in preparation for node.js and fastapi framework."
-        - "any questions and details needed to complete the specification for further development."
-        - "Create a python script (./verify/check_spec_refs.py) to parse the specifications and check file references.  Create that now and test."
-        
-  - task: 
       - id: 0.1
       name: "Expand and Check Domain Modeling & Vocabulary"
       goal: "Identify core domain concepts (nouns, verbs) and relationships in NL."
