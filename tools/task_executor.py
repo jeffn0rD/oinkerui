@@ -206,6 +206,14 @@ class TaskExecutor:
             
             # Build task details
             task_details = []
+            
+            # Add query command to get full task details
+            task_details.append("**Get Full Task Details:**")
+            task_details.append("```bash")
+            task_details.append(f"python3 tools/doc_query.py --query &quot;{task_id}&quot; --mode task --pretty")
+            task_details.append("```")
+            task_details.append("")
+            
             if 'files' in self.task_data:
                 task_details.append("**Files:**")
                 for f in self.task_data['files']:
@@ -286,6 +294,21 @@ class TaskExecutor:
                 spec_files = [f for f in self.task_data['files'] if 'spec/' in f]
                 if spec_files:
                     related_specs = " ".join(spec_files)
+            
+            # Build better query commands for context gathering
+            context_queries = []
+            context_queries.append(f"# Get complete task information")
+            context_queries.append(f"python3 tools/doc_query.py --query &quot;{task_id}&quot; --mode task --pretty")
+            context_queries.append("")
+            
+            if 'files' in self.task_data:
+                for file_ref in self.task_data['files']:
+                    if file_ref.endswith('.yaml'):
+                        context_queries.append(f"# Get {file_ref} content")
+                        context_queries.append(f"python3 tools/doc_query.py --query &quot;{file_ref}&quot; --mode file --pretty")
+                        context_queries.append("")
+            
+            context_queries_str = "\n".join(context_queries)
             
             # Fill template
             prompt = template.format(

@@ -230,28 +230,42 @@ To execute this task:
 ## 4. Document Query Tool
 
 ### Purpose
-Retrieves contextual information from project specifications, logs, and todos.
+Retrieves contextual information from project specifications, logs, and todos with enhanced querying capabilities.
 
-### Usage
+### New Query Modes
+
+**Task Mode** (Recommended for task queries):
+```bash
+python3 tools/doc_query.py --query "0.2" --mode task --pretty
+```
+Returns complete task information including related files and prompts.
+
+**Path Mode** (Structured queries):
+```bash
+python3 tools/doc_query.py --query "current[*].task.id=0.2" --mode path --pretty
+python3 tools/doc_query.py --query "current[*].task.name~Node" --mode path --pretty
+```
+Use structured path notation for precise lookups.
+
+### Traditional Modes
 
 ```bash
-# Text search
-python3 tools/doc_query.py --query "phase 0" --mode text
+# Text search (now with enhanced numeric matching)
+python3 tools/doc_query.py --query "0.2" --mode text --pretty
 
 # Key search
-python3 tools/doc_query.py --query "title" --mode key
+python3 tools/doc_query.py --query "title" --mode key --pretty
 
 # File content
-python3 tools/doc_query.py --query "spec.yaml" --mode file
+python3 tools/doc_query.py --query "spec.yaml" --mode file --pretty
 
 # Related files
-python3 tools/doc_query.py --query "domain" --mode related
-
-# Pretty print
-python3 tools/doc_query.py --query "phase" --mode text --pretty
+python3 tools/doc_query.py --query "domain" --mode related --pretty
 ```
 
-See `tools/doc_query.py` for detailed documentation.
+### Documentation
+
+See [docs/DOC_QUERY_GUIDE.md](DOC_QUERY_GUIDE.md) for comprehensive guide with examples and best practices.
 
 ## Workflow: Complete Task Lifecycle
 

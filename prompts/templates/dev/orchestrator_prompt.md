@@ -54,14 +54,20 @@ Before marking a task complete:
 Use the doc_query tool to gather relevant context:
 
 ```bash
-# Get task-specific context
-python3 tools/doc_query.py --query "{task_id}" --mode text --pretty
+# Get complete task information (RECOMMENDED - use this first)
+python3 tools/doc_query.py --query "{task_id}" --mode task --pretty
 
 # Get related specifications
 python3 tools/doc_query.py --query "{related_specs}" --mode file --pretty
 
-# Find related files
+# Find related files by topic
 python3 tools/doc_query.py --query "{topic}" --mode related --pretty
+
+# Search for specific content
+python3 tools/doc_query.py --query "search term" --mode text --pretty
+
+# Use structured path queries for precise lookups
+python3 tools/doc_query.py --query "current[*].task.name~Node" --mode path --pretty
 ```
 
 ## Task Execution Steps
