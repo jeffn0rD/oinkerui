@@ -56,7 +56,7 @@ current:
     - spec/apis.yaml
     - spec/ui.yaml
     - spec/workflows.yaml
-    
+    - spec/spec.yaml
     details:
       focus:
       - "Domain modeling & vocabulary"
