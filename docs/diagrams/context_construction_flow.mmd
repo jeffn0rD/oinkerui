@@ -1,0 +1,72 @@
+%%{init: {'theme': 'dark', 'themeVariables': { 'primaryColor': '#1e3a5f'}}}%%
+
+flowchart TD
+    subgraph Input
+        A[Load all messages from chat]
+        B[Get current message]
+        C[Get max_context_tokens]
+    end
+
+    subgraph Filter["Filter Messages"]
+        D[Remove discarded messages]
+        E[Remove aside messages<br/>unless pinned]
+        F[Separate pinned messages]
+    end
+
+    subgraph Budget["Calculate Token Budget"]
+        G[Count system prelude tokens]
+        H[Count current message tokens]
+        I[Count pinned message tokens]
+        J[Calculate remaining budget]
+    end
+
+    subgraph Select["Select Messages"]
+        K[Sort remaining by date DESC]
+        L{Remaining budget > 0?}
+        M[Add next message]
+        N[Subtract tokens from budget]
+        O[Skip message]
+    end
+
+    subgraph Output
+        P[Sort selected chronologically]
+        Q[Format for LLM API]
+        R[Return context array]
+    end
+
+    A --> D
+    B --> H
+    C --> G
+
+    D --> E
+    E --> F
+    F --> G
+
+    G --> I
+    H --> I
+    I --> J
+
+    J --> K
+    K --> L
+
+    L -->|Yes| M
+    M --> N
+    N --> L
+
+    L -->|No| P
+    
+    P --> Q
+    Q --> R
+
+    style A fill:#2d3748
+    style B fill:#2d3748
+    style C fill:#2d3748
+    style R fill:#10b981
+
+    classDef filter fill:#553c9a
+    classDef budget fill:#2c5282
+    classDef select fill:#744210
+
+    class D,E,F filter
+    class G,H,I,J budget
+    class K,L,M,N,O select

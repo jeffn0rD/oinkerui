@@ -353,3 +353,61 @@ tasks:
       method: YAML validation
       result: success
       notes: All 50 YAML files valid. All functions have complete specifications.
+- task:
+    id: 0.2.5.4
+    name: API & Interaction Detail
+    goal: Expand apis.yaml and ui.yaml with complete endpoint specifications and interaction flows.
+    completed_date: '2026-01-20'
+    files_created:
+    - docs/diagrams/send_message_flow.mmd
+    - docs/diagrams/create_project_flow.mmd
+    - docs/diagrams/context_construction_flow.mmd
+    - log/task_0.2.5.4_summary.yaml
+    files_modified:
+    - spec/apis.yaml
+    - spec/ui.yaml
+    summary: 'Expanded API and UI specifications with complete detail:
+
+
+      spec/apis.yaml (~850 lines):
+
+      - Common definitions (error schema, pagination, headers)
+
+      - 25+ Node.js API endpoints with full request/response schemas
+
+      - 3 Python Tools API endpoints
+
+      - Error codes, rate limits, and function references
+
+
+      spec/ui.yaml (~1200 lines):
+
+      - Theme and design tokens
+
+      - Three-column layout structure
+
+      - Screen definitions (welcome, chat, project_settings)
+
+      - 6 component specifications with props, state, events
+
+      - 4 modal definitions
+
+      - 3 interaction flows with state updates
+
+      - Keyboard shortcuts and accessibility specs
+
+
+      Created 3 interaction flow diagrams:
+
+      - send_message_flow.mmd (sequence diagram)
+
+      - create_project_flow.mmd (sequence diagram)
+
+      - context_construction_flow.mmd (flowchart)
+
+
+      All 51 YAML files validated successfully.'
+    verification:
+      method: YAML validation
+      result: success
+      notes: All 51 YAML files valid.

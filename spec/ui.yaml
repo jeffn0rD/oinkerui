@@ -1,100 +1,1238 @@
-version: 0.1.0
+# =============================================================================
+# UI Specifications
+# =============================================================================
+
+version: "1.0.0"
+title: UI Specifications
+description: |
+  Complete UI specifications for OinkerUI including layout, components,
+  screens, interaction flows, and state management.
+
+# =============================================================================
+# THEME & DESIGN TOKENS
+# =============================================================================
+
+theme:
+  default: dark
+  implementation: tailwind
+
+  colors:
+    # Primary palette
+    primary:
+      50: "#eef2ff"
+      100: "#e0e7ff"
+      200: "#c7d2fe"
+      300: "#a5b4fc"
+      400: "#818cf8"
+      500: "#6366f1"
+      600: "#4f46e5"
+      700: "#4338ca"
+      800: "#3730a3"
+      900: "#312e81"
+
+    # Background colors
+    background:
+      primary: "#0f172a"      # slate-900
+      secondary: "#1e293b"    # slate-800
+      tertiary: "#334155"     # slate-700
+      elevated: "#1e293b"     # slate-800
+
+    # Text colors
+    text:
+      primary: "#f1f5f9"      # slate-100
+      secondary: "#94a3b8"    # slate-400
+      muted: "#64748b"        # slate-500
+      inverse: "#0f172a"      # slate-900
+
+    # Accent colors
+    accent:
+      success: "#10b981"      # emerald-500
+      warning: "#f59e0b"      # amber-500
+      error: "#ef4444"        # red-500
+      info: "#3b82f6"         # blue-500
+
+    # Message role colors
+    roles:
+      user: "#3b82f6"         # blue-500
+      assistant: "#8b5cf6"    # violet-500
+      system: "#6b7280"       # gray-500
+      tool: "#f59e0b"         # amber-500
+
+    # Status colors
+    status:
+      active: "#10b981"
+      pending: "#f59e0b"
+      error: "#ef4444"
+      discarded: "#64748b"
+      pinned: "#3b82f6"
+      aside: "#eab308"
+
+  typography:
+    font_family:
+      sans: "Inter, system-ui, sans-serif"
+      mono: "JetBrains Mono, Consolas, monospace"
+
+    font_sizes:
+      xs: "0.75rem"
+      sm: "0.875rem"
+      base: "1rem"
+      lg: "1.125rem"
+      xl: "1.25rem"
+      "2xl": "1.5rem"
+
+  spacing:
+    unit: "0.25rem"
+    sidebar_width: "20rem"
+    right_panel_width: "18rem"
+    message_max_width: "48rem"
+
+  borders:
+    radius:
+      sm: "0.25rem"
+      md: "0.375rem"
+      lg: "0.5rem"
+      xl: "0.75rem"
+    color: "#334155"  # slate-700
+
+  shadows:
+    sm: "0 1px 2px 0 rgb(0 0 0 / 0.05)"
+    md: "0 4px 6px -1px rgb(0 0 0 / 0.1)"
+    lg: "0 10px 15px -3px rgb(0 0 0 / 0.1)"
+
+# =============================================================================
+# LAYOUT STRUCTURE
+# =============================================================================
 
 layout:
+  type: three_column
+  description: "Main application layout with collapsible sidebars"
 
-  theme:
-    default: dark
-    impl: tailwind
-    tokens:
-      primary: "indigo-400"
-      background: "slate-900"
-      text: "slate-100"
-      accent: "emerald-400"
-
-  panes:
+  regions:
     left_sidebar:
+      id: left-sidebar
       width: "20rem"
+      min_width: "16rem"
+      max_width: "24rem"
+      collapsible: true
+      default_collapsed: false
+      position: left
+      z_index: 20
+
       sections:
-        - id: projects
-          label: "Projects"
+        - id: project_tree
+          title: "Projects"
           collapsible: true
-          contents:
-            - tree: # Projects -> Chats, Data, Workflows
-        - id: global
-          label: "Global"
+          default_expanded: true
+          component: ProjectTree
+
+        - id: chat_list
+          title: "Chats"
           collapsible: true
+          default_expanded: true
+          component: ChatList
+          depends_on: "selected_project"
+
+        - id: global_actions
+          title: "Global"
+          collapsible: true
+          default_expanded: false
+          component: GlobalActions
 
     main_area:
+      id: main-area
+      flex: 1
+      min_width: "400px"
+      position: center
+
       views:
         - id: chat_view
-          components:
-            - message_list
-            - prompt_input
-            - context_info_bar
+          default: true
+          component: ChatView
+          requires: ["selected_project", "selected_chat"]
+
+        - id: welcome_view
+          component: WelcomeView
+          condition: "no_project_selected"
+
+        - id: project_settings_view
+          component: ProjectSettingsView
+          condition: "settings_mode"
 
     right_sidebar:
+      id: right-sidebar
       width: "18rem"
+      min_width: "14rem"
+      max_width: "22rem"
+      collapsible: true
+      default_collapsed: false
+      position: right
+      z_index: 20
+
       sections:
-        - id: stats
+        - id: context_info
+          title: "Context"
+          collapsible: true
+          default_expanded: true
+          component: ContextInfo
+
+        - id: stats_panel
+          title: "Statistics"
+          collapsible: true
+          default_expanded: true
+          component: StatsPanel
           tabs:
-            - per_turn
-            - per_chat
-            - per_project
+            - id: per_turn
+              label: "Turn"
+            - id: per_chat
+              label: "Chat"
+            - id: per_project
+              label: "Project"
+
+        - id: entity_panel
+          title: "Entities"
+          collapsible: true
+          default_expanded: false
+          component: EntityPanel
+
+# =============================================================================
+# SCREENS
+# =============================================================================
+
+screens:
+  # ---------------------------------------------------------------------------
+  # Welcome Screen
+  # ---------------------------------------------------------------------------
+  welcome:
+    id: welcome_screen
+    route: "/"
+    title: "Welcome to OinkerUI"
+    condition: "no_projects || no_project_selected"
+
+    layout:
+      type: centered
+      max_width: "600px"
+
+    components:
+      - type: hero
+        content:
+          title: "OinkerUI"
+          subtitle: "LLM-Assisted Development Workbench"
+          description: "Create projects, manage conversations, and leverage AI for development tasks."
+
+      - type: action_cards
+        items:
+          - id: create_project
+            icon: "folder-plus"
+            title: "Create Project"
+            description: "Start a new project with Git integration"
+            action: "open_create_project_modal"
+
+          - id: open_project
+            icon: "folder-open"
+            title: "Open Project"
+            description: "Open an existing project"
+            action: "show_project_list"
+            condition: "has_projects"
+
+      - type: recent_projects
+        condition: "has_recent_projects"
+        max_items: 5
+
+    interactions:
+      - trigger: "click create_project"
+        action: "open_modal"
+        modal: "create_project_modal"
+
+      - trigger: "click recent_project"
+        action: "select_project"
+        params: ["project_id"]
+
+  # ---------------------------------------------------------------------------
+  # Chat Screen
+  # ---------------------------------------------------------------------------
+  chat:
+    id: chat_screen
+    route: "/projects/:projectId/chats/:chatId"
+    title: "Chat - {chat.name}"
+    requires: ["selected_project", "selected_chat"]
+
+    layout:
+      type: flex_column
+      height: "100%"
+
+    components:
+      - id: message_list
+        type: MessageList
+        flex: 1
+        overflow: auto
+        props:
+          messages: "$messagesStore"
+          on_message_action: "handle_message_action"
+
+      - id: context_bar
+        type: ContextBar
+        height: "auto"
+        props:
+          context_info: "$contextStore"
+          on_toggle_message: "toggle_message_context"
+
+      - id: prompt_input
+        type: PromptInput
+        height: "auto"
+        min_height: "100px"
+        max_height: "300px"
+        props:
+          value: "$promptInput"
+          model: "$selectedModel"
+          on_send: "handle_send_message"
+          on_slash_command: "handle_slash_command"
+
+    interactions:
+      - trigger: "submit prompt_input"
+        action: "send_message"
+        api: "POST /api/projects/{projectId}/chats/{chatId}/messages"
+        loading_state: "sending_message"
+        on_success:
+          - "add_messages_to_store"
+          - "scroll_to_bottom"
+          - "clear_prompt_input"
+        on_error:
+          - "show_error_toast"
+          - "restore_prompt_input"
+
+      - trigger: "keydown Ctrl+Enter"
+        action: "send_message"
+
+      - trigger: "input starts_with /"
+        action: "show_command_autocomplete"
+
+      - trigger: "click message_pin_button"
+        action: "toggle_message_pin"
+        api: "PATCH /api/projects/{projectId}/chats/{chatId}/messages/{messageId}"
+
+      - trigger: "click message_discard_button"
+        action: "discard_message"
+        api: "POST /api/projects/{projectId}/chats/{chatId}/messages/{messageId}/discard"
+
+  # ---------------------------------------------------------------------------
+  # Project Settings Screen
+  # ---------------------------------------------------------------------------
+  project_settings:
+    id: project_settings_screen
+    route: "/projects/:projectId/settings"
+    title: "Project Settings - {project.name}"
+    requires: ["selected_project"]
+
+    layout:
+      type: tabs
+      tabs:
+        - id: general
+          label: "General"
+        - id: models
+          label: "Models"
+        - id: git
+          label: "Git"
+        - id: advanced
+          label: "Advanced"
+
+    components:
+      - id: general_settings
+        tab: general
+        type: Form
+        fields:
+          - name: name
+            type: text
+            label: "Project Name"
+            validation: "required|pattern:^[a-zA-Z0-9_-]+$"
+          - name: description
+            type: textarea
+            label: "Description"
+          - name: default_model
+            type: select
+            label: "Default Model"
+            options: "$availableModels"
+
+      - id: model_settings
+        tab: models
+        type: ModelConfiguration
+        props:
+          models: "$projectModels"
+          on_change: "update_model_config"
+
+      - id: git_settings
+        tab: git
+        type: GitConfiguration
+        props:
+          status: "$gitStatus"
+          commit_policy: "$project.settings.git_commit_policy"
+
+      - id: advanced_settings
+        tab: advanced
+        type: Form
+        fields:
+          - name: max_context_tokens
+            type: number
+            label: "Max Context Tokens"
+            min: 1000
+            max: 200000
+          - name: context_truncation_strategy
+            type: select
+            label: "Truncation Strategy"
+            options:
+              - value: drop_oldest_non_pinned
+                label: "Drop Oldest Non-Pinned"
+
+# =============================================================================
+# COMPONENTS
+# =============================================================================
 
 components:
+  # ---------------------------------------------------------------------------
+  # Message List Component
+  # ---------------------------------------------------------------------------
+  MessageList:
+    id: message_list
+    description: "Scrollable list of chat messages with context controls"
 
-  message_list:
-    description: "Scrollable list of messages with context controls."
+    props:
+      messages:
+        type: "Message[]"
+        required: true
+      loading:
+        type: boolean
+        default: false
+      on_message_action:
+        type: function
+
+    state:
+      scroll_position: number
+      expanded_messages: "Set<string>"
+      selected_message: "string | null"
+
     features:
-      - collapse_long_messages
-      - markers:
-          - aside: { icon: "⊂", color: "yellow-400" }
-          - pure_aside: { icon: "Ø", color: "orange-400" }
-          - pinned: { icon: "📌", color: "blue-400" }
-          - discarded: { style: "italic", color: "slate-500" }
-      - per_message_stats_line:
-          shows: [tokens, latency_ms, model]
-          style: "small, dim, under message bubble"
+      - id: auto_scroll
+        description: "Auto-scroll to bottom on new messages"
+        behavior: "Scroll to bottom when new message added, unless user has scrolled up"
 
-  prompt_input:
-    description: "Text area with model selector, format selector, template insertion."
+      - id: collapse_long
+        description: "Collapse messages over 500 characters"
+        threshold: 500
+        expand_button: true
+
+      - id: message_markers
+        markers:
+          aside:
+            icon: "⊂"
+            color: "yellow-400"
+            tooltip: "Aside - excluded from future context"
+          pure_aside:
+            icon: "Ø"
+            color: "orange-400"
+            tooltip: "Pure aside - no LLM call"
+          pinned:
+            icon: "📌"
+            color: "blue-400"
+            tooltip: "Pinned - always included in context"
+          discarded:
+            style: "italic opacity-50"
+            color: "slate-500"
+            tooltip: "Discarded - excluded from context"
+
+      - id: per_message_stats
+        position: "below message"
+        shows:
+          - tokens
+          - latency_ms
+          - model
+        style: "text-xs text-slate-500"
+
+    slots:
+      message_header:
+        description: "Custom header for each message"
+      message_footer:
+        description: "Custom footer for each message"
+      empty_state:
+        description: "Shown when no messages"
+
+    events:
+      - name: message_click
+        payload: { message_id: string }
+      - name: message_action
+        payload: { message_id: string, action: string }
+      - name: scroll
+        payload: { position: number, at_bottom: boolean }
+
+  # ---------------------------------------------------------------------------
+  # Prompt Input Component
+  # ---------------------------------------------------------------------------
+  PromptInput:
+    id: prompt_input
+    description: "Text area with model selector, format selector, and template insertion"
+
+    props:
+      value:
+        type: string
+        default: ""
+      model:
+        type: string
+      disabled:
+        type: boolean
+        default: false
+      on_send:
+        type: function
+      on_change:
+        type: function
+
+    state:
+      is_composing: boolean
+      show_autocomplete: boolean
+      autocomplete_items: "CommandSuggestion[]"
+      selected_autocomplete_index: number
+
     controls:
-      - model_selector:
-          source: "config.models"
-      - output_format_selector:
-          options: [text, markdown, json]
-      - template_picker: true
-      - context_overrides:
-          - checkbox_ignore_history_for_this_prompt (pure_aside)
+      - id: model_selector
+        type: dropdown
+        position: "top-left"
+        source: "$availableModels"
+        on_change: "set_selected_model"
+
+      - id: format_selector
+        type: button_group
+        position: "top-right"
+        options:
+          - value: text
+            label: "Text"
+            icon: "text"
+          - value: markdown
+            label: "MD"
+            icon: "markdown"
+          - value: json
+            label: "JSON"
+            icon: "code"
+
+      - id: template_picker
+        type: dropdown_button
+        position: "bottom-left"
+        icon: "template"
+        label: "Templates"
+        on_select: "insert_template"
+
+      - id: aside_checkbox
+        type: checkbox
+        position: "bottom-left"
+        label: "Aside"
+        tooltip: "Send as aside (excluded from future context)"
+
+      - id: pure_aside_checkbox
+        type: checkbox
+        position: "bottom-left"
+        label: "Pure Aside"
+        tooltip: "Pure aside (no LLM call)"
+        depends_on: "aside_checkbox"
+
+      - id: send_button
+        type: button
+        position: "bottom-right"
+        label: "Send"
+        icon: "send"
+        variant: "primary"
+        shortcut: "Ctrl+Enter"
+
     behaviors:
-      - detect_slash_command_on_submit: true
+      - id: slash_command_autocomplete
+        trigger: "input starts with /"
+        action: "show_command_suggestions"
+        complete_on: "Tab"
 
-  context_info_bar:
-    description: "Live context size and model info."
-    displays:
-      - current_model
-      - estimated_tokens
-      - context_limit
-      - ratio: "estimated / limit"
-    updates_on:
-      - message_flag_change
-      - model_change
-      - prompt_text_change
+      - id: template_variable_highlight
+        trigger: "template inserted"
+        action: "highlight_variables"
+        style: "bg-yellow-500/20"
 
-  terminal_view:
-    phase: 3
-    description: "Pseudo-terminal executing commands in project root."
-    behavior:
-      - input_line
-      - output_log
-      - send_command_on_enter
-      - local_only_flag: true
+      - id: auto_resize
+        trigger: "content change"
+        action: "resize_to_content"
+        min_height: "100px"
+        max_height: "300px"
 
-  diff_view:
-    phase: 3
-    description: "Inline diff for text files/entities."
-    modes:
-      - inline
-    sources:
-      - git_commits
-      - working_tree_vs_head
+    keyboard_shortcuts:
+      - key: "Ctrl+Enter"
+        action: "send"
+      - key: "Escape"
+        action: "close_autocomplete"
+      - key: "Tab"
+        action: "accept_autocomplete"
+      - key: "ArrowUp"
+        action: "autocomplete_prev"
+        condition: "autocomplete_visible"
+      - key: "ArrowDown"
+        action: "autocomplete_next"
+        condition: "autocomplete_visible"
+
+  # ---------------------------------------------------------------------------
+  # Context Bar Component
+  # ---------------------------------------------------------------------------
+  ContextBar:
+    id: context_bar
+    description: "Shows context information and token usage"
+
+    props:
+      context_info:
+        type: ContextDisplayData
+      on_toggle_message:
+        type: function
+
+    display:
+      - id: token_usage
+        type: progress_bar
+        label: "Context: {used}/{max} tokens"
+        value: "$context_info.totalTokens"
+        max: "$context_info.maxTokens"
+        color_thresholds:
+          - threshold: 70
+            color: "green"
+          - threshold: 85
+            color: "yellow"
+          - threshold: 95
+            color: "red"
+
+      - id: message_counts
+        type: text
+        content: "{included} included, {excluded} excluded, {pinned} pinned"
+
+      - id: status_indicator
+        type: badge
+        value: "$context_info.status"
+        variants:
+          healthy: "bg-green-500"
+          warning: "bg-yellow-500"
+          critical: "bg-red-500"
+
+  # ---------------------------------------------------------------------------
+  # Project Tree Component
+  # ---------------------------------------------------------------------------
+  ProjectTree:
+    id: project_tree
+    description: "Hierarchical tree of projects"
+
+    props:
+      projects:
+        type: "Project[]"
+      selected_project_id:
+        type: "string | null"
+      on_select:
+        type: function
+
+    features:
+      - id: search
+        type: filter_input
+        placeholder: "Search projects..."
+
+      - id: status_filter
+        type: toggle_group
+        options: [active, archived, all]
+        default: active
+
+      - id: context_menu
+        trigger: "right_click"
+        items:
+          - label: "Open"
+            action: "select_project"
+          - label: "Settings"
+            action: "open_project_settings"
+          - separator: true
+          - label: "Archive"
+            action: "archive_project"
+            condition: "project.status === 'active'"
+          - label: "Restore"
+            action: "restore_project"
+            condition: "project.status === 'archived'"
+          - separator: true
+          - label: "Delete"
+            action: "delete_project"
+            variant: "danger"
+
+    item_template:
+      icon: "folder"
+      icon_color: "$status_color"
+      primary_text: "$project.name"
+      secondary_text: "$project.description"
+      badge: "$chat_count"
+
+  # ---------------------------------------------------------------------------
+  # Chat List Component
+  # ---------------------------------------------------------------------------
+  ChatList:
+    id: chat_list
+    description: "List of chats in selected project"
+
+    props:
+      chats:
+        type: "Chat[]"
+      selected_chat_id:
+        type: "string | null"
+      on_select:
+        type: function
+
+    features:
+      - id: new_chat_button
+        type: button
+        label: "New Chat"
+        icon: "plus"
+        position: "header"
+
+      - id: search
+        type: filter_input
+        placeholder: "Search chats..."
+
+      - id: context_menu
+        trigger: "right_click"
+        items:
+          - label: "Open"
+            action: "select_chat"
+          - label: "Rename"
+            action: "rename_chat"
+          - label: "Fork"
+            action: "fork_chat"
+          - separator: true
+          - label: "Close"
+            action: "close_chat"
+          - label: "Archive"
+            action: "archive_chat"
+          - separator: true
+          - label: "Delete"
+            action: "delete_chat"
+            variant: "danger"
+
+    item_template:
+      icon: "message-square"
+      primary_text: "$chat.name"
+      secondary_text: "$last_message_preview"
+      timestamp: "$chat.updated_at"
+      badge:
+        condition: "$unread_count > 0"
+        value: "$unread_count"
+
+  # ---------------------------------------------------------------------------
+  # Stats Panel Component
+  # ---------------------------------------------------------------------------
+  StatsPanel:
+    id: stats_panel
+    description: "Usage statistics display"
+
+    props:
+      stats:
+        type: Stats
+      scope:
+        type: "turn | chat | project"
+
+    tabs:
+      - id: per_turn
+        label: "Turn"
+        content:
+          - type: stat_row
+            label: "Prompt Tokens"
+            value: "$stats.prompt_tokens"
+          - type: stat_row
+            label: "Completion Tokens"
+            value: "$stats.completion_tokens"
+          - type: stat_row
+            label: "Latency"
+            value: "$stats.latency_ms"
+            format: "ms"
+          - type: stat_row
+            label: "Model"
+            value: "$stats.model"
+
+      - id: per_chat
+        label: "Chat"
+        content:
+          - type: stat_row
+            label: "Messages"
+            value: "$stats.message_count"
+          - type: stat_row
+            label: "Total Tokens"
+            value: "$stats.total_tokens"
+          - type: stat_row
+            label: "Avg Response"
+            value: "$stats.avg_latency_ms"
+            format: "ms"
+
+      - id: per_project
+        label: "Project"
+        content:
+          - type: stat_row
+            label: "Total Requests"
+            value: "$stats.total_requests"
+          - type: stat_row
+            label: "Total Tokens"
+            value: "$stats.total_tokens"
+          - type: stat_row
+            label: "Est. Cost"
+            value: "$stats.estimated_cost"
+            format: "currency"
+          - type: chart
+            type: "line"
+            data: "$stats.daily_usage"
+
+# =============================================================================
+# MODALS
+# =============================================================================
+
+modals:
+  create_project:
+    id: create_project_modal
+    title: "Create New Project"
+    size: "md"
+
+    form:
+      fields:
+        - name: name
+          type: text
+          label: "Project Name"
+          placeholder: "my-project"
+          validation:
+            required: true
+            pattern: "^[a-zA-Z0-9][a-zA-Z0-9_\\- ]*$"
+            max_length: 100
+          help: "Letters, numbers, underscores, and hyphens only"
+
+        - name: description
+          type: textarea
+          label: "Description"
+          placeholder: "Optional project description"
+          validation:
+            max_length: 500
+
+        - name: default_model
+          type: select
+          label: "Default Model"
+          options: "$availableModels"
+          default: "openrouter/openai/gpt-4o"
+
+      actions:
+        - type: cancel
+          label: "Cancel"
+        - type: submit
+          label: "Create Project"
+          variant: "primary"
+
+    on_submit:
+      api: "POST /api/projects"
+      on_success:
+        - "close_modal"
+        - "select_project"
+        - "show_success_toast"
+      on_error:
+        - "show_field_errors"
+
+  create_chat:
+    id: create_chat_modal
+    title: "Create New Chat"
+    size: "md"
+
+    form:
+      fields:
+        - name: name
+          type: text
+          label: "Chat Name"
+          placeholder: "Optional chat name"
+
+        - name: system_prelude_type
+          type: radio_group
+          label: "System Prompt"
+          options:
+            - value: none
+              label: "None"
+            - value: inline
+              label: "Custom"
+            - value: template
+              label: "From Template"
+
+        - name: system_prelude_content
+          type: textarea
+          label: "System Prompt"
+          condition: "system_prelude_type === 'inline'"
+          placeholder: "You are a helpful assistant..."
+
+        - name: system_prelude_template
+          type: select
+          label: "Template"
+          condition: "system_prelude_type === 'template'"
+          options: "$systemTemplates"
+
+      actions:
+        - type: cancel
+          label: "Cancel"
+        - type: submit
+          label: "Create Chat"
+          variant: "primary"
+
+    on_submit:
+      api: "POST /api/projects/{projectId}/chats"
+      on_success:
+        - "close_modal"
+        - "select_chat"
+
+  fork_chat:
+    id: fork_chat_modal
+    title: "Fork Chat"
+    size: "md"
+
+    form:
+      fields:
+        - name: from_message_id
+          type: message_selector
+          label: "Fork From"
+          help: "Select a message to fork from, or leave empty to fork all"
+
+        - name: prune_excluded
+          type: checkbox
+          label: "Prune excluded messages"
+          help: "Only include messages that were in context"
+
+        - name: new_name
+          type: text
+          label: "New Chat Name"
+          placeholder: "Forked chat name"
+
+      actions:
+        - type: cancel
+          label: "Cancel"
+        - type: submit
+          label: "Fork Chat"
+          variant: "primary"
+
+  confirm_delete:
+    id: confirm_delete_modal
+    title: "Confirm Delete"
+    size: "sm"
+    variant: "danger"
+
+    content:
+      type: text
+      value: "Are you sure you want to delete {item_name}? This action cannot be undone."
+
+    actions:
+      - type: cancel
+        label: "Cancel"
+      - type: confirm
+        label: "Delete"
+        variant: "danger"
+
+# =============================================================================
+# INTERACTION FLOWS
+# =============================================================================
+
+interaction_flows:
+  # ---------------------------------------------------------------------------
+  # Send Message Flow
+  # ---------------------------------------------------------------------------
+  send_message:
+    id: send_message_flow
+    description: "Complete flow for sending a message and receiving response"
+
+    trigger:
+      type: user_action
+      action: "submit_prompt"
+
+    steps:
+      - id: validate_input
+        type: validation
+        checks:
+          - "prompt_text is not empty"
+          - "chat is active"
+          - "not already sending"
+        on_fail: "show_validation_error"
+
+      - id: check_slash_command
+        type: condition
+        condition: "prompt_text starts with '/'"
+        on_true: "execute_slash_command"
+        on_false: "continue"
+
+      - id: set_loading_state
+        type: state_update
+        updates:
+          - store: uiStore
+            key: isLoading
+            value: true
+          - store: uiStore
+            key: promptInput
+            value: ""
+
+      - id: create_optimistic_message
+        type: state_update
+        updates:
+          - store: messagesStore
+            action: append
+            value:
+              id: "temp-{uuid}"
+              role: user
+              content: "$prompt_text"
+              status: pending
+
+      - id: call_api
+        type: api_call
+        method: POST
+        endpoint: "/api/projects/{projectId}/chats/{chatId}/messages"
+        body:
+          raw_text: "$prompt_text"
+          model_id: "$selected_model"
+          output_format_hint: "$output_format"
+          is_aside: "$is_aside"
+          pure_aside: "$pure_aside"
+
+      - id: handle_response
+        type: condition
+        condition: "api_response.success"
+        on_true:
+          - id: update_messages
+            type: state_update
+            updates:
+              - store: messagesStore
+                action: replace_temp
+                value: "$api_response.user_message"
+              - store: messagesStore
+                action: append
+                value: "$api_response.assistant_message"
+                condition: "$api_response.assistant_message"
+          - id: update_stats
+            type: state_update
+            updates:
+              - store: statsStore
+                action: update
+                value: "$api_response.request_log"
+          - id: scroll_to_bottom
+            type: ui_action
+            action: scroll_to_bottom
+            target: message_list
+        on_false:
+          - id: show_error
+            type: ui_action
+            action: show_toast
+            variant: error
+            message: "$api_response.error.message"
+          - id: restore_input
+            type: state_update
+            updates:
+              - store: uiStore
+                key: promptInput
+                value: "$prompt_text"
+
+      - id: clear_loading
+        type: state_update
+        updates:
+          - store: uiStore
+            key: isLoading
+            value: false
+
+  # ---------------------------------------------------------------------------
+  # Create Project Flow
+  # ---------------------------------------------------------------------------
+  create_project:
+    id: create_project_flow
+    description: "Flow for creating a new project"
+
+    trigger:
+      type: modal_submit
+      modal: create_project_modal
+
+    steps:
+      - id: validate_form
+        type: validation
+        checks:
+          - "name is valid"
+          - "name is unique"
+
+      - id: set_creating_state
+        type: state_update
+        updates:
+          - store: uiStore
+            key: isCreatingProject
+            value: true
+
+      - id: call_api
+        type: api_call
+        method: POST
+        endpoint: "/api/projects"
+        body:
+          name: "$form.name"
+          description: "$form.description"
+          default_model: "$form.default_model"
+
+      - id: handle_response
+        type: condition
+        condition: "api_response.success"
+        on_true:
+          - id: add_to_store
+            type: state_update
+            updates:
+              - store: projectsStore
+                action: prepend
+                value: "$api_response.data"
+          - id: select_project
+            type: state_update
+            updates:
+              - store: appStore
+                key: activeProjectId
+                value: "$api_response.data.id"
+          - id: close_modal
+            type: ui_action
+            action: close_modal
+          - id: show_success
+            type: ui_action
+            action: show_toast
+            variant: success
+            message: "Project created successfully"
+        on_false:
+          - id: show_errors
+            type: ui_action
+            action: show_form_errors
+            errors: "$api_response.errors"
+
+      - id: clear_creating
+        type: state_update
+        updates:
+          - store: uiStore
+            key: isCreatingProject
+            value: false
+
+  # ---------------------------------------------------------------------------
+  # Toggle Message Pin Flow
+  # ---------------------------------------------------------------------------
+  toggle_message_pin:
+    id: toggle_message_pin_flow
+    description: "Flow for pinning/unpinning a message"
+
+    trigger:
+      type: user_action
+      action: "click_pin_button"
+      params: [message_id]
+
+    steps:
+      - id: optimistic_update
+        type: state_update
+        updates:
+          - store: messagesStore
+            action: update
+            id: "$message_id"
+            changes:
+              is_pinned: "!$current.is_pinned"
+
+      - id: call_api
+        type: api_call
+        method: PATCH
+        endpoint: "/api/projects/{projectId}/chats/{chatId}/messages/{messageId}"
+        body:
+          is_pinned: "$new_value"
+
+      - id: handle_failure
+        type: condition
+        condition: "!api_response.success"
+        on_true:
+          - id: revert_update
+            type: state_update
+            updates:
+              - store: messagesStore
+                action: update
+                id: "$message_id"
+                changes:
+                  is_pinned: "$original_value"
+          - id: show_error
+            type: ui_action
+            action: show_toast
+            variant: error
+            message: "Failed to update message"
+
+      - id: update_context
+        type: action
+        action: "recalculate_context"
+
+# =============================================================================
+# KEYBOARD SHORTCUTS
+# =============================================================================
+
+keyboard_shortcuts:
+  global:
+    - key: "Ctrl+K"
+      action: "open_command_palette"
+      description: "Open command palette"
+
+    - key: "Ctrl+N"
+      action: "create_new_chat"
+      description: "Create new chat"
+
+    - key: "Ctrl+Shift+N"
+      action: "create_new_project"
+      description: "Create new project"
+
+    - key: "Ctrl+,"
+      action: "open_settings"
+      description: "Open settings"
+
+    - key: "Ctrl+Backslash"
+      action: "toggle_left_sidebar"
+      description: "Toggle left sidebar"
+
+    - key: "Ctrl+Shift+Backslash"
+      action: "toggle_right_sidebar"
+      description: "Toggle right sidebar"
+
+  chat_view:
+    - key: "Ctrl+Enter"
+      action: "send_message"
+      description: "Send message"
+
+    - key: "Escape"
+      action: "cancel_or_close"
+      description: "Cancel current action or close modal"
+
+    - key: "Ctrl+/"
+      action: "focus_prompt"
+      description: "Focus prompt input"
+
+    - key: "Ctrl+Up"
+      action: "previous_chat"
+      description: "Switch to previous chat"
+
+    - key: "Ctrl+Down"
+      action: "next_chat"
+      description: "Switch to next chat"
+
+# =============================================================================
+# ACCESSIBILITY
+# =============================================================================
+
+accessibility:
+  aria_labels:
+    left_sidebar: "Project navigation"
+    main_area: "Chat conversation"
+    right_sidebar: "Context and statistics"
+    message_list: "Chat messages"
+    prompt_input: "Message input"
+
+  focus_management:
+    - on: "modal_open"
+      focus: "first_focusable_element"
+    - on: "modal_close"
+      focus: "trigger_element"
+    - on: "message_sent"
+      focus: "prompt_input"
+
+  screen_reader:
+    announce:
+      - event: "new_message"
+        message: "New message from {role}"
+      - event: "loading"
+        message: "Waiting for response"
+      - event: "error"
+        message: "Error: {message}"
+
+  reduced_motion:
+    disable:
+      - "scroll_animations"
+      - "transition_effects"
+    keep:
+      - "focus_indicators"
+      - "loading_spinners"

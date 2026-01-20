@@ -1,0 +1,59 @@
+%%{init: {'theme': 'dark', 'themeVariables': { 'primaryColor': '#1e3a5f'}}}%%
+
+sequenceDiagram
+    autonumber
+    participant U as User
+    participant M as Modal
+    participant UI as UIStore
+    participant PS as ProjectsStore
+    participant API as Backend API
+    participant FS as File System
+    participant Git as Git
+
+    U->>M: Click "Create Project"
+    M->>M: Open create_project_modal
+    
+    U->>M: Fill form & submit
+    M->>M: Validate form
+    
+    alt Validation fails
+        M-->>U: Show field errors
+    else Validation passes
+        M->>UI: Set isCreatingProject = true
+        
+        M->>API: POST /api/projects
+        Note over API: {name, description,<br/>default_model}
+        
+        API->>API: Validate project name
+        API->>API: Generate slug
+        API->>API: Check slug uniqueness
+        
+        alt Slug exists
+            API-->>M: 409 PROJECT_EXISTS
+            M->>UI: Set isCreatingProject = false
+            M-->>U: Show error
+        else Slug unique
+            API->>API: Generate project ID
+            API->>FS: Create project directory
+            FS-->>API: Directory created
+            
+            API->>FS: Create subdirectories
+            Note over FS: chats/, data/,<br/>logs/, public/
+            
+            API->>Git: Initialize repository
+            Git-->>API: Repo initialized
+            
+            API->>FS: Create .gitignore
+            API->>FS: Create project.json
+            API->>Git: Initial commit
+            
+            API->>FS: Update project index
+            API-->>M: 201 Project created
+            
+            M->>PS: Add project to store
+            M->>UI: Set activeProjectId
+            M->>M: Close modal
+            M->>UI: Set isCreatingProject = false
+            M-->>U: Show success toast
+        end
+    end

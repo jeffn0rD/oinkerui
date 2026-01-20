@@ -1,145 +1,1382 @@
-version: 0.1.0
+# =============================================================================
+# API Specifications
+# =============================================================================
+
+version: "1.0.0"
+title: API Specifications
+description: |
+  Complete API specifications for OinkerUI services including request/response
+  schemas, error handling, rate limits, and examples.
+
+# =============================================================================
+# COMMON DEFINITIONS
+# =============================================================================
+
+common:
+  error_schema:
+    type: object
+    required: [error, message]
+    properties:
+      error:
+        type: string
+        description: "Error code"
+      message:
+        type: string
+        description: "Human-readable error message"
+      details:
+        type: object
+        description: "Additional error details"
+
+  pagination:
+    type: object
+    properties:
+      page:
+        type: integer
+        default: 1
+        minimum: 1
+      limit:
+        type: integer
+        default: 20
+        minimum: 1
+        maximum: 100
+      total:
+        type: integer
+      has_more:
+        type: boolean
+
+  headers:
+    request:
+      Content-Type: "application/json"
+      Accept: "application/json"
+    response:
+      Content-Type: "application/json"
+      X-Request-Id: "UUID for request tracking"
+
+# =============================================================================
+# NODE.JS API SERVICE
+# =============================================================================
 
 services:
-
   node_api:
+    base_url: "http://localhost:3000"
     base_path: "/api"
+    description: "Primary Node.js backend API for OinkerUI"
+    authentication: "none"  # Phase 1-2, JWT in Phase 4+
+
     endpoints:
+      # =========================================================================
+      # PROJECT ENDPOINTS
+      # =========================================================================
 
       - name: list_projects
         method: GET
-        path: "/projects"
+        path: /projects
+        description: "List all projects"
+        function_reference: "spec/modules/backend_node.yaml#list_projects"
+
         request:
-          query: {}
+          query:
+            status:
+              type: string
+              enum: [active, archived, all]
+              default: active
+              description: "Filter by project status"
+            page:
+              type: integer
+              default: 1
+            limit:
+              type: integer
+              default: 20
+
         response:
-          status: 200
-          body:
-            type: array
-            items: { $ref: Project }
+          success:
+            status: 200
+            content_type: application/json
+            schema:
+              type: object
+              properties:
+                projects:
+                  type: array
+                  items:
+                    $ref: "spec/domain.yaml#Project"
+                pagination:
+                  $ref: "#common/pagination"
+            example:
+              projects:
+                - id: "550e8400-e29b-41d4-a716-446655440000"
+                  name: "my-project"
+                  slug: "my-project"
+                  status: "active"
+                  created_at: "2024-01-20T10:00:00Z"
+                  updated_at: "2024-01-20T10:00:00Z"
+              pagination:
+                page: 1
+                limit: 20
+                total: 1
+                has_more: false
+
+          errors:
+            - status: 500
+              code: INTERNAL_ERROR
+              message: "Internal server error"
+
+        rate_limit:
+          requests: 60
+          window: 60
 
       - name: create_project
         method: POST
-        path: "/projects"
+        path: /projects
+        description: "Create a new project"
+        function_reference: "spec/functions/backend_node/create_project.yaml"
+
         request:
-          body:
+          content_type: application/json
+          schema:
+            type: object
+            required: [name]
+            properties:
+              name:
+                type: string
+                pattern: "^[a-zA-Z0-9][a-zA-Z0-9_\\- ]*$"
+                minLength: 1
+                maxLength: 100
+                description: "Project name"
+              description:
+                type: string
+                maxLength: 500
+                description: "Optional project description"
+              default_model:
+                type: string
+                default: "openrouter/openai/gpt-4o"
+                description: "Default LLM model for new chats"
+
+          example:
+            name: "my-project"
+            description: "My awesome project"
+            default_model: "openrouter/openai/gpt-4o"
+
+        response:
+          success:
+            status: 201
+            content_type: application/json
+            schema:
+              $ref: "spec/domain.yaml#Project"
+            example:
+              id: "550e8400-e29b-41d4-a716-446655440000"
+              name: "my-project"
+              slug: "my-project"
+              status: "active"
+              created_at: "2024-01-20T10:00:00Z"
+              updated_at: "2024-01-20T10:00:00Z"
+              default_model: "openrouter/openai/gpt-4o"
+
+          errors:
+            - status: 400
+              code: INVALID_PROJECT_NAME
+              message: "Project name is invalid"
+              example:
+                error: "INVALID_PROJECT_NAME"
+                message: "Project name must match pattern ^[a-zA-Z0-9][a-zA-Z0-9_\\- ]*$"
+
+            - status: 409
+              code: PROJECT_EXISTS
+              message: "Project with this name already exists"
+              example:
+                error: "PROJECT_EXISTS"
+                message: "A project named 'my-project' already exists"
+
+            - status: 500
+              code: INTERNAL_ERROR
+              message: "Internal server error"
+
+        rate_limit:
+          requests: 10
+          window: 60
+
+      - name: get_project
+        method: GET
+        path: /projects/{project_id}
+        description: "Get a specific project by ID"
+
+        request:
+          path_params:
+            project_id:
+              type: string
+              format: uuid
+              required: true
+              description: "Project UUID"
+
+        response:
+          success:
+            status: 200
+            content_type: application/json
+            schema:
+              $ref: "spec/domain.yaml#Project"
+
+          errors:
+            - status: 404
+              code: PROJECT_NOT_FOUND
+              message: "Project not found"
+
+        rate_limit:
+          requests: 60
+          window: 60
+
+      - name: update_project
+        method: PATCH
+        path: /projects/{project_id}
+        description: "Update project settings"
+
+        request:
+          path_params:
+            project_id:
+              type: string
+              format: uuid
+              required: true
+          content_type: application/json
+          schema:
             type: object
             properties:
-              name: { type: string }
-              slug: { type: string, nullable: true }
-              default_model: { type: string }
+              name:
+                type: string
+                minLength: 1
+                maxLength: 100
+              description:
+                type: string
+                maxLength: 500
+              default_model:
+                type: string
+              settings:
+                type: object
+                properties:
+                  max_context_tokens:
+                    type: integer
+                    minimum: 1000
+                    maximum: 200000
+                  git_commit_policy:
+                    type: string
+                    enum: [auto_batch, manual_only]
+
         response:
-          status: 201
-          body: { $ref: Project }
+          success:
+            status: 200
+            schema:
+              $ref: "spec/domain.yaml#Project"
+
+          errors:
+            - status: 404
+              code: PROJECT_NOT_FOUND
+            - status: 400
+              code: INVALID_SETTINGS
+
+        rate_limit:
+          requests: 30
+          window: 60
+
+      - name: archive_project
+        method: POST
+        path: /projects/{project_id}/archive
+        description: "Archive a project"
+
+        request:
+          path_params:
+            project_id:
+              type: string
+              format: uuid
+              required: true
+
+        response:
+          success:
+            status: 200
+            schema:
+              $ref: "spec/domain.yaml#Project"
+
+          errors:
+            - status: 404
+              code: PROJECT_NOT_FOUND
+            - status: 409
+              code: PROJECT_ALREADY_ARCHIVED
+
+        rate_limit:
+          requests: 10
+          window: 60
+
+      - name: restore_project
+        method: POST
+        path: /projects/{project_id}/restore
+        description: "Restore an archived project"
+
+        request:
+          path_params:
+            project_id:
+              type: string
+              format: uuid
+              required: true
+
+        response:
+          success:
+            status: 200
+            schema:
+              $ref: "spec/domain.yaml#Project"
+
+          errors:
+            - status: 404
+              code: PROJECT_NOT_FOUND
+            - status: 409
+              code: PROJECT_NOT_ARCHIVED
+
+        rate_limit:
+          requests: 10
+          window: 60
+
+      - name: delete_project
+        method: DELETE
+        path: /projects/{project_id}
+        description: "Delete a project (soft delete)"
+
+        request:
+          path_params:
+            project_id:
+              type: string
+              format: uuid
+              required: true
+          query:
+            permanent:
+              type: boolean
+              default: false
+              description: "Permanently delete (cannot be undone)"
+
+        response:
+          success:
+            status: 204
+
+          errors:
+            - status: 404
+              code: PROJECT_NOT_FOUND
+
+        rate_limit:
+          requests: 5
+          window: 60
+
+      # =========================================================================
+      # CHAT ENDPOINTS
+      # =========================================================================
 
       - name: list_chats
         method: GET
-        path: "/projects/{project_id}/chats"
+        path: /projects/{project_id}/chats
+        description: "List all chats in a project"
+        function_reference: "spec/modules/backend_node.yaml#list_chats"
+
+        request:
+          path_params:
+            project_id:
+              type: string
+              format: uuid
+              required: true
+          query:
+            status:
+              type: string
+              enum: [active, closed, archived, all]
+              default: active
+
         response:
-          status: 200
-          body:
-            type: array
-            items: { $ref: Chat }
+          success:
+            status: 200
+            schema:
+              type: object
+              properties:
+                chats:
+                  type: array
+                  items:
+                    $ref: "spec/domain.yaml#Chat"
+
+          errors:
+            - status: 404
+              code: PROJECT_NOT_FOUND
+
+        rate_limit:
+          requests: 60
+          window: 60
 
       - name: create_chat
         method: POST
-        path: "/projects/{project_id}/chats"
-        request:
-          body:
-            type: object
-            properties:
-              name: { type: string, nullable: true }
-              system_prelude: { type: string, nullable: true }
-        response:
-          status: 201
-          body: { $ref: Chat }
+        path: /projects/{project_id}/chats
+        description: "Create a new chat in a project"
+        function_reference: "spec/functions/backend_node/create_chat.yaml"
 
-      - name: send_message
-        method: POST
-        path: "/projects/{project_id}/chats/{chat_id}/messages"
-        description: "Submit a new user message (incl. slash command parsing and LLM call if applicable)."
         request:
-          body:
+          path_params:
+            project_id:
+              type: string
+              format: uuid
+              required: true
+          content_type: application/json
+          schema:
             type: object
             properties:
-              raw_text: { type: string }   # includes potential slash commands
-              model_id: { type: string, nullable: true }
-              output_format_hint:
-                type: enum
-                values: [text, markdown, json]
-                default: text
-        response:
-          status: 200
-          body:
-            type: object
-            properties:
-              messages:
-                type: array
-                items: { $ref: Message } # includes new user + assistant messages if LLM was called
-              request_log:
-                $ref: LLMRequestLogEntry
+              name:
+                type: string
+                maxLength: 200
+                description: "Chat name (auto-generated if not provided)"
+              system_prelude:
+                type: object
+                properties:
+                  source_type:
+                    type: string
+                    enum: [inline, template]
+                  content:
+                    type: string
+                    description: "Inline system prompt"
+                  template_id:
+                    type: string
+                    description: "Template ID if source_type is template"
+                  variables:
+                    type: object
+                    description: "Variables for template"
 
-      - name: get_context_preview
-        method: POST
-        path: "/projects/{project_id}/chats/{chat_id}/context-preview"
-        description: "Return computed context messages + token counts without sending to LLM."
-        request:
-          body:
-            type: object
-            properties:
-              model_id: { type: string }
-              current_prompt_text: { type: string }
+          example:
+            name: "Feature Discussion"
+            system_prelude:
+              source_type: "inline"
+              content: "You are a helpful assistant."
+
         response:
-          status: 200
-          body:
-            type: object
-            properties:
-              messages:
-                type: array
-                items: { $ref: Message }
-              estimated_tokens: { type: integer }
-              context_limit: { type: integer }
+          success:
+            status: 201
+            schema:
+              $ref: "spec/domain.yaml#Chat"
+
+          errors:
+            - status: 404
+              code: PROJECT_NOT_FOUND
+            - status: 400
+              code: INVALID_TEMPLATE
+
+        rate_limit:
+          requests: 30
+          window: 60
+
+      - name: get_chat
+        method: GET
+        path: /projects/{project_id}/chats/{chat_id}
+        description: "Get a specific chat with messages"
+
+        request:
+          path_params:
+            project_id:
+              type: string
+              format: uuid
+              required: true
+            chat_id:
+              type: string
+              format: uuid
+              required: true
+          query:
+            include_messages:
+              type: boolean
+              default: true
+            message_limit:
+              type: integer
+              default: 100
+              maximum: 500
+
+        response:
+          success:
+            status: 200
+            schema:
+              type: object
+              properties:
+                chat:
+                  $ref: "spec/domain.yaml#Chat"
+                messages:
+                  type: array
+                  items:
+                    $ref: "spec/domain.yaml#Message"
+
+          errors:
+            - status: 404
+              code: CHAT_NOT_FOUND
+
+        rate_limit:
+          requests: 60
+          window: 60
+
+      - name: close_chat
+        method: POST
+        path: /projects/{project_id}/chats/{chat_id}/close
+        description: "Close a chat"
+
+        request:
+          path_params:
+            project_id:
+              type: string
+              format: uuid
+            chat_id:
+              type: string
+              format: uuid
+
+        response:
+          success:
+            status: 200
+            schema:
+              $ref: "spec/domain.yaml#Chat"
+
+          errors:
+            - status: 404
+              code: CHAT_NOT_FOUND
+
+        rate_limit:
+          requests: 30
+          window: 60
 
       - name: fork_chat
         method: POST
-        path: "/projects/{project_id}/chats/{chat_id}/fork"
+        path: /projects/{project_id}/chats/{chat_id}/fork
+        description: "Fork a chat from a specific message"
+
         request:
-          body:
+          path_params:
+            project_id:
+              type: string
+              format: uuid
+            chat_id:
+              type: string
+              format: uuid
+          content_type: application/json
+          schema:
             type: object
             properties:
-              from_message_id: { type: uuid, nullable: true }
-              prune_excluded: { type: boolean, default: false }
+              from_message_id:
+                type: string
+                format: uuid
+                description: "Message ID to fork from (null = fork all)"
+              prune_excluded:
+                type: boolean
+                default: false
+                description: "Exclude messages not in context"
+              new_name:
+                type: string
+                description: "Name for forked chat"
+
         response:
-          status: 201
-          body: { $ref: Chat }
+          success:
+            status: 201
+            schema:
+              $ref: "spec/domain.yaml#Chat"
 
-  python_tools:
-    base_path: "/tools"
-    endpoints:
+          errors:
+            - status: 404
+              code: CHAT_NOT_FOUND
+            - status: 404
+              code: MESSAGE_NOT_FOUND
 
-      - name: execute_command
+        rate_limit:
+          requests: 10
+          window: 60
+
+      # =========================================================================
+      # MESSAGE ENDPOINTS
+      # =========================================================================
+
+      - name: send_message
         method: POST
-        path: "/projects/{project_id}/execute"
+        path: /projects/{project_id}/chats/{chat_id}/messages
+        description: "Send a message and get LLM response"
+        function_reference: "spec/functions/backend_node/send_message.yaml"
+
         request:
-          body:
+          path_params:
+            project_id:
+              type: string
+              format: uuid
+            chat_id:
+              type: string
+              format: uuid
+          content_type: application/json
+          schema:
             type: object
+            required: [raw_text]
             properties:
-              language: { type: string } # "bash", "python"
-              code: { type: string }
-              args: { type: array, items: { type: string }, nullable: true }
-              files_to_read:
-                type: array
-                items: { type: string }
-              files_to_write:
-                type: array
-                items: { type: string }
+              raw_text:
+                type: string
+                minLength: 1
+                maxLength: 100000
+                description: "Message content (may include slash commands)"
+              model_id:
+                type: string
+                description: "Override default model"
+              output_format_hint:
+                type: string
+                enum: [text, markdown, json]
+                default: text
+              is_aside:
+                type: boolean
+                default: false
+                description: "Mark as aside (excluded from future context)"
+              pure_aside:
+                type: boolean
+                default: false
+                description: "Pure aside (no LLM call)"
+
+          example:
+            raw_text: "Explain how to implement a binary search tree"
+            model_id: "openrouter/anthropic/claude-3-opus"
+            output_format_hint: "markdown"
+
         response:
-          status: 200
-          body:
+          success:
+            status: 200
+            schema:
+              type: object
+              properties:
+                user_message:
+                  $ref: "spec/domain.yaml#Message"
+                assistant_message:
+                  $ref: "spec/domain.yaml#Message"
+                  nullable: true
+                request_log:
+                  $ref: "spec/domain.yaml#LLMRequestLogEntry"
+                  nullable: true
+                command_result:
+                  type: object
+                  nullable: true
+                  description: "Result if slash command was executed"
+
+          errors:
+            - status: 404
+              code: CHAT_NOT_FOUND
+            - status: 400
+              code: EMPTY_MESSAGE
+            - status: 400
+              code: UNKNOWN_COMMAND
+            - status: 502
+              code: LLM_ERROR
+              message: "LLM API call failed"
+            - status: 504
+              code: LLM_TIMEOUT
+              message: "LLM request timed out"
+
+        rate_limit:
+          requests: 20
+          window: 60
+
+      - name: get_messages
+        method: GET
+        path: /projects/{project_id}/chats/{chat_id}/messages
+        description: "Get messages for a chat"
+
+        request:
+          path_params:
+            project_id:
+              type: string
+              format: uuid
+            chat_id:
+              type: string
+              format: uuid
+          query:
+            limit:
+              type: integer
+              default: 100
+              maximum: 500
+            before_id:
+              type: string
+              format: uuid
+              description: "Get messages before this ID"
+            after_id:
+              type: string
+              format: uuid
+              description: "Get messages after this ID"
+
+        response:
+          success:
+            status: 200
+            schema:
+              type: object
+              properties:
+                messages:
+                  type: array
+                  items:
+                    $ref: "spec/domain.yaml#Message"
+                has_more:
+                  type: boolean
+
+          errors:
+            - status: 404
+              code: CHAT_NOT_FOUND
+
+        rate_limit:
+          requests: 60
+          window: 60
+
+      - name: update_message
+        method: PATCH
+        path: /projects/{project_id}/chats/{chat_id}/messages/{message_id}
+        description: "Update message flags"
+
+        request:
+          path_params:
+            project_id:
+              type: string
+              format: uuid
+            chat_id:
+              type: string
+              format: uuid
+            message_id:
+              type: string
+              format: uuid
+          content_type: application/json
+          schema:
             type: object
             properties:
-              stdout: { type: string }
-              stderr: { type: string }
-              exit_code: { type: integer }
-              written_files:
+              is_pinned:
+                type: boolean
+              is_aside:
+                type: boolean
+              is_discarded:
+                type: boolean
+              include_in_context:
+                type: boolean
+
+        response:
+          success:
+            status: 200
+            schema:
+              $ref: "spec/domain.yaml#Message"
+
+          errors:
+            - status: 404
+              code: MESSAGE_NOT_FOUND
+            - status: 400
+              code: INVALID_FLAG_COMBINATION
+
+        rate_limit:
+          requests: 60
+          window: 60
+
+      - name: discard_message
+        method: POST
+        path: /projects/{project_id}/chats/{chat_id}/messages/{message_id}/discard
+        description: "Discard a message (exclude from context)"
+
+        request:
+          path_params:
+            project_id:
+              type: string
+              format: uuid
+            chat_id:
+              type: string
+              format: uuid
+            message_id:
+              type: string
+              format: uuid
+
+        response:
+          success:
+            status: 200
+            schema:
+              $ref: "spec/domain.yaml#Message"
+
+          errors:
+            - status: 404
+              code: MESSAGE_NOT_FOUND
+            - status: 409
+              code: MESSAGE_PINNED
+              message: "Cannot discard pinned message"
+
+        rate_limit:
+          requests: 60
+          window: 60
+
+      # =========================================================================
+      # CONTEXT ENDPOINTS
+      # =========================================================================
+
+      - name: get_context_preview
+        method: POST
+        path: /projects/{project_id}/chats/{chat_id}/context-preview
+        description: "Preview context that would be sent to LLM"
+        function_reference: "spec/functions/backend_node/construct_context.yaml"
+
+        request:
+          path_params:
+            project_id:
+              type: string
+              format: uuid
+            chat_id:
+              type: string
+              format: uuid
+          content_type: application/json
+          schema:
+            type: object
+            properties:
+              model_id:
+                type: string
+              current_prompt_text:
+                type: string
+                description: "Include this as the current message"
+
+        response:
+          success:
+            status: 200
+            schema:
+              type: object
+              properties:
+                messages:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      role:
+                        type: string
+                      content:
+                        type: string
+                      source_message_id:
+                        type: string
+                        format: uuid
+                estimated_tokens:
+                  type: integer
+                context_limit:
+                  type: integer
+                included_count:
+                  type: integer
+                excluded_count:
+                  type: integer
+
+          errors:
+            - status: 404
+              code: CHAT_NOT_FOUND
+
+        rate_limit:
+          requests: 30
+          window: 60
+
+      # =========================================================================
+      # GIT ENDPOINTS
+      # =========================================================================
+
+      - name: get_git_status
+        method: GET
+        path: /projects/{project_id}/git/status
+        description: "Get Git repository status"
+
+        request:
+          path_params:
+            project_id:
+              type: string
+              format: uuid
+
+        response:
+          success:
+            status: 200
+            schema:
+              type: object
+              properties:
+                branch:
+                  type: string
+                is_clean:
+                  type: boolean
+                staged:
+                  type: array
+                  items:
+                    type: string
+                modified:
+                  type: array
+                  items:
+                    type: string
+                untracked:
+                  type: array
+                  items:
+                    type: string
+                ahead:
+                  type: integer
+                behind:
+                  type: integer
+
+          errors:
+            - status: 404
+              code: PROJECT_NOT_FOUND
+            - status: 400
+              code: NOT_GIT_REPO
+
+        rate_limit:
+          requests: 30
+          window: 60
+
+      - name: git_commit
+        method: POST
+        path: /projects/{project_id}/git/commit
+        description: "Commit changes"
+
+        request:
+          path_params:
+            project_id:
+              type: string
+              format: uuid
+          content_type: application/json
+          schema:
+            type: object
+            required: [message]
+            properties:
+              message:
+                type: string
+                minLength: 1
+                maxLength: 500
+              files:
                 type: array
-                items: { type: string }
+                items:
+                  type: string
+                description: "Specific files to commit (null = all)"
+
+        response:
+          success:
+            status: 200
+            schema:
+              type: object
+              properties:
+                commit_hash:
+                  type: string
+                message:
+                  type: string
+                files_committed:
+                  type: array
+                  items:
+                    type: string
+
+          errors:
+            - status: 404
+              code: PROJECT_NOT_FOUND
+            - status: 400
+              code: NOTHING_TO_COMMIT
+            - status: 500
+              code: GIT_ERROR
+
+        rate_limit:
+          requests: 10
+          window: 60
+
+      - name: git_push
+        method: POST
+        path: /projects/{project_id}/git/push
+        description: "Push commits to remote"
+
+        request:
+          path_params:
+            project_id:
+              type: string
+              format: uuid
+          content_type: application/json
+          schema:
+            type: object
+            properties:
+              remote:
+                type: string
+                default: "origin"
+              branch:
+                type: string
+
+        response:
+          success:
+            status: 200
+            schema:
+              type: object
+              properties:
+                pushed:
+                  type: boolean
+                commits_pushed:
+                  type: integer
+
+          errors:
+            - status: 404
+              code: PROJECT_NOT_FOUND
+            - status: 400
+              code: NO_REMOTE
+            - status: 409
+              code: PUSH_REJECTED
+            - status: 500
+              code: GIT_ERROR
+
+        rate_limit:
+          requests: 5
+          window: 60
+
+      - name: get_git_diff
+        method: GET
+        path: /projects/{project_id}/git/diff
+        description: "Get diff for changes"
+        function_reference: "spec/functions/git_integration/get_diff.yaml"
+
+        request:
+          path_params:
+            project_id:
+              type: string
+              format: uuid
+          query:
+            file:
+              type: string
+              description: "Specific file path"
+            staged:
+              type: boolean
+              default: false
+            commit:
+              type: string
+              description: "Specific commit hash"
+
+        response:
+          success:
+            status: 200
+            schema:
+              type: object
+              properties:
+                diff:
+                  type: string
+                files:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      path:
+                        type: string
+                      status:
+                        type: string
+                      additions:
+                        type: integer
+                      deletions:
+                        type: integer
+
+          errors:
+            - status: 404
+              code: PROJECT_NOT_FOUND
+            - status: 404
+              code: FILE_NOT_FOUND
+
+        rate_limit:
+          requests: 30
+          window: 60
+
+      # =========================================================================
+      # TEMPLATE ENDPOINTS
+      # =========================================================================
+
+      - name: list_templates
+        method: GET
+        path: /templates
+        description: "List available prompt templates"
+
+        request:
+          query:
+            category:
+              type: string
+              description: "Filter by category"
+
+        response:
+          success:
+            status: 200
+            schema:
+              type: object
+              properties:
+                templates:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      name:
+                        type: string
+                      category:
+                        type: string
+                      description:
+                        type: string
+                      variables:
+                        type: array
+                        items:
+                          type: string
+
+        rate_limit:
+          requests: 60
+          window: 60
+
+      - name: render_template
+        method: POST
+        path: /templates/{template_id}/render
+        description: "Render a template with variables"
+        function_reference: "spec/functions/backend_python_tools/render_template.yaml"
+
+        request:
+          path_params:
+            template_id:
+              type: string
+          content_type: application/json
+          schema:
+            type: object
+            properties:
+              variables:
+                type: object
+                description: "Template variables"
+
+        response:
+          success:
+            status: 200
+            schema:
+              type: object
+              properties:
+                content:
+                  type: string
+                variables_used:
+                  type: array
+                  items:
+                    type: string
+
+          errors:
+            - status: 404
+              code: TEMPLATE_NOT_FOUND
+            - status: 400
+              code: MISSING_VARIABLE
+            - status: 400
+              code: TEMPLATE_ERROR
+
+        rate_limit:
+          requests: 30
+          window: 60
+
+      # =========================================================================
+      # STATS ENDPOINTS
+      # =========================================================================
+
+      - name: get_project_stats
+        method: GET
+        path: /projects/{project_id}/stats
+        description: "Get project usage statistics"
+        function_reference: "spec/functions/logging_and_metrics/get_stats.yaml"
+
+        request:
+          path_params:
+            project_id:
+              type: string
+              format: uuid
+          query:
+            from_date:
+              type: string
+              format: date
+            to_date:
+              type: string
+              format: date
+            group_by:
+              type: string
+              enum: [day, week, month, model]
+
+        response:
+          success:
+            status: 200
+            schema:
+              type: object
+              properties:
+                summary:
+                  type: object
+                  properties:
+                    total_requests:
+                      type: integer
+                    total_tokens:
+                      type: integer
+                    prompt_tokens:
+                      type: integer
+                    completion_tokens:
+                      type: integer
+                    average_latency_ms:
+                      type: number
+                    estimated_cost:
+                      type: number
+                breakdown:
+                  type: array
+                  items:
+                    type: object
+                models:
+                  type: object
+
+          errors:
+            - status: 404
+              code: PROJECT_NOT_FOUND
+
+        rate_limit:
+          requests: 30
+          window: 60
+
+      - name: get_chat_stats
+        method: GET
+        path: /projects/{project_id}/chats/{chat_id}/stats
+        description: "Get chat usage statistics"
+
+        request:
+          path_params:
+            project_id:
+              type: string
+              format: uuid
+            chat_id:
+              type: string
+              format: uuid
+
+        response:
+          success:
+            status: 200
+            schema:
+              type: object
+              properties:
+                message_count:
+                  type: integer
+                total_tokens:
+                  type: integer
+                models_used:
+                  type: array
+                  items:
+                    type: string
+                average_response_time_ms:
+                  type: number
+
+          errors:
+            - status: 404
+              code: CHAT_NOT_FOUND
+
+        rate_limit:
+          requests: 60
+          window: 60
+
+  # ===========================================================================
+  # PYTHON TOOLS API SERVICE
+  # ===========================================================================
+
+  python_tools_api:
+    base_url: "http://localhost:8000"
+    base_path: "/tools"
+    description: "Python tools backend for template rendering and code execution"
+    authentication: "internal"  # Only called by Node.js backend
+
+    endpoints:
+      - name: render_template
+        method: POST
+        path: /render-template
+        description: "Render Jinja2 template"
+        function_reference: "spec/functions/backend_python_tools/render_template.yaml"
+
+        request:
+          content_type: application/json
+          schema:
+            type: object
+            required: [template_content]
+            properties:
+              template_content:
+                type: string
+              variables:
+                type: object
+              options:
+                type: object
+                properties:
+                  strict:
+                    type: boolean
+                    default: false
+                  autoescape:
+                    type: boolean
+                    default: true
+
+        response:
+          success:
+            status: 200
+            schema:
+              type: object
+              properties:
+                content:
+                  type: string
+                variables_used:
+                  type: array
+                  items:
+                    type: string
+                warnings:
+                  type: array
+                  items:
+                    type: string
+
+          errors:
+            - status: 400
+              code: TEMPLATE_SYNTAX_ERROR
+            - status: 400
+              code: UNDEFINED_VARIABLE
+            - status: 403
+              code: SECURITY_VIOLATION
+
+      - name: execute_code
+        method: POST
+        path: /execute
+        description: "Execute Python or shell code"
+        function_reference: "spec/functions/backend_python_tools/execute_code.yaml"
+
+        request:
+          content_type: application/json
+          schema:
+            type: object
+            required: [code, language, project_path]
+            properties:
+              code:
+                type: string
+              language:
+                type: string
+                enum: [python, shell]
+              project_path:
+                type: string
+              options:
+                type: object
+                properties:
+                  timeout:
+                    type: integer
+                    default: 30
+                    maximum: 300
+                  working_dir:
+                    type: string
+
+        response:
+          success:
+            status: 200
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                exit_code:
+                  type: integer
+                stdout:
+                  type: string
+                stderr:
+                  type: string
+                duration_ms:
+                  type: integer
+                files_modified:
+                  type: array
+                  items:
+                    type: string
+
+          errors:
+            - status: 408
+              code: EXECUTION_TIMEOUT
+            - status: 403
+              code: SECURITY_VIOLATION
+            - status: 500
+              code: EXECUTION_ERROR
+
+      - name: health_check
+        method: GET
+        path: /health
+        description: "Health check endpoint"
+
+        response:
+          success:
+            status: 200
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [healthy, degraded, unhealthy]
+                version:
+                  type: string
+                uptime_seconds:
+                  type: integer

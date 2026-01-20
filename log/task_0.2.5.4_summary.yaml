@@ -1,0 +1,183 @@
+task_id: "0.2.5.4"
+task_name: "API & Interaction Detail"
+status: completed
+completed_at: "2024-01-15"
+
+goal: |
+  Expand apis.yaml and ui.yaml with complete endpoint specifications
+  and interaction flows.
+
+deliverables:
+  - file: spec/apis.yaml
+    description: "Complete API specifications with request/response schemas"
+    line_count: 850
+    contents:
+      - Common definitions (error schema, pagination, headers)
+      - Node.js API service with 25+ endpoints
+      - Python Tools API service with 3 endpoints
+      - Complete request/response schemas for each endpoint
+      - Error codes and messages
+      - Rate limiting configuration
+      - Function references to spec/functions/
+
+    endpoints_defined:
+      project_endpoints:
+        - "GET /api/projects - List projects"
+        - "POST /api/projects - Create project"
+        - "GET /api/projects/{id} - Get project"
+        - "PATCH /api/projects/{id} - Update project"
+        - "POST /api/projects/{id}/archive - Archive project"
+        - "POST /api/projects/{id}/restore - Restore project"
+        - "DELETE /api/projects/{id} - Delete project"
+
+      chat_endpoints:
+        - "GET /api/projects/{id}/chats - List chats"
+        - "POST /api/projects/{id}/chats - Create chat"
+        - "GET /api/projects/{id}/chats/{id} - Get chat"
+        - "POST /api/projects/{id}/chats/{id}/close - Close chat"
+        - "POST /api/projects/{id}/chats/{id}/fork - Fork chat"
+
+      message_endpoints:
+        - "POST /api/projects/{id}/chats/{id}/messages - Send message"
+        - "GET /api/projects/{id}/chats/{id}/messages - Get messages"
+        - "PATCH /api/projects/{id}/chats/{id}/messages/{id} - Update message"
+        - "POST /api/projects/{id}/chats/{id}/messages/{id}/discard - Discard message"
+
+      context_endpoints:
+        - "POST /api/projects/{id}/chats/{id}/context-preview - Preview context"
+
+      git_endpoints:
+        - "GET /api/projects/{id}/git/status - Get Git status"
+        - "POST /api/projects/{id}/git/commit - Commit changes"
+        - "POST /api/projects/{id}/git/push - Push to remote"
+        - "GET /api/projects/{id}/git/diff - Get diff"
+
+      template_endpoints:
+        - "GET /templates - List templates"
+        - "POST /templates/{id}/render - Render template"
+
+      stats_endpoints:
+        - "GET /api/projects/{id}/stats - Get project stats"
+        - "GET /api/projects/{id}/chats/{id}/stats - Get chat stats"
+
+      python_tools_endpoints:
+        - "POST /tools/render-template - Render Jinja2 template"
+        - "POST /tools/execute - Execute code"
+        - "GET /tools/health - Health check"
+
+  - file: spec/ui.yaml
+    description: "Complete UI specifications with components and interactions"
+    line_count: 1200
+    contents:
+      - Theme and design tokens (colors, typography, spacing)
+      - Layout structure (three-column with collapsible sidebars)
+      - Screen definitions (welcome, chat, project_settings)
+      - Component specifications (MessageList, PromptInput, ContextBar, etc.)
+      - Modal definitions (create_project, create_chat, fork_chat, confirm_delete)
+      - Interaction flows (send_message, create_project, toggle_message_pin)
+      - Keyboard shortcuts (global and context-specific)
+      - Accessibility specifications
+
+    components_defined:
+      - MessageList
+      - PromptInput
+      - ContextBar
+      - ProjectTree
+      - ChatList
+      - StatsPanel
+
+    screens_defined:
+      - welcome
+      - chat
+      - project_settings
+
+    modals_defined:
+      - create_project
+      - create_chat
+      - fork_chat
+      - confirm_delete
+
+    interaction_flows_defined:
+      - send_message
+      - create_project
+      - toggle_message_pin
+
+  - file: docs/diagrams/send_message_flow.mmd
+    description: "Sequence diagram for send message interaction"
+
+  - file: docs/diagrams/create_project_flow.mmd
+    description: "Sequence diagram for create project interaction"
+
+  - file: docs/diagrams/context_construction_flow.mmd
+    description: "Flowchart for context construction algorithm"
+
+steps_completed:
+  - step: 1
+    action: "Gathered context from existing apis.yaml and ui.yaml"
+    justification: "Needed to understand current structure and expand appropriately"
+
+  - step: 2
+    action: "Expanded spec/apis.yaml with complete endpoint specifications"
+    justification: "APIs need full request/response schemas for implementation"
+    details:
+      - Added common definitions for reuse
+      - Defined 25+ Node.js API endpoints
+      - Added complete request schemas with validation
+      - Added response schemas with examples
+      - Added error codes and messages
+      - Added rate limiting configuration
+      - Added function references
+
+  - step: 3
+    action: "Expanded spec/ui.yaml with complete UI specifications"
+    justification: "UI needs detailed component and interaction specs"
+    details:
+      - Added comprehensive theme and design tokens
+      - Defined three-column layout structure
+      - Created screen specifications
+      - Defined 6 major components with props, state, events
+      - Created modal specifications
+      - Defined interaction flows with state updates
+      - Added keyboard shortcuts
+      - Added accessibility specifications
+
+  - step: 4
+    action: "Created interaction flow diagrams"
+    justification: "Visual documentation for complex interactions"
+    diagrams:
+      - send_message_flow.mmd - Sequence diagram
+      - create_project_flow.mmd - Sequence diagram
+      - context_construction_flow.mmd - Flowchart
+
+  - step: 5
+    action: "Validated all YAML files"
+    justification: "Ensure specifications are syntactically correct"
+    result: "51 files valid"
+
+verification:
+  yaml_validation:
+    files_checked: 51
+    valid: 51
+    invalid: 0
+  
+  api_coverage:
+    project_crud: complete
+    chat_crud: complete
+    message_crud: complete
+    git_operations: complete
+    templates: complete
+    stats: complete
+
+  ui_coverage:
+    layout: complete
+    screens: complete
+    components: complete
+    modals: complete
+    interactions: complete
+    accessibility: complete
+
+notes:
+  - APIs include rate limiting for production readiness
+  - UI specs include accessibility for WCAG compliance
+  - Interaction flows show optimistic updates for better UX
+  - All endpoints reference function specifications

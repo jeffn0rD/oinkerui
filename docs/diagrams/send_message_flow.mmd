@@ -1,0 +1,53 @@
+%%{init: {'theme': 'dark', 'themeVariables': { 'primaryColor': '#1e3a5f'}}}%%
+
+sequenceDiagram
+    autonumber
+    participant U as User
+    participant PI as PromptInput
+    participant UI as UIStore
+    participant MS as MessagesStore
+    participant API as Backend API
+    participant LLM as OpenRouter
+
+    U->>PI: Type message & press Enter
+    PI->>PI: Validate input
+    
+    alt Input is empty
+        PI-->>U: Show validation error
+    else Input starts with /
+        PI->>API: Parse slash command
+        API-->>PI: Command result
+        PI->>MS: Add command result message
+    else Normal message
+        PI->>UI: Set isLoading = true
+        PI->>UI: Clear promptInput
+        
+        PI->>MS: Add optimistic user message
+        Note over MS: Message with temp ID,<br/>status: pending
+        
+        PI->>API: POST /messages
+        Note over API: {raw_text, model_id,<br/>output_format_hint}
+        
+        API->>API: Construct context
+        API->>LLM: Chat completion request
+        
+        alt LLM Success
+            LLM-->>API: Response with content
+            API->>API: Save messages
+            API->>API: Log request
+            API-->>PI: {user_message, assistant_message, request_log}
+            
+            PI->>MS: Replace temp with real user message
+            PI->>MS: Add assistant message
+            PI->>UI: Update stats
+            PI->>UI: Scroll to bottom
+        else LLM Error
+            LLM-->>API: Error response
+            API-->>PI: Error details
+            PI->>MS: Mark message as error
+            PI->>UI: Restore promptInput
+            PI-->>U: Show error toast
+        end
+        
+        PI->>UI: Set isLoading = false
+    end

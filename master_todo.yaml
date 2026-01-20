@@ -40,27 +40,6 @@ prompt_guidance: 'Always follow these guidelines and update project documentatio
   '
 current:
 - task:
-    id: 0.2.5.4
-    name: API & Interaction Detail
-    goal: Expand apis.yaml and ui.yaml with complete endpoint specifications and interaction flows.
-    prompt: ./prompts/dev/prompt_0_2_5_4.md
-    files:
-    - spec/apis.yaml
-    - spec/ui.yaml
-    - docs/diagrams/interaction_flow.mmd
-    - docs/diagrams/api_flow.mmd
-    details:
-      focus:
-      - Complete API endpoint specifications
-      - Request/response schemas
-      - UI interaction flows
-      - State changes per interaction
-      verification:
-      - All endpoints have complete specs
-      - All UI interactions documented
-      - All state changes specified
-      - Interaction diagrams complete
-- task:
     id: 0.2.5.5
     name: Workflow Implementation Specs
     goal: Expand workflows.yaml with concrete workflow implementations for Phase 1-2.
