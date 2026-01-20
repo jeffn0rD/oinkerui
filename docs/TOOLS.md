@@ -227,12 +227,19 @@ To execute this task:
    python3 tools/task_cleanup.py --task-id 0.2
 ```
 
-## 4. Document Query Tool
+## 4. Document Query Tool (v3 - with Predicates)
 
 ### Purpose
-Retrieves contextual information from project specifications, logs, and todos with enhanced querying capabilities.
+Retrieves contextual information from project specifications, logs, and todos with powerful predicate-based filtering.
 
-### New Query Modes
+### New Features (v3)
+
+**Predicate-Based Filtering**:
+- Filter data using complex expressions with comparison and logical operators
+- Returns ancestor nodes (entire objects) when predicates match
+- Supports nested field access
+
+### Query Modes
 
 **Task Mode** (Recommended for task queries):
 ```bash
@@ -240,12 +247,24 @@ python3 tools/doc_query.py --query "0.2" --mode task --pretty
 ```
 Returns complete task information including related files and prompts.
 
-**Path Mode** (Structured queries):
+**Path Mode with Predicates** (NEW):
 ```bash
+# Find task by name pattern (returns entire task object)
+python3 tools/doc_query.py --query "current[*].task.{name~Frontend}" --mode path --pretty
+
+# Complex predicate with AND
+python3 tools/doc_query.py --query "current[*].task.{name~Frontend AND status=active}" --mode path --pretty
+
+# Numeric comparison
+python3 tools/doc_query.py --query "current[*].task.{priority>3}" --mode path --pretty
+
+# Legacy syntax (still supported)
 python3 tools/doc_query.py --query "current[*].task.id=0.2" --mode path --pretty
-python3 tools/doc_query.py --query "current[*].task.name~Node" --mode path --pretty
 ```
-Use structured path notation for precise lookups.
+
+**Predicate Operators**:
+- Comparison: `=`, `!=`, `~` (regex), `!~`, `>`, `<`, `>=`, `<=`
+- Logical: `AND`, `OR`, `NOT`
 
 ### Traditional Modes
 

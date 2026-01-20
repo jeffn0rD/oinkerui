@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """
-Task Executor Tool for oinkerui Project
+Task Executor Tool for oinkerui Project (v2)
+
+Enhanced with EnhancedDocQuery integration for better context retrieval.
 
 This tool automates task execution:
-1. Reads task from master_todo.yaml
+1. Reads task from master_todo.yaml using EnhancedDocQuery
 2. Generates orchestrator prompt with prompt_guidance
 3. Executes the task (or generates prompt for manual execution)
 4. Runs task cleanup tool
@@ -23,6 +25,10 @@ from typing import Dict, List, Any, Optional
 import yaml
 import re
 
+# Import EnhancedDocQuery
+sys.path.insert(0, str(Path(__file__).parent))
+from doc_query import EnhancedDocQuery
+
 
 class TaskExecutor:
     """Automates task execution and coordination."""
@@ -32,6 +38,7 @@ class TaskExecutor:
         self.base_path = Path(base_path)
         self.task_data = None
         self.prompt_guidance = None
+        self.doc_query = EnhancedDocQuery(base_path)
         
     def execute_task(self, task_id: str, generate_only: bool = False) -> bool:
         """
@@ -49,7 +56,7 @@ class TaskExecutor:
         print(f"=" * 70)
         print()
         
-        # Load task from master_todo.yaml
+        # Load task using EnhancedDocQuery
         if not self._load_task(task_id):
             return False
         
@@ -93,309 +100,187 @@ class TaskExecutor:
         print(f"=" * 70)
         print()
         
-        # Find next task
+        # Find next task using EnhancedDocQuery
         next_task_id = self._find_next_task()
         if not next_task_id:
             print("❌ No tasks found in master_todo.yaml")
             return False
         
-        print(f"Next task: {next_task_id}")
+        print(f"Found next task: {next_task_id}")
         print()
         
         return self.execute_task(next_task_id, generate_only)
     
     def _load_task(self, task_id: str) -> bool:
-        """Load task data from master_todo.yaml."""
-        master_todo_path = self.base_path / "master_todo.yaml"
+        """Load task data using EnhancedDocQuery."""
+        print(f"Loading task {task_id}...")
         
-        if not master_todo_path.exists():
-            print(f"❌ master_todo.yaml not found")
+        # Use task query mode
+        result = self.doc_query.query_task(task_id)
+        
+        if not result.get('task_found'):
+            print(f"❌ Task {task_id} not found in master_todo.yaml or tasks_completed.yaml")
             return False
         
-        try:
-            # Read as text first to extract prompt_guidance
-            with open(master_todo_path, 'r') as f:
-                content = f.read()
-            
-            # Extract prompt_guidance using regex
-            guidance_match = re.search(
-                r'prompt_guidance:\s*\|\s*\n((?:  .*\n)*)',
-                content,
-                re.MULTILINE
-            )
-            if guidance_match:
-                # Remove leading spaces from each line
-                guidance_lines = guidance_match.group(1).split('\n')
-                self.prompt_guidance = '\n'.join(
-                    line[2:] if line.startswith('  ') else line
-                    for line in guidance_lines
-                ).strip()
-            
-            # Try to parse YAML (may fail due to existing errors)
-            try:
-                data = yaml.safe_load(content)
-                
-                # Find task in current tasks
-                if 'current' in data and isinstance(data['current'], list):
-                    for item in data['current']:
-                        if isinstance(item, dict) and 'task' in item:
-                            task = item['task']
-                            # Handle both list and dict formats
-                            if isinstance(task, list) and len(task) > 0:
-                                task = task[0]
-                            
-                            if isinstance(task, dict):
-                                task_id_field = task.get('id') or (task[0].get('id') if isinstance(task, list) else None)
-                                if str(task_id_field) == str(task_id):
-                                    self.task_data = task
-                                    return True
-            except yaml.YAMLError:
-                # If YAML parsing fails, try to extract task info from text
-                print("⚠️  YAML parsing failed, extracting task info from text...")
-                task_pattern = rf'- id:\s*{re.escape(task_id)}\s*\n\s*name:\s*"([^"]+)"\s*\n\s*goal:\s*"([^"]+)"'
-                match = re.search(task_pattern, content)
-                if match:
-                    self.task_data = {
-                        'id': task_id,
-                        'name': match.group(1),
-                        'goal': match.group(2)
-                    }
-                    return True
-            
-            print(f"❌ Task {task_id} not found in master_todo.yaml")
+        # Check if task is already completed
+        if result.get('completed_task') and not result.get('current_task'):
+            print(f"⚠ Task {task_id} is already completed")
+            print(f"  Found in: {result['completed_task']['file']}")
             return False
-            
-        except Exception as e:
-            print(f"❌ Error loading task: {str(e)}")
-            return False
+        
+        # Store task data
+        self.task_data = result['current_task']
+        print(f"✓ Task loaded from {self.task_data['file']}")
+        
+        return True
     
     def _find_next_task(self) -> Optional[str]:
-        """Find the next task ID in master_todo.yaml."""
-        master_todo_path = self.base_path / "master_todo.yaml"
+        """Find the next task in master_todo.yaml using EnhancedDocQuery."""
+        # Query for all current tasks
+        result = self.doc_query.query_path("current[*].task")
         
-        try:
-            with open(master_todo_path, 'r') as f:
-                content = f.read()
-            
-            # Find first task ID in current section
-            match = re.search(r'current:.*?- id:\s*(\S+)', content, re.DOTALL)
-            if match:
-                return match.group(1)
-            
+        if not result.get('matches'):
             return None
-            
-        except Exception as e:
-            print(f"❌ Error finding next task: {str(e)}")
-            return None
+        
+        # Get the first task from master_todo.yaml
+        for match in result['matches']:
+            if match['file'] == 'master_todo.yaml' and match.get('results'):
+                first_task = match['results'][0]
+                task_data = first_task.get('value', {})
+                return str(task_data.get('id'))
+        
+        return None
     
     def _generate_orchestrator_prompt(self, task_id: str) -> Optional[Path]:
-        """Generate orchestrator prompt from template."""
+        """Generate orchestrator prompt for the task."""
+        print(f"Generating orchestrator prompt...")
+        
+        # Load prompt template
         template_path = self.base_path / "prompts" / "templates" / "dev" / "orchestrator_prompt.md"
-        
         if not template_path.exists():
-            print(f"❌ Orchestrator template not found: {template_path}")
+            print(f"❌ Template not found: {template_path}")
             return None
         
-        try:
-            with open(template_path, 'r') as f:
-                template = f.read()
-            
-            # Extract task details
-            task_name = self.task_data.get('name', f'Task {task_id}')
-            task_goal = self.task_data.get('goal', 'No goal specified')
-            
-            # Build task details
-            task_details = []
-            
-            # Add query command to get full task details
-            task_details.append("**Get Full Task Details:**")
-            task_details.append("```bash")
-            task_details.append(f"python3 tools/doc_query.py --query &quot;{task_id}&quot; --mode task --pretty")
-            task_details.append("```")
-            task_details.append("")
-            
-            if 'files' in self.task_data:
-                task_details.append("**Files:**")
-                for f in self.task_data['files']:
-                    task_details.append(f"- {f}")
-                task_details.append("")
-            
-            if 'details' in self.task_data:
-                details = self.task_data['details']
-                if isinstance(details, dict):
-                    if 'focus' in details:
-                        task_details.append("**Focus Areas:**")
-                        for item in details['focus']:
-                            task_details.append(f"- {item}")
-                        task_details.append("")
-                    
-                    if 'notes' in details:
-                        task_details.append("**Notes:**")
-                        for note in details['notes']:
-                            task_details.append(f"- {note}")
-                        task_details.append("")
-                    
-                    if 'steps' in details:
-                        task_details.append("**Steps:**")
-                        for i, step in enumerate(details['steps'], 1):
-                            task_details.append(f"{i}. {step}")
-                        task_details.append("")
-            
-            # Check for prompt file reference
-            prompt_file = self.task_data.get('prompt', '')
-            if prompt_file:
-                task_details.append(f"**Prompt File:** {prompt_file}")
-                task_details.append("")
-                task_details.append("Review the detailed prompt file for specific instructions.")
-            
-            # Build execution steps
-            execution_steps = []
-            if 'details' in self.task_data and 'steps' in self.task_data['details']:
-                for i, step in enumerate(self.task_data['details']['steps'], 1):
-                    execution_steps.append(f"{i}. {step}")
-            else:
-                execution_steps.append("1. Review task goal and requirements")
-                execution_steps.append("2. Gather context using doc_query tool")
-                execution_steps.append("3. Execute task steps")
-                execution_steps.append("4. Verify completion")
-                execution_steps.append("5. Document work in task summary")
-            
-            # Build expected outputs
-            expected_outputs = []
-            expected_outputs.append(f"- Task {task_id} completed successfully")
-            expected_outputs.append(f"- All deliverables created")
-            expected_outputs.append(f"- Task summary in log/task_{task_id}_summary.yaml")
-            expected_outputs.append(f"- Task moved to log/tasks_completed.yaml")
-            
-            # Build verification steps
-            verification_steps = []
-            verification_steps.append("1. Run YAML validation:")
-            verification_steps.append("   ```bash")
-            verification_steps.append("   python3 verify/validate_yaml.py --all")
-            verification_steps.append("   ```")
-            verification_steps.append("")
-            verification_steps.append("2. Run task cleanup:")
-            verification_steps.append("   ```bash")
-            verification_steps.append(f"   python3 tools/task_cleanup.py --task-id {task_id}")
-            verification_steps.append("   ```")
-            
-            # Build files referenced
-            files_referenced = []
-            if 'files' in self.task_data:
-                for f in self.task_data['files']:
-                    files_referenced.append(f"- {f}")
-            
-            # Get previous task ID for context
-            previous_task_id = self._get_previous_task_id(task_id)
-            
-            # Determine related specs
-            related_specs = "spec"
-            if 'files' in self.task_data:
-                spec_files = [f for f in self.task_data['files'] if 'spec/' in f]
-                if spec_files:
-                    related_specs = " ".join(spec_files)
-            
-            # Build better query commands for context gathering
-            context_queries = []
-            context_queries.append(f"# Get complete task information")
-            context_queries.append(f"python3 tools/doc_query.py --query &quot;{task_id}&quot; --mode task --pretty")
-            context_queries.append("")
-            
-            if 'files' in self.task_data:
-                for file_ref in self.task_data['files']:
-                    if file_ref.endswith('.yaml'):
-                        context_queries.append(f"# Get {file_ref} content")
-                        context_queries.append(f"python3 tools/doc_query.py --query &quot;{file_ref}&quot; --mode file --pretty")
-                        context_queries.append("")
-            
-            context_queries_str = "\n".join(context_queries)
-            
-            # Fill template
-            prompt = template.format(
-                task_id=task_id,
-                task_name=task_name,
-                task_goal=task_goal,
-                task_details="\n".join(task_details),
-                previous_task_id=previous_task_id,
-                related_specs=related_specs,
-                topic=task_name.lower().replace(" ", "_"),
-                execution_steps="\n".join(execution_steps),
-                expected_outputs="\n".join(expected_outputs),
-                verification_steps="\n".join(verification_steps),
-                files_referenced="\n".join(files_referenced) if files_referenced else "See task details above"
-            )
-            
-            # Add prompt guidance at the beginning
-            if self.prompt_guidance:
-                full_prompt = f"# Task {task_id}: {task_name}\n\n"
-                full_prompt += f"## Prompt Guidance\n\n{self.prompt_guidance}\n\n"
-                full_prompt += "---\n\n"
-                full_prompt += prompt
-            else:
-                full_prompt = prompt
-            
-            # Save prompt
-            output_path = self.base_path / "prompts" / f"task_{task_id}_orchestrator.md"
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            
-            with open(output_path, 'w') as f:
-                f.write(full_prompt)
-            
-            return output_path
-            
-        except Exception as e:
-            print(f"❌ Error generating orchestrator prompt: {str(e)}")
-            import traceback
-            traceback.print_exc()
-            return None
+        with open(template_path, 'r') as f:
+            template = f.read()
+        
+        # Load prompt_guidance
+        guidance_path = self.base_path / "prompts" / "prompt_guidance.md"
+        if guidance_path.exists():
+            with open(guidance_path, 'r') as f:
+                self.prompt_guidance = f.read()
+        else:
+            self.prompt_guidance = "(prompt_guidance.md not found)"
+        
+        # Get task details
+        task = self.task_data['task']
+        task_name = task.get('name', 'Unknown Task')
+        task_goal = task.get('goal', 'No goal specified')
+        task_prompt_file = task.get('prompt', '')
+        task_files = task.get('files', [])
+        
+        # Load task-specific prompt if it exists
+        task_prompt_content = ""
+        if task_prompt_file:
+            task_prompt_path = self.base_path / task_prompt_file
+            if task_prompt_path.exists():
+                with open(task_prompt_path, 'r') as f:
+                    task_prompt_content = f.read()
+        
+        # Generate context gathering commands using new predicate syntax
+        context_commands = self._generate_context_commands(task_id, task_files)
+        
+        # Fill in template variables
+        prompt = template.replace("{task_id}", str(task_id))
+        prompt = prompt.replace("{task_name}", task_name)
+        prompt = prompt.replace("{task_goal}", task_goal)
+        prompt = prompt.replace("{task_details}", task_prompt_content)
+        prompt = prompt.replace("{context_commands}", context_commands)
+        prompt = prompt.replace("{prompt_guidance}", self.prompt_guidance)
+        prompt = prompt.replace("{timestamp}", datetime.now().isoformat())
+        
+        # Save orchestrator prompt
+        output_path = self.base_path / "prompts" / "generated" / f"orchestrator_{task_id}.md"
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        with open(output_path, 'w') as f:
+            f.write(prompt)
+        
+        return output_path
     
-    def _get_previous_task_id(self, task_id: str) -> str:
-        """Get the previous task ID."""
-        try:
-            # Parse task ID (e.g., "0.1" -> 0, 1)
-            parts = task_id.split('.')
-            if len(parts) == 2:
-                major, minor = int(parts[0]), int(parts[1])
-                if minor > 0:
-                    return f"{major}.{minor - 1}"
-                elif major > 0:
-                    return f"{major - 1}.0"
-            return "0.0"
-        except:
-            return "0.0"
+    def _generate_context_commands(self, task_id: str, related_files: List[str]) -> str:
+        """Generate context gathering commands using new doc_query syntax."""
+        commands = []
+        
+        # Command to get the task itself
+        commands.append(f"# Get complete task information")
+        commands.append(f"python3 tools/doc_query.py --query &quot;{task_id}&quot; --mode task --pretty")
+        commands.append("")
+        
+        # Commands for related files
+        if related_files:
+            commands.append(f"# Get related specification files")
+            for file in related_files:
+                commands.append(f"python3 tools/doc_query.py --query &quot;{file}&quot; --mode file --pretty")
+            commands.append("")
+        
+        # Example predicate queries
+        commands.append(f"# Example: Find tasks by name pattern")
+        commands.append(f"python3 tools/doc_query.py --query &quot;current[*].task.{{name~pattern}}&quot; --mode path --pretty")
+        commands.append("")
+        
+        commands.append(f"# Example: Find tasks with specific status")
+        commands.append(f"python3 tools/doc_query.py --query &quot;current[*].task.{{status=active}}&quot; --mode path --pretty")
+        commands.append("")
+        
+        commands.append(f"# Example: Complex predicate query")
+        commands.append(f"python3 tools/doc_query.py --query &quot;current[*].task.{{name~Frontend AND priority>3}}&quot; --mode path --pretty")
+        commands.append("")
+        
+        # Text search for keywords
+        commands.append(f"# Search for specific keywords")
+        commands.append(f"python3 tools/doc_query.py --query &quot;keyword*&quot; --mode text --pretty")
+        commands.append("")
+        
+        return "\n".join(commands)
 
 
 def main():
-    """Main entry point."""
     parser = argparse.ArgumentParser(
-        description="Execute tasks from master_todo.yaml"
+        description="Task Executor Tool with EnhancedDocQuery Integration",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Execute specific task
+  python3 tools/task_executor.py --task-id 0.2
+  
+  # Execute next task
+  python3 tools/task_executor.py --next
+  
+  # Generate prompt only (don't execute)
+  python3 tools/task_executor.py --task-id 0.2 --generate-only
+        """
     )
-    parser.add_argument(
-        "--task-id", "-t",
-        help="Task ID to execute (e.g., 0.2, 0.3)"
-    )
-    parser.add_argument(
-        "--next", "-n",
-        action="store_true",
-        help="Execute the next task in the list"
-    )
-    parser.add_argument(
-        "--generate-only", "-g",
-        action="store_true",
-        help="Only generate prompt without executing"
-    )
+    
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument('--task-id', '-t', help='Task ID to execute')
+    group.add_argument('--next', '-n', action='store_true', help='Execute next task')
+    
+    parser.add_argument('--generate-only', '-g', action='store_true',
+                       help='Generate prompt only, do not execute')
+    parser.add_argument('--base-path', '-b', default='.',
+                       help='Base path for the project (default: current directory)')
     
     args = parser.parse_args()
     
-    if not args.task_id and not args.next:
-        parser.error("Either --task-id or --next must be specified")
+    # Initialize executor
+    executor = TaskExecutor(args.base_path)
     
-    executor = TaskExecutor(".")
-    
-    if args.next:
-        success = executor.execute_next_task(args.generate_only)
-    else:
+    # Execute task
+    if args.task_id:
         success = executor.execute_task(args.task_id, args.generate_only)
+    else:
+        success = executor.execute_next_task(args.generate_only)
     
     sys.exit(0 if success else 1)
 

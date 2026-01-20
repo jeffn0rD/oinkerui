@@ -43,11 +43,40 @@ python3 tools/doc_query.py --query "0.2" --mode task --pretty
 }
 ```
 
-### 2. Path Mode (Structured Queries)
+### 2. Path Mode (Structured Queries with Predicates)
 
-**Purpose**: Query using structured path notation for precise lookups.
+**Purpose**: Query using structured path notation with powerful predicate filtering.
 
-**Syntax**:
+**New Predicate Syntax** (v3):
+- `path.to.array[*].{predicate}` - Filter array elements using predicates
+- Returns the **ancestor node** (entire object) when predicate matches
+
+**Predicate Operators**:
+- **Comparison**: `=`, `!=`, `~` (regex), `!~` (not regex), `>`, `<`, `>=`, `<=`
+- **Logical**: `AND`, `OR`, `NOT`
+
+**Predicate Examples**:
+```bash
+# Find task by name pattern (returns entire task object)
+python3 tools/doc_query.py --query "current[*].task.{name~Frontend}" --mode path --pretty
+
+# Find task by exact ID
+python3 tools/doc_query.py --query "current[*].task.{id=0.2}" --mode path --pretty
+
+# Find tasks NOT completed
+python3 tools/doc_query.py --query "current[*].task.{NOT status=completed}" --mode path --pretty
+
+# Complex predicate with AND
+python3 tools/doc_query.py --query "current[*].task.{name~Frontend AND status=active}" --mode path --pretty
+
+# Complex predicate with OR
+python3 tools/doc_query.py --query "current[*].task.{id=0.2 OR id=0.3}" --mode path --pretty
+
+# Numeric comparison
+python3 tools/doc_query.py --query "current[*].task.{priority>3}" --mode path --pretty
+```
+
+**Legacy Syntax** (still supported):
 - `path.to.key=value` - Exact match
 - `path.to.key~pattern` - Pattern match (regex)
 - `path[*].key` - Wildcard for arrays
@@ -244,12 +273,119 @@ results = subprocess.run([
 
 ## Troubleshooting
 
+## Predicate System (v3)
+
+### Overview
+
+The predicate system allows you to filter data using complex expressions. When a predicate matches, the tool returns the **ancestor node** (the entire object containing the matched field), not just the matched field value.
+
+### Predicate Syntax
+
+```
+path.to.array[*].{predicate_expression}
+```
+
+### Supported Operators
+
+#### Comparison Operators
+- `=` - Equals (exact match, works with strings and numbers)
+- `!=` - Not equals
+- `~` - Regex match (case-insensitive)
+- `!~` - Regex not match
+- `>` - Greater than (numeric)
+- `<` - Less than (numeric)
+- `>=` - Greater than or equal
+- `<=` - Less than or equal
+
+#### Logical Operators
+- `AND` or `&&` - Logical AND
+- `OR` or `||` - Logical OR
+- `NOT` or `!` - Logical NOT (prefix)
+
+### Predicate Examples
+
+#### Simple Predicates
+```bash
+# Find task where name contains "Frontend"
+python3 tools/doc_query.py --query "current[*].task.{name~Frontend}" --mode path --pretty
+
+# Find task with exact ID
+python3 tools/doc_query.py --query "current[*].task.{id=0.2}" --mode path --pretty
+
+# Find tasks with priority greater than 3
+python3 tools/doc_query.py --query "current[*].task.{priority>3}" --mode path --pretty
+```
+
+#### Complex Predicates with Logical Operators
+```bash
+# AND: Find tasks matching multiple conditions
+python3 tools/doc_query.py --query "current[*].task.{name~Frontend AND status=active}" --mode path --pretty
+
+# OR: Find tasks matching any condition
+python3 tools/doc_query.py --query "current[*].task.{id=0.2 OR id=0.3}" --mode path --pretty
+
+# NOT: Find tasks not matching condition
+python3 tools/doc_query.py --query "current[*].task.{NOT status=completed}" --mode path --pretty
+
+# Complex: Combine multiple operators
+python3 tools/doc_query.py --query "current[*].task.{name~Frontend AND priority>3 AND NOT status=completed}" --mode path --pretty
+```
+
+#### Nested Field Access
+```bash
+# Access nested fields using dot notation
+python3 tools/doc_query.py --query "current[*].task.{details.focus~Svelte}" --mode path --pretty
+```
+
+### Ancestor Node Return
+
+**Key Feature**: Predicates return the ancestor node, not just the matched field.
+
+Example:
+```bash
+# Query: Find task where name contains "Frontend"
+python3 tools/doc_query.py --query "current[*].task.{name~Frontend}" --mode path --pretty
+
+# Returns: The entire task object
+{
+  "matches": [{
+    "file": "master_todo.yaml",
+    "results": [{
+      "path": "current[3].task",
+      "value": {
+        "id": 0.5,
+        "name": "Initialize Svelte Frontend",
+        "goal": "...",
+        "prompt": "...",
+        "files": [...],
+        "details": {...}
+      }
+    }]
+  }]
+}
+```
+
+### Backward Compatibility
+
+The legacy path syntax (without predicates) is still fully supported:
+
+```bash
+# Legacy syntax (still works)
+python3 tools/doc_query.py --query "current[*].task.id=0.2" --mode path --pretty
+
+# New predicate syntax (recommended)
+python3 tools/doc_query.py --query "current[*].task.{id=0.2}" --mode path --pretty
+```
+
+## Troubleshooting
+
 ### Query returns no results
 
 - Check if the file exists and is a YAML file
 - Try text mode first to see if the content exists
 - Use file mode to see the complete structure
 - Check for typos in path queries
+- For predicates, ensure the field path is correct
 
 ### Numeric values not matching
 
@@ -260,6 +396,13 @@ results = subprocess.run([
 ### Path queries not working
 
 - Ensure proper syntax: `path.to.key=value` or `path.to.key~pattern`
+- For predicates: `path.to.array[*].{field=value}`
 - Use `[*]` for array wildcards
-- Use `.*` for object wildcards
 - Check that the path exists using file mode first
+
+### Predicate not matching
+
+- Verify field names are correct (case-sensitive)
+- For nested fields, use dot notation: `field.subfield`
+- For regex patterns, ensure proper escaping
+- Test with simpler predicates first, then add complexity
