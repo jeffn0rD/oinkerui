@@ -1,0 +1,345 @@
+# =============================================================================
+# Function Specification: logLLMRequest
+# =============================================================================
+
+function:
+  id: logging_and_metrics.log_llm_request
+  name: logLLMRequest
+  module: logging_and_metrics
+  purpose: |
+    Log an LLM request with full context including messages, usage statistics,
+    timing information, and touched resources. Creates a structured log entry
+    for auditing, debugging, and metrics collection.
+
+  signature:
+    parameters:
+      - name: entry
+        type: LLMRequestLogEntry
+        required: true
+        description: "Log entry data"
+        constraints:
+          - "project_id: required UUID"
+          - "chat_id: required UUID"
+          - "model: required string"
+          - "status: pending|success|error|timeout"
+    returns:
+      type: LogResult
+      description: "Result of logging operation"
+      schema:
+        properties:
+          id:
+            type: string
+          logged:
+            type: boolean
+          timestamp:
+            type: datetime
+    throws:
+      - type: ValidationError
+        condition: "Invalid entry data"
+      - type: FileSystemError
+        condition: "Cannot write to log file"
+
+  contract:
+    preconditions:
+      - "entry has required fields"
+      - "project_id references valid project"
+      - "Log directory exists or can be created"
+    postconditions:
+      - "Entry is appended to log file"
+      - "Entry has unique ID"
+      - "Timestamp is set"
+    invariants:
+      - "Log file is valid JSONL"
+      - "Entries are append-only"
+    side_effects:
+      - type: io_operation
+        description: "Appends to JSONL log file"
+        scope: "project/logs/llm_requests.jsonl"
+
+  algorithm:
+    description: |
+      1. Validate entry data
+      2. Generate entry ID if not present
+      3. Set timestamps
+      4. Resolve log file path
+      5. Serialize entry to JSON
+      6. Append to log file
+      7. Update metrics cache
+      8. Return result
+
+    steps:
+      - step: 1
+        action: "Validate required fields present"
+        rationale: "Ensure data integrity"
+      - step: 2
+        action: "Generate UUID for entry.id if not set"
+        rationale: "Unique identifier"
+      - step: 3
+        action: "Set timestamp_start if not set"
+        rationale: "Track timing"
+      - step: 4
+        action: "Get log path: project/logs/llm_requests.jsonl"
+        rationale: "Determine file location"
+      - step: 5
+        action: "JSON.stringify(entry)"
+        rationale: "Prepare for storage"
+      - step: 6
+        action: "Append JSON line to file"
+        rationale: "Persist entry"
+      - step: 7
+        action: "Update in-memory metrics"
+        rationale: "Keep stats current"
+      - step: 8
+        action: "Return LogResult"
+        rationale: "Confirm logging"
+
+    fol_specification: |
+      forall entry in LLMRequestLogEntry:
+        ValidEntry(entry) implies
+          let result = logLLMRequest(entry) in
+          result.logged and
+          NonNull(result.id) and
+          exists line in FileLines(logPath(entry.project_id)):
+            JSON.parse(line).id = result.id
+
+    pseudocode: |
+      function logLLMRequest(entry):
+          // Step 1: Validate
+          if not entry.project_id:
+              throw ValidationError("project_id required")
+          if not entry.chat_id:
+              throw ValidationError("chat_id required")
+          if not entry.model:
+              throw ValidationError("model required")
+          
+          // Step 2: Generate ID
+          if not entry.id:
+              entry.id = generateUUID()
+          
+          // Step 3: Set timestamps
+          if not entry.timestamp_start:
+              entry.timestamp_start = new Date().toISOString()
+          
+          // Step 4: Resolve path
+          projectPath = getProjectPath(entry.project_id)
+          logDir = path.join(projectPath, 'logs')
+          ensureDir(logDir)
+          logPath = path.join(logDir, 'llm_requests.jsonl')
+          
+          // Step 5: Serialize
+          jsonLine = JSON.stringify(entry)
+          
+          // Step 6: Append
+          fs.appendFileSync(logPath, jsonLine + '\n')
+          
+          // Step 7: Update metrics
+          metricsCache.update(entry)
+          
+          // Step 8: Return
+          return {
+              id: entry.id,
+              logged: true,
+              timestamp: entry.timestamp_start
+          }
+
+  complexity:
+    time: "O(1)"
+    space: "O(e)"
+    analysis: |
+      Time:
+        - Validation: O(1)
+        - File append: O(1) amortized
+        - Metrics update: O(1)
+      
+      Space:
+        - Entry object: O(e) where e = entry size
+        - Includes messages_included array
+
+  data_access:
+    reads:
+      - entity: Project
+        operations: [read_path]
+    writes:
+      - entity: LLMRequestLogEntry
+        operations: [create]
+    transactions: false
+
+  error_handling:
+    validation:
+      - parameter: entry.project_id
+        validation: "Must be valid UUID"
+        error_code: "INVALID_PROJECT_ID"
+      - parameter: entry.chat_id
+        validation: "Must be valid UUID"
+        error_code: "INVALID_CHAT_ID"
+      - parameter: entry.model
+        validation: "Must be non-empty string"
+        error_code: "INVALID_MODEL"
+    error_cases:
+      - condition: "Log directory doesn't exist"
+        error_type: FileSystemError
+        recovery: "Create directory"
+      - condition: "Write fails"
+        error_type: FileSystemError
+        recovery: "Retry once, then propagate"
+
+  testing:
+    unit_tests:
+      - name: "logs successful request"
+        scenario: "Complete entry"
+        inputs:
+          entry:
+            project_id: "proj-123"
+            chat_id: "chat-456"
+            model: "gpt-4"
+            status: "success"
+            usage:
+              prompt_tokens: 100
+              completion_tokens: 50
+        expected_output:
+          logged: true
+          id: "non-null"
+        expected_side_effects:
+          - "Entry appended to log file"
+
+      - name: "generates ID if missing"
+        scenario: "Entry without ID"
+        inputs:
+          entry:
+            project_id: "proj-123"
+            chat_id: "chat-456"
+            model: "gpt-4"
+        expected_output:
+          id: "generated UUID"
+
+      - name: "validates required fields"
+        scenario: "Missing project_id"
+        inputs:
+          entry:
+            chat_id: "chat-456"
+            model: "gpt-4"
+        expected_output:
+          error: ValidationError
+
+    edge_cases:
+      - "Very large messages_included array"
+      - "Entry with error details"
+      - "Concurrent log writes"
+      - "Log file doesn't exist yet"
+
+    integration_tests:
+      - "Log request and read back"
+      - "Log multiple requests and verify order"
+      - "Verify metrics updated"
+
+  llm_guidance:
+    implementation_hints: |
+      1. Use append-only file operations
+      2. Ensure atomic writes (single appendFileSync)
+      3. Create log directory if needed
+      4. Update metrics cache for fast queries
+      5. Consider log rotation for large files
+
+    key_considerations:
+      - "Append-only for data integrity"
+      - "JSONL format for easy parsing"
+      - "Include all relevant context"
+      - "Update metrics cache"
+      - "Handle concurrent writes"
+
+    example_code: |
+      const fs = require('fs');
+      const path = require('path');
+      const { v4: uuidv4 } = require('uuid');
+      
+      class LLMRequestLogger {
+        constructor() {
+          this.metricsCache = new Map();
+        }
+        
+        logLLMRequest(entry) {
+          // Validate
+          if (!entry.project_id) {
+            throw new ValidationError('project_id required');
+          }
+          if (!entry.chat_id) {
+            throw new ValidationError('chat_id required');
+          }
+          if (!entry.model) {
+            throw new ValidationError('model required');
+          }
+          
+          // Generate ID
+          if (!entry.id) {
+            entry.id = uuidv4();
+          }
+          
+          // Set timestamp
+          if (!entry.timestamp_start) {
+            entry.timestamp_start = new Date().toISOString();
+          }
+          
+          // Resolve path
+          const projectPath = this.getProjectPath(entry.project_id);
+          const logDir = path.join(projectPath, 'logs');
+          
+          // Ensure directory exists
+          if (!fs.existsSync(logDir)) {
+            fs.mkdirSync(logDir, { recursive: true });
+          }
+          
+          const logPath = path.join(logDir, 'llm_requests.jsonl');
+          
+          // Serialize and append
+          const jsonLine = JSON.stringify(entry);
+          fs.appendFileSync(logPath, jsonLine + '\n');
+          
+          // Update metrics
+          this.updateMetrics(entry);
+          
+          return {
+            id: entry.id,
+            logged: true,
+            timestamp: entry.timestamp_start
+          };
+        }
+        
+        updateMetrics(entry) {
+          const key = entry.project_id;
+          
+          if (!this.metricsCache.has(key)) {
+            this.metricsCache.set(key, {
+              totalRequests: 0,
+              totalTokens: 0,
+              totalLatencyMs: 0,
+              errorCount: 0
+            });
+          }
+          
+          const metrics = this.metricsCache.get(key);
+          metrics.totalRequests++;
+          
+          if (entry.usage) {
+            metrics.totalTokens += entry.usage.total_tokens || 0;
+          }
+          
+          if (entry.timings) {
+            metrics.totalLatencyMs += entry.timings.latency_ms || 0;
+          }
+          
+          if (entry.status === 'error') {
+            metrics.errorCount++;
+          }
+        }
+      }
+
+    common_mistakes:
+      - "Not validating required fields"
+      - "Not generating ID"
+      - "Not creating log directory"
+      - "Overwriting instead of appending"
+      - "Not updating metrics"
+
+  references:
+    - "spec/domain.yaml#LLMRequestLogEntry"
+    - "spec/modules/logging_and_metrics.yaml"

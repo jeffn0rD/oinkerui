@@ -1,0 +1,541 @@
+# =============================================================================
+# Function Specification: sendMessage
+# =============================================================================
+
+function:
+  id: backend_node.send_message
+  name: sendMessage
+  module: backend_node
+  purpose: |
+    Process a user message in a chat, optionally calling the LLM for a response.
+    This is the primary entry point for chat interactions. It handles slash
+    command parsing, context construction, LLM API calls, and message persistence.
+
+  signature:
+    parameters:
+      - name: projectId
+        type: string
+        required: true
+        description: "UUID of the project"
+      - name: chatId
+        type: string
+        required: true
+        description: "UUID of the chat"
+      - name: request
+        type: SendMessageRequest
+        required: true
+        description: "Message request payload"
+        constraints:
+          - "raw_text: non-empty string"
+          - "model_id: optional, valid model ID"
+          - "output_format_hint: text|markdown|json"
+          - "is_aside: optional boolean"
+          - "pure_aside: optional boolean"
+    returns:
+      type: SendMessageResponse
+      description: "Response containing user message, assistant message, and request log"
+      schema:
+        properties:
+          user_message:
+            $ref: "spec/domain.yaml#Message"
+          assistant_message:
+            $ref: "spec/domain.yaml#Message"
+          request_log:
+            $ref: "spec/domain.yaml#LLMRequestLogEntry"
+          command_result:
+            type: object
+            nullable: true
+    throws:
+      - type: NotFoundError
+        condition: "Project or chat not found"
+      - type: ValidationError
+        condition: "Invalid request parameters"
+      - type: LLMError
+        condition: "LLM API call failed"
+
+  contract:
+    preconditions:
+      - "projectId is valid UUID referencing active project"
+      - "chatId is valid UUID referencing active chat in project"
+      - "raw_text is non-empty string"
+      - "If model_id provided, must be valid configured model"
+    postconditions:
+      - "User message is persisted to chat storage"
+      - "If LLM called, assistant message is persisted"
+      - "LLM request is logged"
+      - "Chat updated_at timestamp is updated"
+      - "If slash command, command is executed"
+    invariants:
+      - "Message order is preserved"
+      - "Context construction follows spec/context.yaml algorithm"
+    side_effects:
+      - type: io_operation
+        description: "Appends messages to chat JSONL file"
+        scope: "project/chats/{chat_id}.jsonl"
+      - type: external_call
+        description: "Calls OpenRouter API for LLM response"
+        scope: "External API"
+      - type: state_mutation
+        description: "Updates chat timestamp"
+        scope: "Chat entity"
+      - type: event_emission
+        description: "Logs LLM request"
+        scope: "Logging system"
+
+  algorithm:
+    description: |
+      1. Validate inputs (projectId, chatId, request)
+      2. Load project and chat, verify active status
+      3. Check for slash command prefix
+      4. If slash command: parse and execute, return result
+      5. Create user message object
+      6. Save user message to storage
+      7. If not aside: construct LLM context
+      8. Call LLM API with context
+      9. Create assistant message from response
+      10. Save assistant message to storage
+      11. Log LLM request
+      12. Update chat timestamp
+      13. Return response
+
+    steps:
+      - step: 1
+        action: "Validate projectId, chatId are valid UUIDs"
+        rationale: "Fail fast on invalid input"
+      - step: 2
+        action: "Load project and chat, verify both are active"
+        rationale: "Ensure valid context for message"
+      - step: 3
+        action: "Check if raw_text starts with '/'"
+        rationale: "Detect slash commands"
+      - step: 4
+        action: "If slash command, parse and dispatch to command handler"
+        rationale: "Handle special commands separately"
+      - step: 5
+        action: "Create Message object with role='user'"
+        rationale: "Prepare user message for storage"
+      - step: 6
+        action: "Append user message to chat JSONL"
+        rationale: "Persist user input"
+      - step: 7
+        action: "If not pure_aside, call buildContext() for LLM context"
+        rationale: "Prepare messages for LLM"
+      - step: 8
+        action: "Call OpenRouter API with context and model"
+        rationale: "Get LLM response"
+      - step: 9
+        action: "Create Message object with role='assistant' from response"
+        rationale: "Prepare assistant message"
+      - step: 10
+        action: "Append assistant message to chat JSONL"
+        rationale: "Persist LLM response"
+      - step: 11
+        action: "Create and save LLMRequestLogEntry"
+        rationale: "Audit and metrics"
+      - step: 12
+        action: "Update chat.updated_at"
+        rationale: "Track activity"
+      - step: 13
+        action: "Return SendMessageResponse"
+        rationale: "Provide caller with results"
+
+    fol_specification: |
+      forall projectId, chatId in UUID, req in SendMessageRequest:
+        ValidProject(projectId) and ValidChat(chatId, projectId) and
+        NonEmpty(req.raw_text) implies
+          exists um, am in Message, log in LLMRequestLogEntry:
+            um.role = 'user' and
+            um.content = req.raw_text and
+            um.chat_id = chatId and
+            Persisted(um) and
+            (not IsSlashCommand(req.raw_text) implies
+              am.role = 'assistant' and
+              am.chat_id = chatId and
+              Persisted(am) and
+              log.chat_id = chatId and
+              Persisted(log))
+
+    pseudocode: |
+      function sendMessage(projectId, chatId, request):
+        // Step 1-2: Validate and load
+        validateUUID(projectId)
+        validateUUID(chatId)
+        
+        project = loadProject(projectId)
+        if not project or project.status != "active":
+          throw NotFoundError("Project not found or inactive")
+        
+        chat = loadChat(chatId)
+        if not chat or chat.status != "active":
+          throw NotFoundError("Chat not found or inactive")
+        
+        // Step 3-4: Check for slash command
+        if request.raw_text.startsWith("/"):
+          command = parseSlashCommand(request.raw_text)
+          result = executeSlashCommand(command, project, chat)
+          return { command_result: result }
+        
+        // Step 5-6: Create and save user message
+        userMessage = {
+          id: generateUUID(),
+          chat_id: chatId,
+          project_id: projectId,
+          role: "user",
+          content: request.raw_text,
+          status: "complete",
+          created_at: now(),
+          include_in_context: not request.is_aside,
+          is_aside: request.is_aside || false,
+          pure_aside: request.pure_aside || false
+        }
+        
+        appendToChat(chat.storage_path, userMessage)
+        
+        // Step 7: Build context (unless pure aside)
+        context = []
+        if request.pure_aside:
+          // Only system prelude + current message
+          if chat.system_prelude:
+            context.push({ role: "system", content: chat.system_prelude.content })
+          context.push({ role: "user", content: request.raw_text })
+        else:
+          context = buildContext(chat, userMessage, request.model_id)
+        
+        // Step 8: Call LLM
+        model = request.model_id || project.default_model
+        startTime = now()
+        
+        llmResponse = callOpenRouter({
+          model: model,
+          messages: context,
+          output_format: request.output_format_hint
+        })
+        
+        endTime = now()
+        
+        // Step 9-10: Create and save assistant message
+        assistantMessage = {
+          id: generateUUID(),
+          chat_id: chatId,
+          project_id: projectId,
+          role: "assistant",
+          content: llmResponse.content,
+          status: "complete",
+          created_at: now(),
+          include_in_context: not request.is_aside,
+          is_aside: request.is_aside || false,
+          llm_info: {
+            model: model,
+            request_id: llmResponse.request_id,
+            output_format_hint: request.output_format_hint,
+            usage: llmResponse.usage,
+            timings: {
+              latency_ms: endTime - startTime
+            }
+          }
+        }
+        
+        appendToChat(chat.storage_path, assistantMessage)
+        
+        // Step 11: Log request
+        requestLog = logLLMRequest({
+          project_id: projectId,
+          chat_id: chatId,
+          model: model,
+          messages_included: context.map(m => m.id),
+          usage: llmResponse.usage,
+          timings: { latency_ms: endTime - startTime },
+          status: "success"
+        })
+        
+        // Step 12: Update chat
+        updateChatTimestamp(chatId)
+        
+        // Step 13: Return
+        return {
+          user_message: userMessage,
+          assistant_message: assistantMessage,
+          request_log: requestLog
+        }
+
+  complexity:
+    time: "O(n + m)"
+    space: "O(n)"
+    analysis: |
+      Time: 
+        - Context construction: O(n) where n = number of messages in chat
+        - LLM API call: O(m) where m = context tokens (external)
+        - File operations: O(1) append
+      
+      Space:
+        - Context array: O(n) messages
+        - Response storage: O(r) where r = response length
+      
+      Note: LLM latency dominates actual execution time.
+
+  data_access:
+    reads:
+      - entity: Project
+        operations: [read, verify_status]
+      - entity: Chat
+        operations: [read, verify_status, load_messages]
+      - entity: Message
+        operations: [read_all_for_context]
+    writes:
+      - entity: Message
+        operations: [create, create]
+      - entity: LLMRequestLogEntry
+        operations: [create]
+      - entity: Chat
+        operations: [update_timestamp]
+    transactions: false
+
+  error_handling:
+    validation:
+      - parameter: projectId
+        validation: "Must be valid UUID"
+        error_code: "INVALID_PROJECT_ID"
+      - parameter: chatId
+        validation: "Must be valid UUID"
+        error_code: "INVALID_CHAT_ID"
+      - parameter: request.raw_text
+        validation: "Must be non-empty string"
+        error_code: "EMPTY_MESSAGE"
+      - parameter: request.model_id
+        validation: "Must be valid model if provided"
+        error_code: "INVALID_MODEL"
+    error_cases:
+      - condition: "Project not found"
+        error_type: NotFoundError
+        recovery: propagate
+      - condition: "Chat not found"
+        error_type: NotFoundError
+        recovery: propagate
+      - condition: "LLM API error"
+        error_type: LLMError
+        recovery: propagate
+      - condition: "LLM API timeout"
+        error_type: TimeoutError
+        recovery: propagate
+      - condition: "File write error"
+        error_type: FileSystemError
+        recovery: propagate
+
+  testing:
+    unit_tests:
+      - name: "sends message and receives response"
+        scenario: "Happy path with LLM response"
+        inputs:
+          projectId: "valid-project-uuid"
+          chatId: "valid-chat-uuid"
+          request:
+            raw_text: "Hello, how are you?"
+        expected_output:
+          user_message:
+            role: "user"
+            content: "Hello, how are you?"
+          assistant_message:
+            role: "assistant"
+        expected_side_effects:
+          - "Two messages appended to storage"
+          - "LLM request logged"
+
+      - name: "handles slash command"
+        scenario: "Message is a slash command"
+        inputs:
+          projectId: "valid-project-uuid"
+          chatId: "valid-chat-uuid"
+          request:
+            raw_text: "/aside This is an aside"
+        expected_output:
+          command_result:
+            command: "aside"
+
+      - name: "handles pure aside"
+        scenario: "Pure aside ignores history"
+        inputs:
+          projectId: "valid-project-uuid"
+          chatId: "valid-chat-uuid"
+          request:
+            raw_text: "Quick question"
+            pure_aside: true
+        expected_output:
+          user_message:
+            pure_aside: true
+          assistant_message:
+            is_aside: true
+
+      - name: "throws error for empty message"
+        scenario: "Empty raw_text"
+        inputs:
+          projectId: "valid-project-uuid"
+          chatId: "valid-chat-uuid"
+          request:
+            raw_text: ""
+        expected_output:
+          error: ValidationError
+
+    edge_cases:
+      - "Very long message (>100KB)"
+      - "Message with only whitespace"
+      - "LLM returns empty response"
+      - "LLM API rate limited"
+      - "Network timeout during LLM call"
+      - "Concurrent messages to same chat"
+
+    integration_tests:
+      - "Send message and verify both messages in storage"
+      - "Send aside and verify not in future context"
+      - "Send pure aside and verify minimal context"
+      - "Execute slash command and verify result"
+
+  llm_guidance:
+    implementation_hints: |
+      1. Use axios or fetch for OpenRouter API calls
+      2. Implement proper timeout handling (30-60 seconds)
+      3. Stream responses for better UX (optional in Phase 1)
+      4. Use buildContext() from context service
+      5. Handle rate limiting with exponential backoff
+      6. Log all LLM requests for debugging and billing
+
+    key_considerations:
+      - "Validate all inputs before any side effects"
+      - "Save user message before LLM call (don't lose on failure)"
+      - "Handle LLM errors gracefully - save error state"
+      - "Pure aside should only include system prelude + current"
+      - "Aside messages should set include_in_context=false"
+
+    example_code: |
+      async function sendMessage(projectId, chatId, request) {
+        // Validation
+        if (!isValidUUID(projectId) || !isValidUUID(chatId)) {
+          throw new ValidationError('Invalid ID format');
+        }
+        if (!request.raw_text?.trim()) {
+          throw new ValidationError('Message cannot be empty');
+        }
+        
+        // Load project and chat
+        const project = await projectStore.getById(projectId);
+        const chat = await chatStore.getById(chatId);
+        
+        if (!project || project.status !== 'active') {
+          throw new NotFoundError('Project not found');
+        }
+        if (!chat || chat.status !== 'active') {
+          throw new NotFoundError('Chat not found');
+        }
+        
+        // Check for slash command
+        if (request.raw_text.startsWith('/')) {
+          const command = parseSlashCommand(request.raw_text);
+          const result = await executeSlashCommand(command, project, chat);
+          return { command_result: result };
+        }
+        
+        // Create user message
+        const userMessage = {
+          id: uuidv4(),
+          chat_id: chatId,
+          project_id: projectId,
+          role: 'user',
+          content: request.raw_text,
+          status: 'complete',
+          created_at: new Date().toISOString(),
+          include_in_context: !request.is_aside,
+          is_aside: request.is_aside || false,
+          pure_aside: request.pure_aside || false
+        };
+        
+        // Save user message first
+        await chatStore.appendMessage(chat.storage_path, userMessage);
+        
+        // Build context
+        let context;
+        if (request.pure_aside) {
+          context = [];
+          if (chat.system_prelude?.content) {
+            context.push({ role: 'system', content: chat.system_prelude.content });
+          }
+          context.push({ role: 'user', content: request.raw_text });
+        } else {
+          context = await contextService.buildContext(chat, userMessage);
+        }
+        
+        // Call LLM
+        const model = request.model_id || project.default_model;
+        const startTime = Date.now();
+        
+        const llmResponse = await openRouterClient.chat({
+          model,
+          messages: context,
+          response_format: request.output_format_hint
+        });
+        
+        const latencyMs = Date.now() - startTime;
+        
+        // Create assistant message
+        const assistantMessage = {
+          id: uuidv4(),
+          chat_id: chatId,
+          project_id: projectId,
+          role: 'assistant',
+          content: llmResponse.choices[0].message.content,
+          status: 'complete',
+          created_at: new Date().toISOString(),
+          include_in_context: !request.is_aside,
+          is_aside: request.is_aside || false,
+          llm_info: {
+            model,
+            request_id: llmResponse.id,
+            usage: llmResponse.usage,
+            timings: { latency_ms: latencyMs }
+          }
+        };
+        
+        // Save assistant message
+        await chatStore.appendMessage(chat.storage_path, assistantMessage);
+        
+        // Log request
+        const requestLog = await loggingService.logLLMRequest({
+          project_id: projectId,
+          chat_id: chatId,
+          model,
+          usage: llmResponse.usage,
+          latency_ms: latencyMs,
+          status: 'success'
+        });
+        
+        // Update chat timestamp
+        await chatStore.updateTimestamp(chatId);
+        
+        return { user_message: userMessage, assistant_message: assistantMessage, request_log: requestLog };
+      }
+
+    common_mistakes:
+      - "Not saving user message before LLM call"
+      - "Not handling LLM timeouts"
+      - "Forgetting to set aside flags on assistant message"
+      - "Not updating chat timestamp"
+      - "Not logging failed requests"
+
+    dependencies:
+      - "contextService.buildContext"
+      - "openRouterClient"
+      - "chatStore"
+      - "loggingService"
+      - "parseSlashCommand"
+
+  references:
+    - type: entity
+      id: Message
+      file: "spec/domain.yaml#Message"
+    - type: entity
+      id: LLMRequestLogEntry
+      file: "spec/domain.yaml#LLMRequestLogEntry"
+    - type: spec
+      id: context
+      file: "spec/context.yaml"
+    - type: function
+      id: build_context
+      file: "spec/functions/backend_node/build_context.yaml"

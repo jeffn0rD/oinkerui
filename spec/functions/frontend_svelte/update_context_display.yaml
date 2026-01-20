@@ -1,0 +1,340 @@
+# =============================================================================
+# Function Specification: updateContextDisplay
+# =============================================================================
+
+function:
+  id: frontend_svelte.update_context_display
+  name: updateContextDisplay
+  module: frontend_svelte
+  purpose: |
+    Update the context information display showing which messages are included
+    in the current LLM context, token counts, and context health indicators.
+    Provides visual feedback about context state before sending messages.
+
+  signature:
+    parameters:
+      - name: messages
+        type: Message[]
+        required: true
+        description: "All messages in current chat"
+      - name: settings
+        type: ProjectSettings
+        required: true
+        description: "Project settings including max_context_tokens"
+    returns:
+      type: ContextDisplayData
+      description: "Data for context display component"
+      schema:
+        properties:
+          includedCount:
+            type: integer
+          excludedCount:
+            type: integer
+          totalTokens:
+            type: integer
+          maxTokens:
+            type: integer
+          percentUsed:
+            type: number
+          status:
+            type: string
+            enum: [healthy, warning, critical]
+          pinnedCount:
+            type: integer
+          asideCount:
+            type: integer
+    throws: []
+
+  contract:
+    preconditions:
+      - "messages is array (may be empty)"
+      - "settings has max_context_tokens"
+    postconditions:
+      - "Returns accurate context statistics"
+      - "Token count reflects included messages only"
+      - "Status reflects context health"
+    invariants:
+      - "includedCount + excludedCount = total messages"
+    side_effects: []
+
+  algorithm:
+    description: |
+      1. Filter messages to get included set
+      2. Count excluded messages
+      3. Calculate total tokens for included
+      4. Calculate percentage of max tokens
+      5. Determine status (healthy/warning/critical)
+      6. Count special message types
+      7. Return display data
+
+    steps:
+      - step: 1
+        action: "Filter messages where include_in_context=true and not discarded"
+        rationale: "Get messages that will be in context"
+      - step: 2
+        action: "Count messages not in included set"
+        rationale: "Show excluded count"
+      - step: 3
+        action: "Sum token counts for included messages"
+        rationale: "Calculate context size"
+      - step: 4
+        action: "Calculate percentUsed = totalTokens / maxTokens * 100"
+        rationale: "Show usage percentage"
+      - step: 5
+        action: "Set status based on percentage thresholds"
+        rationale: "Visual health indicator"
+      - step: 6
+        action: "Count pinned and aside messages"
+        rationale: "Show special message counts"
+      - step: 7
+        action: "Return ContextDisplayData object"
+        rationale: "Provide display data"
+
+    fol_specification: |
+      forall msgs in Message[], settings in ProjectSettings:
+        let display = updateContextDisplay(msgs, settings) in
+        display.includedCount = Count(m in msgs: m.include_in_context and not m.is_discarded) and
+        display.excludedCount = Count(msgs) - display.includedCount and
+        display.percentUsed = (display.totalTokens / display.maxTokens) * 100 and
+        (display.percentUsed < 70 implies display.status = 'healthy') and
+        (display.percentUsed >= 70 and display.percentUsed < 90 implies display.status = 'warning') and
+        (display.percentUsed >= 90 implies display.status = 'critical')
+
+    pseudocode: |
+      function updateContextDisplay(messages, settings):
+        // Step 1: Filter included
+        included = messages.filter(m =>
+          m.include_in_context and
+          not m.is_discarded
+        )
+        
+        // Step 2: Count excluded
+        excludedCount = messages.length - included.length
+        
+        // Step 3: Calculate tokens
+        totalTokens = 0
+        for msg in included:
+          // Use cached token count or estimate
+          tokens = msg.token_count || estimateTokens(msg.content)
+          totalTokens += tokens
+        
+        // Step 4: Calculate percentage
+        maxTokens = settings.max_context_tokens || 32000
+        percentUsed = (totalTokens / maxTokens) * 100
+        
+        // Step 5: Determine status
+        status = 'healthy'
+        if percentUsed >= 90:
+          status = 'critical'
+        else if percentUsed >= 70:
+          status = 'warning'
+        
+        // Step 6: Count special types
+        pinnedCount = messages.filter(m => m.is_pinned).length
+        asideCount = messages.filter(m => m.is_aside).length
+        
+        // Step 7: Return
+        return {
+          includedCount: included.length,
+          excludedCount: excludedCount,
+          totalTokens: totalTokens,
+          maxTokens: maxTokens,
+          percentUsed: Math.round(percentUsed * 10) / 10,
+          status: status,
+          pinnedCount: pinnedCount,
+          asideCount: asideCount
+        }
+
+  complexity:
+    time: "O(n)"
+    space: "O(1)"
+    analysis: |
+      Time:
+        - Filter operations: O(n)
+        - Token counting: O(n) if cached, O(n*m) if estimating
+      
+      Space:
+        - Filtered array: O(k) where k = included count
+        - Output object: O(1)
+
+  data_access:
+    reads:
+      - entity: Message
+        operations: [read_flags, read_token_count]
+      - entity: ProjectSettings
+        operations: [read_max_tokens]
+    writes: []
+    transactions: false
+
+  error_handling:
+    validation: []
+    error_cases:
+      - condition: "Missing token counts"
+        error_type: none
+        recovery: "Use character-based estimate"
+
+  testing:
+    unit_tests:
+      - name: "calculates included count"
+        scenario: "Mix of included and excluded"
+        inputs:
+          messages:
+            - include_in_context: true
+            - include_in_context: false
+            - include_in_context: true
+          settings:
+            max_context_tokens: 32000
+        expected_output:
+          includedCount: 2
+          excludedCount: 1
+
+      - name: "calculates token percentage"
+        scenario: "Known token counts"
+        inputs:
+          messages:
+            - include_in_context: true
+              token_count: 1000
+            - include_in_context: true
+              token_count: 2000
+          settings:
+            max_context_tokens: 10000
+        expected_output:
+          totalTokens: 3000
+          percentUsed: 30
+          status: "healthy"
+
+      - name: "sets warning status"
+        scenario: "75% usage"
+        inputs:
+          messages:
+            - include_in_context: true
+              token_count: 7500
+          settings:
+            max_context_tokens: 10000
+        expected_output:
+          status: "warning"
+
+      - name: "sets critical status"
+        scenario: "95% usage"
+        inputs:
+          messages:
+            - include_in_context: true
+              token_count: 9500
+          settings:
+            max_context_tokens: 10000
+        expected_output:
+          status: "critical"
+
+      - name: "counts pinned messages"
+        scenario: "Some pinned"
+        inputs:
+          messages:
+            - is_pinned: true
+            - is_pinned: false
+            - is_pinned: true
+          settings:
+            max_context_tokens: 32000
+        expected_output:
+          pinnedCount: 2
+
+    edge_cases:
+      - "Empty messages array"
+      - "All messages excluded"
+      - "All messages pinned"
+      - "Missing token_count fields"
+      - "Zero max_context_tokens"
+
+    integration_tests:
+      - "Update display after adding message"
+      - "Update display after pinning message"
+      - "Verify status changes at thresholds"
+
+  llm_guidance:
+    implementation_hints: |
+      1. Cache token counts in message objects
+      2. Use reactive Svelte store for auto-updates
+      3. Debounce updates for performance
+      4. Show visual progress bar for percentage
+      5. Use color coding for status
+
+    key_considerations:
+      - "Token counting should be fast (use cache)"
+      - "Update reactively when messages change"
+      - "Show clear visual indicators"
+      - "Warn user before context overflow"
+      - "Consider system prelude in token count"
+
+    example_code: |
+      <script>
+        import { derived } from 'svelte/store';
+        import { messagesStore } from '$lib/stores/messages';
+        import { projectStore } from '$lib/stores/project';
+        
+        // Reactive context display
+        const contextDisplay = derived(
+          [messagesStore, projectStore],
+          ([$messages, $project]) => {
+            const settings = $project?.settings || { max_context_tokens: 32000 };
+            return updateContextDisplay($messages, settings);
+          }
+        );
+        
+        function updateContextDisplay(messages, settings) {
+          const included = messages.filter(m =>
+            m.include_in_context && !m.is_discarded
+          );
+          
+          const totalTokens = included.reduce((sum, m) => {
+            return sum + (m.token_count || estimateTokens(m.content));
+          }, 0);
+          
+          const maxTokens = settings.max_context_tokens || 32000;
+          const percentUsed = (totalTokens / maxTokens) * 100;
+          
+          let status = 'healthy';
+          if (percentUsed >= 90) status = 'critical';
+          else if (percentUsed >= 70) status = 'warning';
+          
+          return {
+            includedCount: included.length,
+            excludedCount: messages.length - included.length,
+            totalTokens,
+            maxTokens,
+            percentUsed: Math.round(percentUsed * 10) / 10,
+            status,
+            pinnedCount: messages.filter(m => m.is_pinned).length,
+            asideCount: messages.filter(m => m.is_aside).length
+          };
+        }
+        
+        function estimateTokens(content) {
+          // Rough estimate: ~4 chars per token
+          return Math.ceil((content?.length || 0) / 4);
+        }
+      </script>
+      
+      <div class="context-display">
+        <div class="progress-bar" class:warning={$contextDisplay.status === 'warning'}
+             class:critical={$contextDisplay.status === 'critical'}>
+          <div class="fill" style="width: {$contextDisplay.percentUsed}%"></div>
+        </div>
+        <div class="stats">
+          <span>{$contextDisplay.includedCount} messages</span>
+          <span>{$contextDisplay.totalTokens.toLocaleString()} / {$contextDisplay.maxTokens.toLocaleString()} tokens</span>
+          <span>{$contextDisplay.percentUsed}%</span>
+        </div>
+        {#if $contextDisplay.pinnedCount > 0}
+          <span class="badge">📌 {$contextDisplay.pinnedCount}</span>
+        {/if}
+      </div>
+
+    common_mistakes:
+      - "Not updating reactively"
+      - "Expensive token counting on every render"
+      - "Not handling missing token counts"
+      - "Ignoring system prelude tokens"
+      - "Not showing clear status indicators"
+
+  references:
+    - "spec/context.yaml - Context construction"
+    - "spec/ui.yaml - UI specifications"

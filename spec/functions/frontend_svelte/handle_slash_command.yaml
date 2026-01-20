@@ -1,0 +1,372 @@
+# =============================================================================
+# Function Specification: handleSlashCommand
+# =============================================================================
+
+function:
+  id: frontend_svelte.handle_slash_command
+  name: handleSlashCommand
+  module: frontend_svelte
+  purpose: |
+    Handle slash command input in the prompt field. Provides autocomplete
+    suggestions, validates commands, and either executes client-side commands
+    or delegates to the backend for server-side execution.
+
+  signature:
+    parameters:
+      - name: input
+        type: string
+        required: true
+        description: "Current prompt input text"
+      - name: event
+        type: KeyboardEvent
+        required: false
+        description: "Keyboard event for autocomplete handling"
+    returns:
+      type: SlashCommandResult
+      description: "Result of slash command handling"
+      schema:
+        properties:
+          isCommand:
+            type: boolean
+          suggestions:
+            type: array
+            items:
+              type: CommandSuggestion
+          executed:
+            type: boolean
+          result:
+            type: object
+            nullable: true
+    throws:
+      - type: CommandError
+        condition: "Command execution fails"
+
+  contract:
+    preconditions:
+      - "input is string"
+    postconditions:
+      - "If input starts with '/', returns command info"
+      - "If Tab pressed, autocomplete is applied"
+      - "If Enter pressed on valid command, command executes"
+    invariants:
+      - "Unknown commands show error suggestion"
+    side_effects:
+      - type: state_mutation
+        description: "May update prompt input for autocomplete"
+        scope: "uiStore"
+      - type: external_call
+        description: "May call backend for server commands"
+        scope: "API"
+
+  algorithm:
+    description: |
+      1. Check if input starts with '/'
+      2. If not, return { isCommand: false }
+      3. Parse partial command from input
+      4. Generate autocomplete suggestions
+      5. If Tab key: apply first suggestion
+      6. If Enter key: validate and execute
+      7. Return result
+
+    steps:
+      - step: 1
+        action: "Check input.startsWith('/')"
+        rationale: "Detect slash command"
+      - step: 2
+        action: "If not slash command, return early"
+        rationale: "Normal message handling"
+      - step: 3
+        action: "Extract command name and partial args"
+        rationale: "Parse current input"
+      - step: 4
+        action: "Filter COMMANDS by prefix match"
+        rationale: "Generate suggestions"
+      - step: 5
+        action: "If Tab and suggestions exist, complete first"
+        rationale: "Autocomplete support"
+      - step: 6
+        action: "If Enter, validate command and execute"
+        rationale: "Command execution"
+      - step: 7
+        action: "Return SlashCommandResult"
+        rationale: "Provide result to caller"
+
+    fol_specification: |
+      forall input in String:
+        let result = handleSlashCommand(input) in
+        (not StartsWith(input, '/') implies not result.isCommand) and
+        (StartsWith(input, '/') implies
+          result.isCommand and
+          result.suggestions = FilterByPrefix(COMMANDS, ExtractCommand(input)))
+
+    pseudocode: |
+      function handleSlashCommand(input, event = null):
+        // Step 1-2: Check for slash command
+        if not input.startsWith('/'):
+          return { isCommand: false, suggestions: [], executed: false }
+        
+        // Step 3: Parse input
+        content = input.slice(1)
+        spaceIndex = content.indexOf(' ')
+        
+        if spaceIndex == -1:
+          partialCommand = content.toLowerCase()
+          args = ''
+        else:
+          partialCommand = content.slice(0, spaceIndex).toLowerCase()
+          args = content.slice(spaceIndex + 1)
+        
+        // Step 4: Generate suggestions
+        suggestions = COMMANDS
+          .filter(cmd => cmd.name.startsWith(partialCommand))
+          .map(cmd => ({
+            name: cmd.name,
+            description: cmd.description,
+            usage: cmd.usage,
+            completion: `/${cmd.name} `
+          }))
+        
+        // Add "unknown command" if no matches
+        if suggestions.length == 0 and partialCommand:
+          suggestions = [{
+            name: partialCommand,
+            description: 'Unknown command',
+            isError: true
+          }]
+        
+        // Step 5: Handle Tab for autocomplete
+        if event?.key == 'Tab' and suggestions.length > 0:
+          event.preventDefault()
+          if not suggestions[0].isError:
+            uiStore.setPromptInput(suggestions[0].completion)
+          return { isCommand: true, suggestions, executed: false }
+        
+        // Step 6: Handle Enter for execution
+        if event?.key == 'Enter' and not event.shiftKey:
+          // Check if command is complete
+          matchedCommand = COMMANDS.find(c => c.name == partialCommand)
+          
+          if matchedCommand:
+            event.preventDefault()
+            
+            // Client-side commands
+            if matchedCommand.clientSide:
+              result = executeClientCommand(matchedCommand, args)
+              return { isCommand: true, suggestions, executed: true, result }
+            
+            // Server-side commands - let normal send handle it
+            return { isCommand: true, suggestions, executed: false, delegateToSend: true }
+        
+        // Step 7: Return suggestions for display
+        return { isCommand: true, suggestions, executed: false }
+
+  complexity:
+    time: "O(c)"
+    space: "O(c)"
+    analysis: |
+      Time:
+        - Command filtering: O(c) where c = number of commands
+        - String operations: O(n) where n = input length
+      
+      Space:
+        - Suggestions array: O(c)
+
+  data_access:
+    reads:
+      - entity: CommandRegistry
+        operations: [list, filter]
+    writes:
+      - entity: UIStore
+        operations: [set_prompt_input]
+    transactions: false
+
+  error_handling:
+    validation: []
+    error_cases:
+      - condition: "Unknown command on Enter"
+        error_type: none
+        recovery: "Show error in suggestions"
+      - condition: "Client command fails"
+        error_type: CommandError
+        recovery: "Show error toast"
+
+  testing:
+    unit_tests:
+      - name: "detects slash command"
+        scenario: "Input starts with /"
+        inputs:
+          input: "/help"
+        expected_output:
+          isCommand: true
+
+      - name: "returns suggestions"
+        scenario: "Partial command"
+        inputs:
+          input: "/he"
+        expected_output:
+          isCommand: true
+          suggestions:
+            - name: "help"
+
+      - name: "handles Tab autocomplete"
+        scenario: "Tab pressed with suggestion"
+        inputs:
+          input: "/he"
+          event:
+            key: "Tab"
+        expected_output:
+          isCommand: true
+        expected_side_effects:
+          - "Prompt input set to '/help '"
+
+      - name: "shows unknown command"
+        scenario: "No matching command"
+        inputs:
+          input: "/xyz"
+        expected_output:
+          suggestions:
+            - name: "xyz"
+              isError: true
+
+      - name: "ignores non-slash input"
+        scenario: "Normal message"
+        inputs:
+          input: "Hello world"
+        expected_output:
+          isCommand: false
+
+    edge_cases:
+      - "Just '/' character"
+      - "Command with special characters"
+      - "Very long command input"
+      - "Multiple spaces in args"
+      - "Tab with no suggestions"
+
+    integration_tests:
+      - "Type /help and verify suggestions"
+      - "Tab complete and verify input update"
+      - "Execute /aside and verify handling"
+
+  llm_guidance:
+    implementation_hints: |
+      1. Use reactive input binding for real-time suggestions
+      2. Show suggestions in dropdown below input
+      3. Support keyboard navigation in suggestions
+      4. Highlight matching prefix in suggestions
+      5. Show command usage hint when selected
+
+    key_considerations:
+      - "Suggestions should update as user types"
+      - "Tab should complete, not submit"
+      - "Enter on valid command should execute"
+      - "Show helpful error for unknown commands"
+      - "Client commands execute immediately"
+
+    example_code: |
+      <script>
+        import { uiStore } from '$lib/stores/ui';
+        
+        const COMMANDS = [
+          { name: 'help', description: 'Show help', usage: '/help [command]', clientSide: true },
+          { name: 'aside', description: 'Send as aside', usage: '/aside <message>' },
+          { name: 'pin', description: 'Pin message', usage: '/pin <message_id>' },
+          { name: 'unpin', description: 'Unpin message', usage: '/unpin <message_id>' },
+          { name: 'discard', description: 'Discard message', usage: '/discard <message_id>' },
+          { name: 'template', description: 'Use template', usage: '/template <name>' },
+          { name: 'model', description: 'Change model', usage: '/model <model_id>' },
+          { name: 'fork', description: 'Fork chat', usage: '/fork <message_id>' },
+          { name: 'clear', description: 'Clear history', usage: '/clear --confirm' },
+          { name: 'export', description: 'Export chat', usage: '/export <format>' }
+        ];
+        
+        let promptInput = '';
+        let suggestions = [];
+        let showSuggestions = false;
+        
+        function handleInput() {
+          const result = handleSlashCommand(promptInput);
+          suggestions = result.suggestions;
+          showSuggestions = result.isCommand && suggestions.length > 0;
+        }
+        
+        function handleKeydown(event) {
+          if (!promptInput.startsWith('/')) return;
+          
+          const result = handleSlashCommand(promptInput, event);
+          
+          if (result.executed) {
+            // Command was executed client-side
+            promptInput = '';
+            showSuggestions = false;
+          } else if (result.delegateToSend) {
+            // Let normal send handle it
+            return;
+          }
+          
+          suggestions = result.suggestions;
+        }
+        
+        function handleSlashCommand(input, event = null) {
+          if (!input.startsWith('/')) {
+            return { isCommand: false, suggestions: [] };
+          }
+          
+          const content = input.slice(1);
+          const spaceIndex = content.indexOf(' ');
+          const partialCommand = spaceIndex === -1 
+            ? content.toLowerCase() 
+            : content.slice(0, spaceIndex).toLowerCase();
+          
+          const matches = COMMANDS.filter(cmd => 
+            cmd.name.startsWith(partialCommand)
+          );
+          
+          const suggestions = matches.length > 0 
+            ? matches.map(cmd => ({
+                ...cmd,
+                completion: `/${cmd.name} `
+              }))
+            : partialCommand 
+              ? [{ name: partialCommand, description: 'Unknown command', isError: true }]
+              : COMMANDS.map(cmd => ({ ...cmd, completion: `/${cmd.name} ` }));
+          
+          // Handle Tab
+          if (event?.key === 'Tab' && suggestions.length > 0 && !suggestions[0].isError) {
+            event.preventDefault();
+            promptInput = suggestions[0].completion;
+            return { isCommand: true, suggestions, executed: false };
+          }
+          
+          return { isCommand: true, suggestions, executed: false };
+        }
+      </script>
+      
+      <div class="prompt-container">
+        <textarea
+          bind:value={promptInput}
+          on:input={handleInput}
+          on:keydown={handleKeydown}
+        />
+        
+        {#if showSuggestions}
+          <div class="suggestions">
+            {#each suggestions as suggestion}
+              <div class="suggestion" class:error={suggestion.isError}>
+                <span class="name">/{suggestion.name}</span>
+                <span class="description">{suggestion.description}</span>
+              </div>
+            {/each}
+          </div>
+        {/if}
+      </div>
+
+    common_mistakes:
+      - "Not preventing default on Tab"
+      - "Executing on every keystroke"
+      - "Not showing unknown command error"
+      - "Case-sensitive command matching"
+      - "Not handling empty '/' input"
+
+  references:
+    - "spec/commands.yaml - Command definitions"
+    - "spec/ui.yaml - UI specifications"

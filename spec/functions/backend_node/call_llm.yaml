@@ -1,0 +1,434 @@
+# =============================================================================
+# Function Specification: callLLM
+# =============================================================================
+
+function:
+  id: backend_node.call_llm
+  name: callLLM
+  module: backend_node
+  purpose: |
+    Make an API call to OpenRouter to get an LLM response. Handles authentication,
+    request formatting, response parsing, error handling, and retry logic.
+    This is the core integration point with external LLM providers.
+
+  signature:
+    parameters:
+      - name: request
+        type: LLMRequest
+        required: true
+        description: "LLM request configuration"
+        constraints:
+          - "model: valid OpenRouter model ID"
+          - "messages: non-empty array of {role, content}"
+          - "max_tokens: optional, positive integer"
+          - "temperature: optional, 0.0-2.0"
+          - "output_format: optional, text|json"
+    returns:
+      type: LLMResponse
+      description: "LLM response with content and metadata"
+      schema:
+        properties:
+          content:
+            type: string
+          model:
+            type: string
+          usage:
+            type: object
+            properties:
+              prompt_tokens: integer
+              completion_tokens: integer
+              total_tokens: integer
+          request_id:
+            type: string
+          finish_reason:
+            type: string
+    throws:
+      - type: LLMError
+        condition: "API returns error"
+      - type: TimeoutError
+        condition: "Request times out"
+      - type: RateLimitError
+        condition: "Rate limit exceeded"
+      - type: AuthenticationError
+        condition: "Invalid API key"
+
+  contract:
+    preconditions:
+      - "OPENROUTER_API_KEY environment variable is set"
+      - "request.model is valid OpenRouter model ID"
+      - "request.messages is non-empty array"
+      - "Each message has role and content"
+    postconditions:
+      - "Returns LLMResponse with non-empty content"
+      - "Usage statistics are populated"
+      - "Request ID is available for tracking"
+    invariants:
+      - "API key is never logged or exposed"
+      - "Request/response are logged (content may be truncated)"
+    side_effects:
+      - type: external_call
+        description: "HTTP POST to OpenRouter API"
+        scope: "https://openrouter.ai/api/v1/chat/completions"
+      - type: event_emission
+        description: "Logs request timing and status"
+        scope: "Logging system"
+
+  algorithm:
+    description: |
+      1. Validate request parameters
+      2. Get API key from environment
+      3. Format request for OpenRouter API
+      4. Make HTTP POST request with timeout
+      5. Handle response or error
+      6. Parse response JSON
+      7. Extract content and metadata
+      8. Return LLMResponse
+
+    steps:
+      - step: 1
+        action: "Validate model ID, messages array, optional parameters"
+        rationale: "Fail fast on invalid input"
+      - step: 2
+        action: "Read OPENROUTER_API_KEY from environment"
+        rationale: "Secure credential access"
+      - step: 3
+        action: "Format request body per OpenRouter API spec"
+        rationale: "Match API requirements"
+      - step: 4
+        action: "POST to /api/v1/chat/completions with 60s timeout"
+        rationale: "Make API call with reasonable timeout"
+      - step: 5
+        action: "Check HTTP status, handle errors"
+        rationale: "Proper error handling"
+      - step: 6
+        action: "Parse JSON response body"
+        rationale: "Extract structured data"
+      - step: 7
+        action: "Extract content, usage, request_id from response"
+        rationale: "Normalize response format"
+      - step: 8
+        action: "Return LLMResponse object"
+        rationale: "Provide caller with results"
+
+    fol_specification: |
+      forall req in LLMRequest:
+        ValidAPIKey() and
+        ValidModel(req.model) and
+        NonEmpty(req.messages) and
+        forall m in req.messages: HasRole(m) and HasContent(m)
+        implies
+          exists resp in LLMResponse:
+            NonEmpty(resp.content) and
+            resp.usage.total_tokens > 0 and
+            NonEmpty(resp.request_id)
+        or
+          exists err in Error:
+            err.type in {LLMError, TimeoutError, RateLimitError}
+
+    pseudocode: |
+      function callLLM(request):
+        // Step 1: Validate
+        if not request.model:
+          throw ValidationError("Model is required")
+        if not request.messages or request.messages.length == 0:
+          throw ValidationError("Messages are required")
+        
+        // Step 2: Get API key
+        apiKey = process.env.OPENROUTER_API_KEY
+        if not apiKey:
+          throw ConfigError("OPENROUTER_API_KEY not set")
+        
+        // Step 3: Format request
+        body = {
+          model: request.model,
+          messages: request.messages,
+          max_tokens: request.max_tokens || undefined,
+          temperature: request.temperature || undefined,
+          response_format: request.output_format == 'json' 
+            ? { type: 'json_object' } 
+            : undefined
+        }
+        
+        // Step 4: Make request
+        startTime = Date.now()
+        
+        try:
+          response = await axios.post(
+            'https://openrouter.ai/api/v1/chat/completions',
+            body,
+            {
+              headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json',
+                'HTTP-Referer': config.app_url,
+                'X-Title': 'OinkerUI'
+              },
+              timeout: 60000
+            }
+          )
+        catch error:
+          // Step 5: Handle errors
+          if error.code == 'ECONNABORTED':
+            throw TimeoutError("LLM request timed out")
+          if error.response?.status == 401:
+            throw AuthenticationError("Invalid API key")
+          if error.response?.status == 429:
+            throw RateLimitError("Rate limit exceeded")
+          if error.response?.status >= 400:
+            throw LLMError(error.response?.data?.error?.message || "LLM API error")
+          throw error
+        
+        latencyMs = Date.now() - startTime
+        
+        // Step 6-7: Parse response
+        data = response.data
+        choice = data.choices[0]
+        
+        // Step 8: Return
+        return {
+          content: choice.message.content,
+          model: data.model,
+          usage: {
+            prompt_tokens: data.usage.prompt_tokens,
+            completion_tokens: data.usage.completion_tokens,
+            total_tokens: data.usage.total_tokens
+          },
+          request_id: data.id,
+          finish_reason: choice.finish_reason,
+          latency_ms: latencyMs
+        }
+
+  complexity:
+    time: "O(1) + network latency"
+    space: "O(n)"
+    analysis: |
+      Time:
+        - Local processing: O(1)
+        - Network latency: Variable (typically 1-30 seconds)
+        - Dominated by external API response time
+      
+      Space:
+        - Request body: O(n) where n = total message content size
+        - Response: O(m) where m = response content size
+      
+      Note: Actual performance depends entirely on LLM provider.
+
+  data_access:
+    reads:
+      - entity: Configuration
+        operations: [read_api_key, read_app_url]
+    writes: []
+    transactions: false
+
+  error_handling:
+    validation:
+      - parameter: request.model
+        validation: "Must be non-empty string"
+        error_code: "INVALID_MODEL"
+      - parameter: request.messages
+        validation: "Must be non-empty array"
+        error_code: "INVALID_MESSAGES"
+    error_cases:
+      - condition: "API key not configured"
+        error_type: ConfigError
+        recovery: propagate
+      - condition: "Network timeout"
+        error_type: TimeoutError
+        recovery: "Retry with backoff (max 3 attempts)"
+      - condition: "Rate limit (429)"
+        error_type: RateLimitError
+        recovery: "Retry after delay from headers"
+      - condition: "Authentication error (401)"
+        error_type: AuthenticationError
+        recovery: propagate
+      - condition: "Server error (5xx)"
+        error_type: LLMError
+        recovery: "Retry with backoff (max 3 attempts)"
+      - condition: "Client error (4xx)"
+        error_type: LLMError
+        recovery: propagate
+
+  testing:
+    unit_tests:
+      - name: "successful LLM call"
+        scenario: "Valid request returns response"
+        inputs:
+          request:
+            model: "openai/gpt-4"
+            messages:
+              - role: user
+                content: "Hello"
+        expected_output:
+          content: "non-empty string"
+          usage:
+            total_tokens: "> 0"
+        mocks:
+          - "axios.post returns valid response"
+
+      - name: "handles timeout"
+        scenario: "Request times out"
+        inputs:
+          request:
+            model: "openai/gpt-4"
+            messages:
+              - role: user
+                content: "Hello"
+        expected_output:
+          error: TimeoutError
+        mocks:
+          - "axios.post throws ECONNABORTED"
+
+      - name: "handles rate limit"
+        scenario: "API returns 429"
+        inputs:
+          request:
+            model: "openai/gpt-4"
+            messages:
+              - role: user
+                content: "Hello"
+        expected_output:
+          error: RateLimitError
+        mocks:
+          - "axios.post returns 429"
+
+      - name: "handles invalid API key"
+        scenario: "API returns 401"
+        inputs:
+          request:
+            model: "openai/gpt-4"
+            messages:
+              - role: user
+                content: "Hello"
+        expected_output:
+          error: AuthenticationError
+        mocks:
+          - "axios.post returns 401"
+
+    edge_cases:
+      - "Empty response content"
+      - "Very large response (>100KB)"
+      - "Malformed JSON response"
+      - "Missing usage data in response"
+      - "Network disconnection mid-response"
+
+    integration_tests:
+      - "Make real API call with test model"
+      - "Verify usage statistics accuracy"
+      - "Test retry logic with simulated failures"
+
+  llm_guidance:
+    implementation_hints: |
+      1. Use axios with proper timeout configuration
+      2. Set HTTP-Referer and X-Title headers for OpenRouter
+      3. Implement exponential backoff for retries
+      4. Log request/response for debugging (truncate content)
+      5. Consider streaming for long responses (Phase 2+)
+      6. Cache model list for validation
+
+    key_considerations:
+      - "Never log or expose API key"
+      - "Handle all HTTP error codes appropriately"
+      - "Implement proper timeout (60s default)"
+      - "Retry on 5xx and timeout, not on 4xx"
+      - "Extract rate limit headers for smart retry"
+      - "Log latency for performance monitoring"
+
+    example_code: |
+      const axios = require('axios');
+      
+      async function callLLM(request) {
+        // Validate
+        if (!request.model) {
+          throw new ValidationError('Model is required');
+        }
+        if (!request.messages?.length) {
+          throw new ValidationError('Messages are required');
+        }
+        
+        // Get API key
+        const apiKey = process.env.OPENROUTER_API_KEY;
+        if (!apiKey) {
+          throw new ConfigError('OPENROUTER_API_KEY not set');
+        }
+        
+        // Format request
+        const body = {
+          model: request.model,
+          messages: request.messages,
+          ...(request.max_tokens && { max_tokens: request.max_tokens }),
+          ...(request.temperature !== undefined && { temperature: request.temperature }),
+          ...(request.output_format === 'json' && { 
+            response_format: { type: 'json_object' } 
+          })
+        };
+        
+        const startTime = Date.now();
+        
+        try {
+          const response = await axios.post(
+            'https://openrouter.ai/api/v1/chat/completions',
+            body,
+            {
+              headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json',
+                'HTTP-Referer': process.env.APP_URL || 'http://localhost:3000',
+                'X-Title': 'OinkerUI'
+              },
+              timeout: 60000
+            }
+          );
+          
+          const latencyMs = Date.now() - startTime;
+          const data = response.data;
+          const choice = data.choices[0];
+          
+          return {
+            content: choice.message.content,
+            model: data.model,
+            usage: {
+              prompt_tokens: data.usage?.prompt_tokens || 0,
+              completion_tokens: data.usage?.completion_tokens || 0,
+              total_tokens: data.usage?.total_tokens || 0
+            },
+            request_id: data.id,
+            finish_reason: choice.finish_reason,
+            latency_ms: latencyMs
+          };
+          
+        } catch (error) {
+          if (error.code === 'ECONNABORTED') {
+            throw new TimeoutError('LLM request timed out');
+          }
+          
+          const status = error.response?.status;
+          const message = error.response?.data?.error?.message || error.message;
+          
+          if (status === 401) {
+            throw new AuthenticationError('Invalid API key');
+          }
+          if (status === 429) {
+            throw new RateLimitError('Rate limit exceeded', {
+              retryAfter: error.response?.headers?.['retry-after']
+            });
+          }
+          if (status >= 400) {
+            throw new LLMError(message);
+          }
+          
+          throw error;
+        }
+      }
+
+    common_mistakes:
+      - "Logging API key in error messages"
+      - "Not handling timeout properly"
+      - "Retrying on 4xx errors (except 429)"
+      - "Not setting required OpenRouter headers"
+      - "Ignoring rate limit headers"
+      - "Not validating response structure"
+
+  references:
+    - "https://openrouter.ai/docs - OpenRouter API documentation"
+    - "spec/config.yaml - Configuration for API keys"
+    - "spec/apis.yaml - API endpoint definitions"

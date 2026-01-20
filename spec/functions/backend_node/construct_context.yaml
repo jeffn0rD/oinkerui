@@ -1,0 +1,479 @@
+# =============================================================================
+# Function Specification: constructContext
+# =============================================================================
+
+function:
+  id: backend_node.construct_context
+  name: constructContext
+  module: backend_node
+  purpose: |
+    Build the message context array for an LLM request following the context
+    construction algorithm defined in spec/context.yaml. This function selects
+    which messages to include, respects token limits, handles pinned/aside
+    messages, and applies truncation strategies.
+
+  signature:
+    parameters:
+      - name: chat
+        type: Chat
+        required: true
+        description: "Chat object with message history"
+      - name: currentMessage
+        type: Message
+        required: true
+        description: "Current user message being processed"
+      - name: modelId
+        type: string
+        required: false
+        description: "Model ID for token limit lookup"
+    returns:
+      type: ContextMessage[]
+      description: "Array of messages formatted for LLM API"
+      schema:
+        type: array
+        items:
+          type: object
+          properties:
+            role:
+              type: string
+              enum: [system, user, assistant]
+            content:
+              type: string
+    throws:
+      - type: ValidationError
+        condition: "Chat has no messages"
+      - type: ConfigError
+        condition: "Model token limit not configured"
+
+  contract:
+    preconditions:
+      - "chat is valid Chat object"
+      - "chat.storage_path exists and is readable"
+      - "currentMessage is valid Message object"
+    postconditions:
+      - "Returned array contains system prelude if present"
+      - "Returned array contains currentMessage"
+      - "All pinned messages are included"
+      - "Total tokens <= max_context_tokens"
+      - "Messages are in chronological order"
+      - "Discarded messages are excluded"
+      - "Aside messages are excluded (unless pinned)"
+    invariants:
+      - "System prelude is always first if present"
+      - "Current message is always last"
+      - "Pinned messages are never truncated"
+    side_effects: []
+
+  algorithm:
+    description: |
+      1. Load all messages from chat storage
+      2. Filter out discarded messages
+      3. Separate pinned messages from regular messages
+      4. Calculate token budget
+      5. Reserve tokens for system prelude and current message
+      6. Reserve tokens for pinned messages
+      7. Fill remaining budget with recent messages (newest first)
+      8. Apply truncation strategy if needed
+      9. Sort final selection chronologically
+      10. Format for LLM API
+
+    steps:
+      - step: 1
+        action: "Load all messages from chat JSONL file"
+        rationale: "Get complete message history"
+      - step: 2
+        action: "Filter: exclude messages where is_discarded=true"
+        rationale: "Discarded messages should never be in context"
+      - step: 3
+        action: "Filter: exclude messages where is_aside=true AND is_pinned=false"
+        rationale: "Aside messages excluded unless explicitly pinned"
+      - step: 4
+        action: "Separate pinned messages (is_pinned=true) from regular"
+        rationale: "Pinned messages have priority"
+      - step: 5
+        action: "Get max_context_tokens from project settings or model config"
+        rationale: "Determine token budget"
+      - step: 6
+        action: "Calculate tokens for system prelude, reserve from budget"
+        rationale: "System prelude always included"
+      - step: 7
+        action: "Calculate tokens for current message, reserve from budget"
+        rationale: "Current message always included"
+      - step: 8
+        action: "Calculate tokens for all pinned messages, reserve from budget"
+        rationale: "Pinned messages always included"
+      - step: 9
+        action: "Sort remaining messages by created_at descending"
+        rationale: "Prefer recent messages"
+      - step: 10
+        action: "Add messages until budget exhausted"
+        rationale: "Fill context with recent history"
+      - step: 11
+        action: "Sort selected messages chronologically"
+        rationale: "LLM expects chronological order"
+      - step: 12
+        action: "Format as [{role, content}] array"
+        rationale: "Match LLM API format"
+
+    fol_specification: |
+      forall chat in Chat, current in Message:
+        let context = constructContext(chat, current) in
+        let messages = loadMessages(chat) in
+        
+        // System prelude first if exists
+        (exists prelude in chat.system_prelude implies
+          context[0].role = 'system' and
+          context[0].content = prelude.content) and
+        
+        // Current message always last
+        context[last].content = current.content and
+        
+        // All pinned messages included
+        forall m in messages:
+          (m.is_pinned and not m.is_discarded) implies
+            exists c in context: c.content = m.content and
+        
+        // No discarded messages
+        forall c in context:
+          not exists m in messages:
+            m.content = c.content and m.is_discarded and
+        
+        // No aside messages (unless pinned)
+        forall c in context:
+          not exists m in messages:
+            m.content = c.content and m.is_aside and not m.is_pinned and
+        
+        // Token limit respected
+        sum(tokenCount(c.content) for c in context) <= maxTokens(chat.project)
+
+    pseudocode: |
+      function constructContext(chat, currentMessage, modelId):
+        // Step 1: Load messages
+        allMessages = loadMessagesFromJSONL(chat.storage_path)
+        
+        // Step 2-3: Filter messages
+        eligibleMessages = allMessages.filter(m =>
+          !m.is_discarded and
+          (!m.is_aside or m.is_pinned) and
+          m.include_in_context
+        )
+        
+        // Step 4: Separate pinned
+        pinnedMessages = eligibleMessages.filter(m => m.is_pinned)
+        regularMessages = eligibleMessages.filter(m => !m.is_pinned)
+        
+        // Step 5: Get token budget
+        project = getProject(chat.project_id)
+        maxTokens = project.settings.max_context_tokens || 32000
+        
+        // Step 6-8: Reserve tokens
+        usedTokens = 0
+        selectedMessages = []
+        
+        // System prelude
+        if chat.system_prelude?.content:
+          preludeTokens = countTokens(chat.system_prelude.content)
+          usedTokens += preludeTokens
+        
+        // Current message
+        currentTokens = countTokens(currentMessage.content)
+        usedTokens += currentTokens
+        
+        // Pinned messages (must include)
+        for msg in pinnedMessages:
+          msgTokens = countTokens(msg.content)
+          usedTokens += msgTokens
+          selectedMessages.push(msg)
+        
+        // Check if over budget already
+        if usedTokens > maxTokens:
+          // Truncation needed - this is an edge case
+          // In practice, warn user about too many pinned messages
+          log.warn("Pinned messages exceed token budget")
+        
+        // Step 9-10: Fill with recent messages
+        remainingBudget = maxTokens - usedTokens
+        
+        // Sort by created_at descending (newest first)
+        regularMessages.sort((a, b) => b.created_at - a.created_at)
+        
+        for msg in regularMessages:
+          if msg.id == currentMessage.id:
+            continue  // Already counted
+          
+          msgTokens = countTokens(msg.content)
+          if msgTokens <= remainingBudget:
+            selectedMessages.push(msg)
+            remainingBudget -= msgTokens
+        
+        // Step 11: Sort chronologically
+        selectedMessages.sort((a, b) => a.created_at - b.created_at)
+        
+        // Step 12: Format for API
+        context = []
+        
+        if chat.system_prelude?.content:
+          context.push({
+            role: 'system',
+            content: chat.system_prelude.content
+          })
+        
+        for msg in selectedMessages:
+          context.push({
+            role: msg.role,
+            content: msg.content
+          })
+        
+        // Add current message last
+        context.push({
+          role: currentMessage.role,
+          content: currentMessage.content
+        })
+        
+        return context
+
+  complexity:
+    time: "O(n log n)"
+    space: "O(n)"
+    analysis: |
+      Time:
+        - Load messages: O(n)
+        - Filter messages: O(n)
+        - Sort messages: O(n log n)
+        - Token counting: O(n * m) where m = avg message length
+        - Final sort: O(k log k) where k = selected messages
+      
+      Space:
+        - All messages array: O(n)
+        - Selected messages: O(k) where k <= n
+        - Context array: O(k)
+      
+      Dominant factor: Sorting and token counting.
+      Token counting can be optimized by caching token counts per message.
+
+  data_access:
+    reads:
+      - entity: Chat
+        operations: [read_storage_path, read_system_prelude]
+      - entity: Message
+        operations: [read_all]
+      - entity: Project
+        operations: [read_settings]
+    writes: []
+    transactions: false
+
+  error_handling:
+    validation:
+      - parameter: chat
+        validation: "Must be valid Chat object"
+        error_code: "INVALID_CHAT"
+      - parameter: chat.storage_path
+        validation: "File must exist"
+        error_code: "CHAT_FILE_NOT_FOUND"
+    error_cases:
+      - condition: "Chat storage file not found"
+        error_type: FileSystemError
+        recovery: propagate
+      - condition: "Token counting fails"
+        error_type: InternalError
+        recovery: "Use character-based estimate"
+      - condition: "Pinned messages exceed budget"
+        error_type: Warning
+        recovery: "Include all pinned, warn user"
+
+  testing:
+    unit_tests:
+      - name: "includes system prelude first"
+        scenario: "Chat has system prelude"
+        inputs:
+          chat:
+            system_prelude:
+              content: "You are a helpful assistant"
+            messages: []
+          currentMessage:
+            content: "Hello"
+        expected_output:
+          - role: system
+            content: "You are a helpful assistant"
+          - role: user
+            content: "Hello"
+
+      - name: "excludes discarded messages"
+        scenario: "Chat has discarded messages"
+        inputs:
+          chat:
+            messages:
+              - content: "Message 1"
+                is_discarded: false
+              - content: "Message 2"
+                is_discarded: true
+          currentMessage:
+            content: "Current"
+        expected_output:
+          - content: "Message 1"
+          - content: "Current"
+
+      - name: "always includes pinned messages"
+        scenario: "Pinned message exists"
+        inputs:
+          chat:
+            messages:
+              - content: "Important"
+                is_pinned: true
+          currentMessage:
+            content: "Current"
+        expected_output:
+          - content: "Important"
+          - content: "Current"
+
+      - name: "excludes aside messages"
+        scenario: "Aside message not pinned"
+        inputs:
+          chat:
+            messages:
+              - content: "Aside note"
+                is_aside: true
+                is_pinned: false
+          currentMessage:
+            content: "Current"
+        expected_output:
+          - content: "Current"
+
+      - name: "respects token limit"
+        scenario: "Messages exceed token limit"
+        inputs:
+          chat:
+            messages:
+              - content: "Old message 1"
+              - content: "Old message 2"
+              - content: "Recent message"
+          currentMessage:
+            content: "Current"
+          maxTokens: 100
+        expected_output:
+          - "Recent messages prioritized"
+          - "Total tokens <= 100"
+
+    edge_cases:
+      - "Empty chat (only current message)"
+      - "All messages are pinned"
+      - "All messages are aside"
+      - "Single message exceeds token limit"
+      - "System prelude exceeds token limit"
+
+    integration_tests:
+      - "Build context for real chat and verify token count"
+      - "Verify chronological order in output"
+      - "Verify pinned messages survive truncation"
+
+  llm_guidance:
+    implementation_hints: |
+      1. Use tiktoken library for accurate token counting
+      2. Cache token counts in message objects to avoid recalculation
+      3. Consider streaming messages from file for large chats
+      4. Implement token count estimation fallback (chars / 4)
+      5. Log context construction for debugging
+
+    key_considerations:
+      - "System prelude MUST be first message"
+      - "Current message MUST be last message"
+      - "Pinned messages MUST always be included"
+      - "Discarded messages MUST never be included"
+      - "Aside messages excluded unless pinned"
+      - "Chronological order in final output"
+
+    example_code: |
+      async function constructContext(chat, currentMessage, modelId) {
+        // Load messages
+        const allMessages = await loadMessagesFromJSONL(chat.storage_path);
+        
+        // Filter eligible messages
+        const eligible = allMessages.filter(m =>
+          !m.is_discarded &&
+          m.include_in_context &&
+          (!m.is_aside || m.is_pinned)
+        );
+        
+        // Separate pinned
+        const pinned = eligible.filter(m => m.is_pinned);
+        const regular = eligible.filter(m => !m.is_pinned);
+        
+        // Get token budget
+        const project = await getProject(chat.project_id);
+        const maxTokens = project.settings?.max_context_tokens || 32000;
+        
+        // Calculate reserved tokens
+        let usedTokens = 0;
+        const selected = [];
+        
+        // System prelude
+        if (chat.system_prelude?.content) {
+          usedTokens += countTokens(chat.system_prelude.content);
+        }
+        
+        // Current message
+        usedTokens += countTokens(currentMessage.content);
+        
+        // Pinned messages (always include)
+        for (const msg of pinned) {
+          usedTokens += countTokens(msg.content);
+          selected.push(msg);
+        }
+        
+        // Fill with recent messages
+        const sorted = regular.sort((a, b) => 
+          new Date(b.created_at) - new Date(a.created_at)
+        );
+        
+        for (const msg of sorted) {
+          if (msg.id === currentMessage.id) continue;
+          
+          const tokens = countTokens(msg.content);
+          if (usedTokens + tokens <= maxTokens) {
+            selected.push(msg);
+            usedTokens += tokens;
+          }
+        }
+        
+        // Sort chronologically
+        selected.sort((a, b) => 
+          new Date(a.created_at) - new Date(b.created_at)
+        );
+        
+        // Build context array
+        const context = [];
+        
+        if (chat.system_prelude?.content) {
+          context.push({
+            role: 'system',
+            content: chat.system_prelude.content
+          });
+        }
+        
+        for (const msg of selected) {
+          context.push({
+            role: msg.role,
+            content: msg.content
+          });
+        }
+        
+        context.push({
+          role: currentMessage.role,
+          content: currentMessage.content
+        });
+        
+        return context;
+      }
+
+    common_mistakes:
+      - "Forgetting to exclude discarded messages"
+      - "Including aside messages in context"
+      - "Not respecting chronological order"
+      - "Truncating pinned messages"
+      - "Not counting system prelude tokens"
+      - "Off-by-one errors in token budget"
+
+  references:
+    - "spec/context.yaml - Context construction algorithm"
+    - "spec/domain.yaml#Message - Message entity definition"
+    - "spec/domain.yaml#Chat - Chat entity definition"

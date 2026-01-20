@@ -1,0 +1,405 @@
+# =============================================================================
+# Function Specification: handleSendMessage
+# =============================================================================
+
+function:
+  id: frontend_svelte.handle_send_message
+  name: handleSendMessage
+  module: frontend_svelte
+  purpose: |
+    Handle the user action of sending a message. Validates input, updates UI
+    state, calls the backend API, and handles the response. This is the main
+    entry point for user message submission from the prompt input.
+
+  signature:
+    parameters:
+      - name: content
+        type: string
+        required: true
+        description: "Message content from prompt input"
+      - name: options
+        type: SendOptions
+        required: false
+        default: {}
+        description: "Send options"
+        constraints:
+          - "modelId: optional model override"
+          - "outputFormat: text|markdown|json"
+          - "isAside: boolean"
+          - "pureAside: boolean"
+    returns:
+      type: Promise<SendResult>
+      description: "Result of send operation"
+      schema:
+        properties:
+          success:
+            type: boolean
+          userMessage:
+            $ref: "spec/domain.yaml#Message"
+          assistantMessage:
+            $ref: "spec/domain.yaml#Message"
+          error:
+            type: string
+            nullable: true
+    throws:
+      - type: ValidationError
+        condition: "Empty content"
+      - type: NetworkError
+        condition: "API call fails"
+
+  contract:
+    preconditions:
+      - "Active project is selected"
+      - "Active chat is selected"
+      - "content is non-empty string"
+      - "Chat is not in loading state"
+    postconditions:
+      - "User message appears in chat"
+      - "If not slash command: assistant message appears"
+      - "Prompt input is cleared"
+      - "Chat scrolls to bottom"
+      - "Loading state is cleared"
+    invariants:
+      - "UI remains responsive during API call"
+    side_effects:
+      - type: state_mutation
+        description: "Updates messages store"
+        scope: "messagesStore"
+      - type: state_mutation
+        description: "Updates loading state"
+        scope: "uiStore"
+      - type: external_call
+        description: "Calls backend API"
+        scope: "POST /api/projects/{id}/chats/{id}/messages"
+
+  algorithm:
+    description: |
+      1. Validate content is non-empty
+      2. Check active project and chat
+      3. Set loading state
+      4. Clear prompt input
+      5. Create optimistic user message
+      6. Add to messages store
+      7. Call backend API
+      8. Handle response or error
+      9. Update messages with server response
+      10. Clear loading state
+      11. Scroll to bottom
+
+    steps:
+      - step: 1
+        action: "Trim content, check non-empty"
+        rationale: "Validate user input"
+      - step: 2
+        action: "Get activeProjectId and activeChatId from store"
+        rationale: "Ensure valid context"
+      - step: 3
+        action: "Set isLoading = true in uiStore"
+        rationale: "Show loading indicator"
+      - step: 4
+        action: "Clear promptInput in uiStore"
+        rationale: "Reset input for next message"
+      - step: 5
+        action: "Create optimistic user message with temp ID"
+        rationale: "Immediate UI feedback"
+      - step: 6
+        action: "Add optimistic message to messagesStore"
+        rationale: "Show message immediately"
+      - step: 7
+        action: "POST to /api/projects/{projectId}/chats/{chatId}/messages"
+        rationale: "Send to backend"
+      - step: 8
+        action: "On success: replace optimistic with server message"
+        rationale: "Update with real data"
+      - step: 9
+        action: "On success: add assistant message to store"
+        rationale: "Show LLM response"
+      - step: 10
+        action: "On error: mark optimistic message as error"
+        rationale: "Show error state"
+      - step: 11
+        action: "Set isLoading = false"
+        rationale: "Clear loading state"
+      - step: 12
+        action: "Scroll chat to bottom"
+        rationale: "Show latest messages"
+
+    fol_specification: |
+      forall content in String, opts in SendOptions:
+        NonEmpty(content) and
+        ActiveProject() and
+        ActiveChat() implies
+          let result = handleSendMessage(content, opts) in
+          (result.success implies
+            InStore(result.userMessage) and
+            (not IsSlashCommand(content) implies InStore(result.assistantMessage))) and
+          (not result.success implies
+            exists errorMsg in Store: errorMsg.status = 'error')
+
+    pseudocode: |
+      async function handleSendMessage(content, options = {}):
+        // Step 1: Validate
+        content = content.trim()
+        if not content:
+          throw ValidationError("Message cannot be empty")
+        
+        // Step 2: Get context
+        projectId = get(activeProjectId)
+        chatId = get(activeChatId)
+        
+        if not projectId or not chatId:
+          throw ValidationError("No active chat")
+        
+        // Step 3: Set loading
+        uiStore.setLoading(true)
+        
+        // Step 4: Clear input
+        uiStore.clearPromptInput()
+        
+        // Step 5: Create optimistic message
+        tempId = `temp-${Date.now()}`
+        optimisticMessage = {
+          id: tempId,
+          chat_id: chatId,
+          project_id: projectId,
+          role: 'user',
+          content: content,
+          status: 'pending',
+          created_at: new Date().toISOString(),
+          is_aside: options.isAside || false,
+          pure_aside: options.pureAside || false
+        }
+        
+        // Step 6: Add to store
+        messagesStore.addMessage(optimisticMessage)
+        
+        try:
+          // Step 7: Call API
+          response = await api.post(
+            `/projects/${projectId}/chats/${chatId}/messages`,
+            {
+              raw_text: content,
+              model_id: options.modelId,
+              output_format_hint: options.outputFormat || 'text',
+              is_aside: options.isAside,
+              pure_aside: options.pureAside
+            }
+          )
+          
+          // Step 8: Replace optimistic message
+          messagesStore.replaceMessage(tempId, response.user_message)
+          
+          // Step 9: Add assistant message
+          if response.assistant_message:
+            messagesStore.addMessage(response.assistant_message)
+          
+          // Step 11: Clear loading
+          uiStore.setLoading(false)
+          
+          // Step 12: Scroll
+          scrollToBottom()
+          
+          return {
+            success: true,
+            userMessage: response.user_message,
+            assistantMessage: response.assistant_message
+          }
+          
+        catch error:
+          // Step 10: Mark error
+          messagesStore.updateMessage(tempId, { status: 'error' })
+          uiStore.setLoading(false)
+          uiStore.setError(error.message)
+          
+          return {
+            success: false,
+            error: error.message
+          }
+
+  complexity:
+    time: "O(1) + API latency"
+    space: "O(m)"
+    analysis: |
+      Time:
+        - Local operations: O(1)
+        - API call: Variable (1-30 seconds)
+      
+      Space:
+        - Message objects: O(m) where m = message size
+
+  data_access:
+    reads:
+      - entity: UIStore
+        operations: [read_active_project, read_active_chat]
+    writes:
+      - entity: MessagesStore
+        operations: [add, replace, update]
+      - entity: UIStore
+        operations: [set_loading, clear_input, set_error]
+    transactions: false
+
+  error_handling:
+    validation:
+      - parameter: content
+        validation: "Must be non-empty after trim"
+        error_code: "EMPTY_MESSAGE"
+    error_cases:
+      - condition: "No active chat"
+        error_type: ValidationError
+        recovery: "Show error toast"
+      - condition: "Network error"
+        error_type: NetworkError
+        recovery: "Mark message as error, show retry"
+      - condition: "API error"
+        error_type: APIError
+        recovery: "Mark message as error, show error"
+
+  testing:
+    unit_tests:
+      - name: "sends message successfully"
+        scenario: "Happy path"
+        inputs:
+          content: "Hello"
+        expected_output:
+          success: true
+          userMessage:
+            role: "user"
+          assistantMessage:
+            role: "assistant"
+        expected_side_effects:
+          - "Loading state toggled"
+          - "Input cleared"
+          - "Messages added to store"
+
+      - name: "handles empty content"
+        scenario: "Empty message"
+        inputs:
+          content: "   "
+        expected_output:
+          error: ValidationError
+
+      - name: "handles API error"
+        scenario: "Backend returns error"
+        inputs:
+          content: "Hello"
+        mocks:
+          - "api.post throws NetworkError"
+        expected_output:
+          success: false
+        expected_side_effects:
+          - "Optimistic message marked as error"
+
+      - name: "sends aside message"
+        scenario: "Aside option set"
+        inputs:
+          content: "Side note"
+          options:
+            isAside: true
+        expected_output:
+          userMessage:
+            is_aside: true
+
+    edge_cases:
+      - "Very long message"
+      - "Message with only whitespace"
+      - "Rapid consecutive sends"
+      - "Send while previous still loading"
+      - "Network disconnection mid-request"
+
+    integration_tests:
+      - "Send message and verify in chat"
+      - "Send aside and verify flag"
+      - "Send slash command and verify handling"
+
+  llm_guidance:
+    implementation_hints: |
+      1. Use optimistic updates for immediate feedback
+      2. Implement proper loading states
+      3. Handle network errors gracefully
+      4. Support keyboard shortcuts (Enter to send)
+      5. Implement retry mechanism for failed sends
+
+    key_considerations:
+      - "Always show immediate feedback"
+      - "Don't lose user input on error"
+      - "Handle concurrent sends properly"
+      - "Clear input only after successful add to store"
+      - "Scroll to bottom after new messages"
+
+    example_code: |
+      <script>
+        import { activeProjectId, activeChatId } from '$lib/stores/app';
+        import { messagesStore } from '$lib/stores/messages';
+        import { uiStore } from '$lib/stores/ui';
+        import { api } from '$lib/api';
+        
+        let promptInput = '';
+        let isLoading = false;
+        
+        async function handleSendMessage() {
+          const content = promptInput.trim();
+          if (!content) return;
+          
+          const projectId = $activeProjectId;
+          const chatId = $activeChatId;
+          
+          if (!projectId || !chatId) {
+            uiStore.showError('No active chat');
+            return;
+          }
+          
+          isLoading = true;
+          const tempId = `temp-${Date.now()}`;
+          
+          // Optimistic update
+          const optimisticMessage = {
+            id: tempId,
+            chat_id: chatId,
+            role: 'user',
+            content,
+            status: 'pending',
+            created_at: new Date().toISOString()
+          };
+          
+          messagesStore.add(optimisticMessage);
+          promptInput = '';
+          
+          try {
+            const response = await api.post(
+              `/projects/${projectId}/chats/${chatId}/messages`,
+              { raw_text: content }
+            );
+            
+            messagesStore.replace(tempId, response.user_message);
+            
+            if (response.assistant_message) {
+              messagesStore.add(response.assistant_message);
+            }
+            
+            scrollToBottom();
+          } catch (error) {
+            messagesStore.update(tempId, { status: 'error' });
+            uiStore.showError(error.message);
+          } finally {
+            isLoading = false;
+          }
+        }
+        
+        function handleKeydown(event) {
+          if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault();
+            handleSendMessage();
+          }
+        }
+      </script>
+
+    common_mistakes:
+      - "Not using optimistic updates"
+      - "Clearing input before store update"
+      - "Not handling loading state"
+      - "Blocking UI during API call"
+      - "Not scrolling to new messages"
+
+  references:
+    - "spec/ui.yaml - UI specifications"
+    - "spec/apis.yaml - API endpoints"

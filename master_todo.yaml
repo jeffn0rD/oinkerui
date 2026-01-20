@@ -40,29 +40,6 @@ prompt_guidance: 'Always follow these guidelines and update project documentatio
   '
 current:
 - task:
-    id: 0.2.5.3
-    name: Function Specification Framework
-    goal: Create detailed function specifications for 20+ critical functions with contracts, FOL algorithms, and complexity
-      analysis.
-    prompt: ./prompts/dev/prompt_0_2_5_3.md
-    files:
-    - spec/functions/backend_node/*.yaml
-    - spec/functions/frontend_svelte/*.yaml
-    - spec/functions/backend_python_tools/*.yaml
-    - spec/functions/git_integration/*.yaml
-    - spec/functions/logging_and_metrics/*.yaml
-    details:
-      focus:
-      - Function contracts (pre/post conditions)
-      - Algorithms in First Order Logic
-      - Complexity analysis
-      - LLM implementation guidance
-      verification:
-      - All functions follow schema
-      - FOL specifications are valid
-      - Complexity analysis is accurate
-      - All error cases documented
-- task:
     id: 0.2.5.4
     name: API & Interaction Detail
     goal: Expand apis.yaml and ui.yaml with complete endpoint specifications and interaction flows.

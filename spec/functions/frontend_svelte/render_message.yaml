@@ -1,0 +1,345 @@
+# =============================================================================
+# Function Specification: renderMessage
+# =============================================================================
+
+function:
+  id: frontend_svelte.render_message
+  name: renderMessage
+  module: frontend_svelte
+  purpose: |
+    Render a chat message with proper formatting, markdown parsing, syntax
+    highlighting, and visual indicators for message flags (aside, pinned,
+    discarded). This is the core display component for chat messages.
+
+  signature:
+    parameters:
+      - name: message
+        type: Message
+        required: true
+        description: "Message object to render"
+      - name: options
+        type: RenderOptions
+        required: false
+        default: {}
+        description: "Rendering options"
+        constraints:
+          - "showStats: boolean - show token/timing stats"
+          - "collapsed: boolean - render in collapsed state"
+          - "highlightSearch: string - highlight search term"
+    returns:
+      type: SvelteComponent
+      description: "Rendered message component"
+    throws:
+      - type: RenderError
+        condition: "Invalid message structure"
+
+  contract:
+    preconditions:
+      - "message is valid Message object"
+      - "message.role is valid role"
+      - "message.content is string"
+    postconditions:
+      - "Returns renderable Svelte component"
+      - "Markdown is parsed and sanitized"
+      - "Code blocks have syntax highlighting"
+      - "Message flags are visually indicated"
+    invariants:
+      - "HTML output is sanitized (XSS safe)"
+    side_effects: []
+
+  algorithm:
+    description: |
+      1. Validate message structure
+      2. Determine message styling based on role
+      3. Parse markdown content
+      4. Apply syntax highlighting to code blocks
+      5. Sanitize HTML output
+      6. Add visual indicators for flags
+      7. Add stats line if enabled
+      8. Return component
+
+    steps:
+      - step: 1
+        action: "Validate message has id, role, content"
+        rationale: "Ensure renderable message"
+      - step: 2
+        action: "Select CSS classes based on role (user/assistant/system)"
+        rationale: "Visual differentiation"
+      - step: 3
+        action: "Parse content with marked library"
+        rationale: "Convert markdown to HTML"
+      - step: 4
+        action: "Apply highlight.js to code blocks"
+        rationale: "Syntax highlighting"
+      - step: 5
+        action: "Sanitize HTML with DOMPurify"
+        rationale: "Prevent XSS attacks"
+      - step: 6
+        action: "Add flag indicators (aside, pinned, discarded)"
+        rationale: "Visual status indicators"
+      - step: 7
+        action: "Add stats line if showStats and llm_info present"
+        rationale: "Show token/timing info"
+      - step: 8
+        action: "Return component with all elements"
+        rationale: "Complete rendered message"
+
+    fol_specification: |
+      forall msg in Message:
+        ValidMessage(msg) implies
+          let rendered = renderMessage(msg) in
+          IsSanitized(rendered.html) and
+          (msg.is_aside implies HasAsideIndicator(rendered)) and
+          (msg.is_pinned implies HasPinnedIndicator(rendered)) and
+          (msg.is_discarded implies HasDiscardedStyle(rendered))
+
+    pseudocode: |
+      function renderMessage(message, options = {}):
+        // Step 1: Validate
+        if not message.id or not message.role or message.content == undefined:
+          throw RenderError("Invalid message structure")
+        
+        // Step 2: Determine styling
+        roleClass = getRoleClass(message.role)
+        containerClasses = [roleClass]
+        
+        if message.is_discarded:
+          containerClasses.push('discarded')
+        if message.is_aside:
+          containerClasses.push('aside')
+        
+        // Step 3: Parse markdown
+        rawHtml = marked.parse(message.content)
+        
+        // Step 4: Syntax highlighting
+        htmlWithHighlighting = highlightCodeBlocks(rawHtml)
+        
+        // Step 5: Sanitize
+        safeHtml = DOMPurify.sanitize(htmlWithHighlighting, {
+          ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'code', 'pre', 'ul', 'ol', 'li', 'a', 'h1', 'h2', 'h3', 'blockquote', 'span'],
+          ALLOWED_ATTR: ['href', 'class', 'target']
+        })
+        
+        // Step 6: Build indicators
+        indicators = []
+        if message.is_pinned:
+          indicators.push({ icon: '📌', class: 'pinned', tooltip: 'Pinned' })
+        if message.is_aside:
+          indicators.push({ icon: '⊂', class: 'aside', tooltip: 'Aside' })
+        if message.pure_aside:
+          indicators.push({ icon: 'Ø', class: 'pure-aside', tooltip: 'Pure Aside' })
+        
+        // Step 7: Stats line
+        statsLine = null
+        if options.showStats and message.llm_info:
+          statsLine = {
+            tokens: message.llm_info.usage?.total_tokens,
+            latency: message.llm_info.timings?.latency_ms,
+            model: message.llm_info.model
+          }
+        
+        // Step 8: Return component data
+        return {
+          id: message.id,
+          role: message.role,
+          html: safeHtml,
+          classes: containerClasses,
+          indicators: indicators,
+          stats: statsLine,
+          collapsed: options.collapsed || false,
+          timestamp: message.created_at
+        }
+
+  complexity:
+    time: "O(n)"
+    space: "O(n)"
+    analysis: |
+      Time:
+        - Markdown parsing: O(n) where n = content length
+        - Syntax highlighting: O(n * k) where k = code block count
+        - Sanitization: O(n)
+      
+      Space:
+        - HTML string: O(n)
+        - DOM elements: O(n)
+
+  data_access:
+    reads:
+      - entity: Message
+        operations: [read_all_fields]
+    writes: []
+    transactions: false
+
+  error_handling:
+    validation:
+      - parameter: message
+        validation: "Must have id, role, content"
+        error_code: "INVALID_MESSAGE"
+    error_cases:
+      - condition: "Invalid message structure"
+        error_type: RenderError
+        recovery: "Render error placeholder"
+      - condition: "Markdown parsing fails"
+        error_type: RenderError
+        recovery: "Render as plain text"
+
+  testing:
+    unit_tests:
+      - name: "renders user message"
+        scenario: "Basic user message"
+        inputs:
+          message:
+            id: "msg-1"
+            role: "user"
+            content: "Hello world"
+        expected_output:
+          role: "user"
+          html: "<p>Hello world</p>"
+          classes: ["user"]
+
+      - name: "renders markdown"
+        scenario: "Message with markdown"
+        inputs:
+          message:
+            id: "msg-1"
+            role: "assistant"
+            content: "**bold** and *italic*"
+        expected_output:
+          html: "contains <strong> and <em>"
+
+      - name: "highlights code"
+        scenario: "Message with code block"
+        inputs:
+          message:
+            id: "msg-1"
+            role: "assistant"
+            content: "```javascript\nconst x = 1;\n```"
+        expected_output:
+          html: "contains hljs classes"
+
+      - name: "shows pinned indicator"
+        scenario: "Pinned message"
+        inputs:
+          message:
+            id: "msg-1"
+            role: "user"
+            content: "Important"
+            is_pinned: true
+        expected_output:
+          indicators:
+            - icon: "📌"
+
+      - name: "applies discarded style"
+        scenario: "Discarded message"
+        inputs:
+          message:
+            id: "msg-1"
+            role: "user"
+            content: "Old message"
+            is_discarded: true
+        expected_output:
+          classes: ["user", "discarded"]
+
+    edge_cases:
+      - "Empty content"
+      - "Very long content (>100KB)"
+      - "Malicious HTML in content"
+      - "Invalid markdown syntax"
+      - "Missing llm_info for stats"
+
+    integration_tests:
+      - "Render message list and verify order"
+      - "Toggle collapse and verify state"
+      - "Click pin button and verify indicator"
+
+  llm_guidance:
+    implementation_hints: |
+      1. Use marked library for markdown parsing
+      2. Use highlight.js for syntax highlighting
+      3. Use DOMPurify for HTML sanitization
+      4. Implement lazy rendering for long messages
+      5. Use Svelte transitions for collapse/expand
+
+    key_considerations:
+      - "Always sanitize HTML to prevent XSS"
+      - "Support dark theme colors"
+      - "Handle very long messages gracefully"
+      - "Show loading state for streaming messages"
+      - "Preserve scroll position on updates"
+
+    example_code: |
+      <script>
+        import { marked } from 'marked';
+        import DOMPurify from 'dompurify';
+        import hljs from 'highlight.js';
+        
+        export let message;
+        export let showStats = false;
+        export let collapsed = false;
+        
+        // Configure marked
+        marked.setOptions({
+          highlight: (code, lang) => {
+            if (lang && hljs.getLanguage(lang)) {
+              return hljs.highlight(code, { language: lang }).value;
+            }
+            return hljs.highlightAuto(code).value;
+          }
+        });
+        
+        $: roleClass = message.role === 'user' ? 'bg-slate-700' : 'bg-slate-800';
+        $: isDiscarded = message.is_discarded;
+        $: isPinned = message.is_pinned;
+        $: isAside = message.is_aside;
+        
+        $: safeHtml = DOMPurify.sanitize(marked.parse(message.content || ''));
+        
+        $: stats = message.llm_info ? {
+          tokens: message.llm_info.usage?.total_tokens,
+          latency: message.llm_info.timings?.latency_ms,
+          model: message.llm_info.model
+        } : null;
+      </script>
+      
+      <div class="message {roleClass}" class:discarded={isDiscarded} class:aside={isAside}>
+        <div class="message-header">
+          <span class="role">{message.role}</span>
+          <div class="indicators">
+            {#if isPinned}
+              <span class="indicator pinned" title="Pinned">📌</span>
+            {/if}
+            {#if isAside}
+              <span class="indicator aside" title="Aside">⊂</span>
+            {/if}
+          </div>
+        </div>
+        
+        <div class="message-content" class:collapsed>
+          {@html safeHtml}
+        </div>
+        
+        {#if showStats && stats}
+          <div class="message-stats">
+            {#if stats.tokens}
+              <span>{stats.tokens} tokens</span>
+            {/if}
+            {#if stats.latency}
+              <span>{stats.latency}ms</span>
+            {/if}
+            {#if stats.model}
+              <span>{stats.model}</span>
+            {/if}
+          </div>
+        {/if}
+      </div>
+
+    common_mistakes:
+      - "Not sanitizing HTML"
+      - "Not handling empty content"
+      - "Blocking UI with large markdown"
+      - "Not supporting dark theme"
+      - "Missing accessibility attributes"
+
+  references:
+    - "spec/ui.yaml - UI component specifications"
+    - "spec/domain.yaml#Message - Message entity"

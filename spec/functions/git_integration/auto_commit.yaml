@@ -1,0 +1,426 @@
+# =============================================================================
+# Function Specification: autoCommit
+# =============================================================================
+
+function:
+  id: git_integration.auto_commit
+  name: autoCommit
+  module: git_integration
+  purpose: |
+    Automatically commit changes in a project repository with intelligent
+    batching. Groups related changes, generates meaningful commit messages,
+    and respects the project's commit policy settings.
+
+  signature:
+    parameters:
+      - name: projectPath
+        type: string
+        required: true
+        description: "Path to project directory"
+      - name: options
+        type: AutoCommitOptions
+        required: false
+        default: {}
+        description: "Auto-commit options"
+        constraints:
+          - "message: optional custom commit message"
+          - "files: optional specific files to commit"
+          - "force: boolean - commit even if policy is manual"
+    returns:
+      type: AutoCommitResult
+      description: "Commit result"
+      schema:
+        properties:
+          committed:
+            type: boolean
+          commitHash:
+            type: string
+            nullable: true
+          message:
+            type: string
+          filesCommitted:
+            type: array
+            items:
+              type: string
+          skipped:
+            type: boolean
+          skipReason:
+            type: string
+            nullable: true
+    throws:
+      - type: GitError
+        condition: "Git operation fails"
+      - type: ValidationError
+        condition: "Invalid project path"
+
+  contract:
+    preconditions:
+      - "projectPath is valid Git repository"
+      - "Repository has changes to commit (or force=true)"
+    postconditions:
+      - "If committed: new commit exists with changes"
+      - "If skipped: no changes to repository"
+      - "Working directory is clean after commit"
+    invariants:
+      - "Respects project commit policy unless forced"
+      - "Commit message is meaningful"
+    side_effects:
+      - type: git_operation
+        description: "Creates Git commit"
+        scope: "projectPath/.git/"
+
+  algorithm:
+    description: |
+      1. Validate project is Git repository
+      2. Check project commit policy
+      3. Get repository status
+      4. If no changes, return skipped
+      5. Determine files to commit
+      6. Generate commit message
+      7. Stage files
+      8. Create commit
+      9. Return result
+
+    steps:
+      - step: 1
+        action: "Verify .git directory exists"
+        rationale: "Ensure valid repository"
+      - step: 2
+        action: "Load project settings, check git_commit_policy"
+        rationale: "Respect project configuration"
+      - step: 3
+        action: "Run git status to get changed files"
+        rationale: "Determine what to commit"
+      - step: 4
+        action: "If no changes, return { skipped: true }"
+        rationale: "Nothing to commit"
+      - step: 5
+        action: "Filter files if options.files specified"
+        rationale: "Allow selective commits"
+      - step: 6
+        action: "Generate message from changes or use provided"
+        rationale: "Meaningful commit messages"
+      - step: 7
+        action: "Run git add for selected files"
+        rationale: "Stage changes"
+      - step: 8
+        action: "Run git commit with message"
+        rationale: "Create commit"
+      - step: 9
+        action: "Return AutoCommitResult"
+        rationale: "Provide result"
+
+    fol_specification: |
+      forall path in Path, opts in AutoCommitOptions:
+        IsGitRepo(path) implies
+          let result = autoCommit(path, opts) in
+          (HasChanges(path) and PolicyAllows(path, opts) implies
+            result.committed and NonNull(result.commitHash)) and
+          (not HasChanges(path) implies
+            result.skipped and result.skipReason = 'no_changes') and
+          (not PolicyAllows(path, opts) and not opts.force implies
+            result.skipped and result.skipReason = 'policy')
+
+    pseudocode: |
+      async function autoCommit(projectPath, options = {}):
+          // Step 1: Validate
+          git = simpleGit(projectPath)
+          
+          isRepo = await git.checkIsRepo()
+          if not isRepo:
+              throw ValidationError("Not a Git repository")
+          
+          // Step 2: Check policy
+          project = await loadProject(projectPath)
+          policy = project?.settings?.git_commit_policy || 'auto_batch'
+          
+          if policy == 'manual_only' and not options.force:
+              return {
+                  committed: false,
+                  skipped: true,
+                  skipReason: 'policy'
+              }
+          
+          // Step 3: Get status
+          status = await git.status()
+          
+          // Step 4: Check for changes
+          changedFiles = [
+              ...status.modified,
+              ...status.created,
+              ...status.deleted,
+              ...status.not_added
+          ]
+          
+          if changedFiles.length == 0:
+              return {
+                  committed: false,
+                  skipped: true,
+                  skipReason: 'no_changes'
+              }
+          
+          // Step 5: Filter files
+          filesToCommit = changedFiles
+          if options.files:
+              filesToCommit = changedFiles.filter(f => options.files.includes(f))
+              if filesToCommit.length == 0:
+                  return {
+                      committed: false,
+                      skipped: true,
+                      skipReason: 'no_matching_files'
+                  }
+          
+          // Step 6: Generate message
+          message = options.message || generateCommitMessage(filesToCommit, status)
+          
+          // Step 7: Stage
+          await git.add(filesToCommit)
+          
+          // Step 8: Commit
+          result = await git.commit(message)
+          
+          // Step 9: Return
+          return {
+              committed: true,
+              commitHash: result.commit,
+              message: message,
+              filesCommitted: filesToCommit,
+              skipped: false
+          }
+      
+      function generateCommitMessage(files, status):
+          // Analyze changes to generate meaningful message
+          if files.length == 1:
+              file = files[0]
+              action = getFileAction(file, status)
+              return `${action} ${file}`
+          
+          // Group by directory or type
+          extensions = groupByExtension(files)
+          
+          if extensions.length == 1:
+              return `Update ${extensions[0]} files (${files.length} files)`
+          
+          // Generic message
+          actions = []
+          if status.created.length > 0:
+              actions.push(`add ${status.created.length}`)
+          if status.modified.length > 0:
+              actions.push(`modify ${status.modified.length}`)
+          if status.deleted.length > 0:
+              actions.push(`delete ${status.deleted.length}`)
+          
+          return `Auto-commit: ${actions.join(', ')} files`
+
+  complexity:
+    time: "O(f)"
+    space: "O(f)"
+    analysis: |
+      Time:
+        - Git status: O(f) where f = files in repo
+        - Git add: O(c) where c = files to commit
+        - Git commit: O(c)
+      
+      Space:
+        - File lists: O(f)
+
+  data_access:
+    reads:
+      - entity: Project
+        operations: [read_settings]
+      - entity: GitRepository
+        operations: [status]
+    writes:
+      - entity: GitRepository
+        operations: [add, commit]
+    transactions: false
+
+  error_handling:
+    validation:
+      - parameter: projectPath
+        validation: "Must be Git repository"
+        error_code: "NOT_GIT_REPO"
+    error_cases:
+      - condition: "Not a repository"
+        error_type: ValidationError
+        recovery: propagate
+      - condition: "Git commit fails"
+        error_type: GitError
+        recovery: propagate
+      - condition: "Merge conflict"
+        error_type: GitError
+        recovery: "Return error with conflict info"
+
+  testing:
+    unit_tests:
+      - name: "commits changes"
+        scenario: "Repository with changes"
+        inputs:
+          projectPath: "/tmp/test_repo"
+        expected_output:
+          committed: true
+          commitHash: "non-null"
+          filesCommitted: ["file1.txt"]
+
+      - name: "skips when no changes"
+        scenario: "Clean repository"
+        inputs:
+          projectPath: "/tmp/clean_repo"
+        expected_output:
+          committed: false
+          skipped: true
+          skipReason: "no_changes"
+
+      - name: "respects manual policy"
+        scenario: "Policy is manual_only"
+        inputs:
+          projectPath: "/tmp/manual_repo"
+        expected_output:
+          committed: false
+          skipped: true
+          skipReason: "policy"
+
+      - name: "force overrides policy"
+        scenario: "Force with manual policy"
+        inputs:
+          projectPath: "/tmp/manual_repo"
+          options:
+            force: true
+        expected_output:
+          committed: true
+
+      - name: "uses custom message"
+        scenario: "Custom commit message"
+        inputs:
+          projectPath: "/tmp/test_repo"
+          options:
+            message: "Custom message"
+        expected_output:
+          message: "Custom message"
+
+    edge_cases:
+      - "Very large number of files"
+      - "Binary files"
+      - "Files with special characters"
+      - "Untracked files only"
+      - "Deleted files only"
+
+    integration_tests:
+      - "Auto-commit and verify in git log"
+      - "Auto-commit specific files"
+      - "Verify policy enforcement"
+
+  llm_guidance:
+    implementation_hints: |
+      1. Use simple-git for all Git operations
+      2. Generate meaningful commit messages
+      3. Batch related changes together
+      4. Respect project commit policy
+      5. Handle edge cases (no changes, conflicts)
+
+    key_considerations:
+      - "Check policy before committing"
+      - "Generate useful commit messages"
+      - "Handle no-changes case gracefully"
+      - "Support selective file commits"
+      - "Force option for manual override"
+
+    example_code: |
+      const simpleGit = require('simple-git');
+      const path = require('path');
+      
+      async function autoCommit(projectPath, options = {}) {
+        const git = simpleGit(projectPath);
+        
+        // Validate
+        const isRepo = await git.checkIsRepo();
+        if (!isRepo) {
+          throw new ValidationError('Not a Git repository');
+        }
+        
+        // Check policy
+        const project = await loadProject(projectPath);
+        const policy = project?.settings?.git_commit_policy || 'auto_batch';
+        
+        if (policy === 'manual_only' && !options.force) {
+          return {
+            committed: false,
+            skipped: true,
+            skipReason: 'policy'
+          };
+        }
+        
+        // Get status
+        const status = await git.status();
+        
+        const changedFiles = [
+          ...status.modified,
+          ...status.created,
+          ...status.deleted,
+          ...status.not_added
+        ];
+        
+        if (changedFiles.length === 0) {
+          return {
+            committed: false,
+            skipped: true,
+            skipReason: 'no_changes'
+          };
+        }
+        
+        // Filter files
+        let filesToCommit = changedFiles;
+        if (options.files) {
+          filesToCommit = changedFiles.filter(f => options.files.includes(f));
+          if (filesToCommit.length === 0) {
+            return {
+              committed: false,
+              skipped: true,
+              skipReason: 'no_matching_files'
+            };
+          }
+        }
+        
+        // Generate message
+        const message = options.message || generateCommitMessage(filesToCommit, status);
+        
+        // Stage and commit
+        await git.add(filesToCommit);
+        const result = await git.commit(message);
+        
+        return {
+          committed: true,
+          commitHash: result.commit,
+          message,
+          filesCommitted: filesToCommit,
+          skipped: false
+        };
+      }
+      
+      function generateCommitMessage(files, status) {
+        if (files.length === 1) {
+          const file = files[0];
+          let action = 'Update';
+          if (status.created.includes(file)) action = 'Add';
+          if (status.deleted.includes(file)) action = 'Delete';
+          return `${action} ${file}`;
+        }
+        
+        const parts = [];
+        if (status.created.length) parts.push(`add ${status.created.length}`);
+        if (status.modified.length) parts.push(`modify ${status.modified.length}`);
+        if (status.deleted.length) parts.push(`delete ${status.deleted.length}`);
+        
+        return `Auto-commit: ${parts.join(', ')} files`;
+      }
+
+    common_mistakes:
+      - "Not checking for changes first"
+      - "Ignoring commit policy"
+      - "Poor commit messages"
+      - "Not handling untracked files"
+      - "Not returning skip reason"
+
+  references:
+    - "spec/modules/git_integration.yaml"
+    - "spec/domain.yaml#Project.settings.git_commit_policy"

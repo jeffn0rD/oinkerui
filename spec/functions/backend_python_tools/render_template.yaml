@@ -1,0 +1,348 @@
+# =============================================================================
+# Function Specification: renderTemplate
+# =============================================================================
+
+function:
+  id: backend_python_tools.render_template
+  name: render_template
+  module: backend_python_tools
+  purpose: |
+    Render a Jinja2 template with provided variables. Supports safe filters,
+    custom OinkerUI filters, and sandboxed execution to prevent code injection.
+    Used for prompt templates and code generation.
+
+  signature:
+    parameters:
+      - name: template_content
+        type: string
+        required: true
+        description: "Jinja2 template string"
+      - name: variables
+        type: dict
+        required: false
+        default: {}
+        description: "Variables to substitute in template"
+      - name: options
+        type: RenderOptions
+        required: false
+        default: {}
+        description: "Rendering options"
+        constraints:
+          - "strict: boolean - fail on undefined variables"
+          - "autoescape: boolean - HTML escape output"
+    returns:
+      type: RenderResult
+      description: "Rendered template result"
+      schema:
+        properties:
+          content:
+            type: string
+          variables_used:
+            type: array
+            items:
+              type: string
+          warnings:
+            type: array
+            items:
+              type: string
+    throws:
+      - type: TemplateError
+        condition: "Invalid template syntax"
+      - type: UndefinedError
+        condition: "Undefined variable in strict mode"
+      - type: SecurityError
+        condition: "Unsafe template operation attempted"
+
+  contract:
+    preconditions:
+      - "template_content is valid Jinja2 syntax"
+      - "variables is dict with string keys"
+    postconditions:
+      - "Returns rendered content"
+      - "All variables are substituted"
+      - "No unsafe operations executed"
+    invariants:
+      - "Template execution is sandboxed"
+      - "No file system access from template"
+      - "No code execution from template"
+    side_effects: []
+
+  algorithm:
+    description: |
+      1. Validate template syntax
+      2. Create sandboxed Jinja2 environment
+      3. Register safe filters
+      4. Parse template
+      5. Extract variable names
+      6. Render with provided variables
+      7. Collect warnings for undefined
+      8. Return result
+
+    steps:
+      - step: 1
+        action: "Parse template to check syntax"
+        rationale: "Fail fast on invalid template"
+      - step: 2
+        action: "Create SandboxedEnvironment"
+        rationale: "Prevent unsafe operations"
+      - step: 3
+        action: "Register custom filters (date, json, etc.)"
+        rationale: "Provide useful utilities"
+      - step: 4
+        action: "Compile template from string"
+        rationale: "Prepare for rendering"
+      - step: 5
+        action: "Extract undeclared variables from AST"
+        rationale: "Track variable usage"
+      - step: 6
+        action: "Render template with variables"
+        rationale: "Produce output"
+      - step: 7
+        action: "Collect undefined variable warnings"
+        rationale: "Inform caller of issues"
+      - step: 8
+        action: "Return RenderResult"
+        rationale: "Provide complete result"
+
+    fol_specification: |
+      forall template in String, vars in Dict:
+        ValidJinja2(template) implies
+          let result = render_template(template, vars) in
+          result.content = Substitute(template, vars) and
+          forall v in ExtractVariables(template):
+            (v in vars implies Substituted(v, result.content)) and
+            (v not in vars implies v in result.warnings)
+
+    pseudocode: |
+      def render_template(template_content: str, variables: dict = {}, options: dict = {}):
+          # Step 1: Validate syntax
+          try:
+              ast = env.parse(template_content)
+          except TemplateSyntaxError as e:
+              raise TemplateError(f"Invalid syntax: {e}")
+          
+          # Step 2: Create sandboxed environment
+          env = SandboxedEnvironment(
+              autoescape=options.get('autoescape', False),
+              undefined=StrictUndefined if options.get('strict') else Undefined
+          )
+          
+          # Step 3: Register filters
+          env.filters['date'] = format_date
+          env.filters['json'] = json_dumps
+          env.filters['indent'] = indent_text
+          env.filters['trim'] = str.strip
+          env.filters['upper'] = str.upper
+          env.filters['lower'] = str.lower
+          env.filters['title'] = str.title
+          env.filters['default'] = lambda v, d: v if v else d
+          
+          # Step 4: Compile template
+          template = env.from_string(template_content)
+          
+          # Step 5: Extract variables
+          ast = env.parse(template_content)
+          variables_used = meta.find_undeclared_variables(ast)
+          
+          # Step 6: Render
+          warnings = []
+          try:
+              content = template.render(**variables)
+          except UndefinedError as e:
+              if options.get('strict'):
+                  raise
+              warnings.append(str(e))
+              # Render with undefined as empty
+              env.undefined = lambda name: ''
+              template = env.from_string(template_content)
+              content = template.render(**variables)
+          
+          # Step 7-8: Return result
+          return {
+              'content': content,
+              'variables_used': list(variables_used),
+              'warnings': warnings
+          }
+
+  complexity:
+    time: "O(n + v)"
+    space: "O(n)"
+    analysis: |
+      Time:
+        - Template parsing: O(n) where n = template length
+        - Variable extraction: O(n)
+        - Rendering: O(n + v) where v = total variable content size
+      
+      Space:
+        - AST: O(n)
+        - Output: O(n + v)
+
+  data_access:
+    reads: []
+    writes: []
+    transactions: false
+
+  error_handling:
+    validation:
+      - parameter: template_content
+        validation: "Must be valid Jinja2"
+        error_code: "INVALID_TEMPLATE"
+    error_cases:
+      - condition: "Invalid syntax"
+        error_type: TemplateError
+        recovery: propagate
+      - condition: "Undefined variable (strict)"
+        error_type: UndefinedError
+        recovery: propagate
+      - condition: "Unsafe operation"
+        error_type: SecurityError
+        recovery: propagate
+
+  testing:
+    unit_tests:
+      - name: "renders simple template"
+        scenario: "Basic variable substitution"
+        inputs:
+          template_content: "Hello, {{ name }}!"
+          variables:
+            name: "World"
+        expected_output:
+          content: "Hello, World!"
+          variables_used: ["name"]
+
+      - name: "handles filters"
+        scenario: "Template with filter"
+        inputs:
+          template_content: "{{ name | upper }}"
+          variables:
+            name: "hello"
+        expected_output:
+          content: "HELLO"
+
+      - name: "handles undefined variable"
+        scenario: "Missing variable, non-strict"
+        inputs:
+          template_content: "Hello, {{ name }}!"
+          variables: {}
+          options:
+            strict: false
+        expected_output:
+          content: "Hello, !"
+          warnings: ["'name' is undefined"]
+
+      - name: "throws on undefined in strict mode"
+        scenario: "Missing variable, strict"
+        inputs:
+          template_content: "Hello, {{ name }}!"
+          variables: {}
+          options:
+            strict: true
+        expected_output:
+          error: UndefinedError
+
+      - name: "blocks unsafe operations"
+        scenario: "Attempt file access"
+        inputs:
+          template_content: "{{ ''.__class__.__mro__[2].__subclasses__() }}"
+          variables: {}
+        expected_output:
+          error: SecurityError
+
+    edge_cases:
+      - "Empty template"
+      - "Template with only variables"
+      - "Nested variable access"
+      - "Loop constructs"
+      - "Conditional blocks"
+
+    integration_tests:
+      - "Render prompt template with project context"
+      - "Render code template with file content"
+
+  llm_guidance:
+    implementation_hints: |
+      1. Use jinja2.sandbox.SandboxedEnvironment
+      2. Whitelist safe filters only
+      3. Use meta.find_undeclared_variables for extraction
+      4. Consider caching compiled templates
+      5. Log template rendering for debugging
+
+    key_considerations:
+      - "SECURITY: Always use SandboxedEnvironment"
+      - "SECURITY: Don't allow arbitrary attribute access"
+      - "Handle undefined variables gracefully"
+      - "Provide useful error messages"
+      - "Support common filters"
+
+    example_code: |
+      from jinja2 import Environment, meta
+      from jinja2.sandbox import SandboxedEnvironment
+      from jinja2 import UndefinedError, TemplateSyntaxError
+      import json
+      from datetime import datetime
+      
+      def create_safe_environment(strict=False, autoescape=False):
+          """Create a sandboxed Jinja2 environment."""
+          from jinja2 import StrictUndefined, Undefined
+          
+          env = SandboxedEnvironment(
+              autoescape=autoescape,
+              undefined=StrictUndefined if strict else Undefined
+          )
+          
+          # Register safe filters
+          env.filters['date'] = lambda d, fmt='%Y-%m-%d': d.strftime(fmt) if d else ''
+          env.filters['json'] = lambda v: json.dumps(v, indent=2)
+          env.filters['indent'] = lambda s, n=4: '\n'.join(' ' * n + line for line in s.split('\n'))
+          
+          return env
+      
+      def render_template(template_content: str, variables: dict = None, options: dict = None):
+          variables = variables or {}
+          options = options or {}
+          
+          env = create_safe_environment(
+              strict=options.get('strict', False),
+              autoescape=options.get('autoescape', False)
+          )
+          
+          # Validate syntax
+          try:
+              ast = env.parse(template_content)
+          except TemplateSyntaxError as e:
+              raise TemplateError(f"Invalid template syntax at line {e.lineno}: {e.message}")
+          
+          # Extract variables
+          variables_used = list(meta.find_undeclared_variables(ast))
+          
+          # Compile and render
+          template = env.from_string(template_content)
+          warnings = []
+          
+          try:
+              content = template.render(**variables)
+          except UndefinedError as e:
+              if options.get('strict'):
+                  raise
+              warnings.append(str(e))
+              # Re-render with permissive undefined
+              env.undefined = lambda *args, **kwargs: ''
+              template = env.from_string(template_content)
+              content = template.render(**variables)
+          
+          return {
+              'content': content,
+              'variables_used': variables_used,
+              'warnings': warnings
+          }
+
+    common_mistakes:
+      - "Using regular Environment instead of Sandboxed"
+      - "Not handling undefined variables"
+      - "Allowing unsafe filters"
+      - "Not validating syntax before render"
+      - "Exposing internal objects to templates"
+
+  references:
+    - "https://jinja.palletsprojects.com/en/3.1.x/sandbox/"
+    - "spec/apis.yaml#render_template"

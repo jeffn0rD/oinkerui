@@ -1,0 +1,431 @@
+# =============================================================================
+# Function Specification: createSandbox
+# =============================================================================
+
+function:
+  id: backend_python_tools.create_sandbox
+  name: create_sandbox
+  module: backend_python_tools
+  purpose: |
+    Create an isolated execution sandbox for a project. Sets up a Python
+    virtual environment, configures security restrictions, and prepares
+    the execution context for code execution.
+
+  signature:
+    parameters:
+      - name: project_path
+        type: string
+        required: true
+        description: "Project root directory"
+      - name: options
+        type: SandboxOptions
+        required: false
+        default: {}
+        description: "Sandbox configuration"
+        constraints:
+          - "python_version: string (default system python)"
+          - "packages: list of pip packages to install"
+          - "memory_limit_mb: integer (default 512)"
+          - "cpu_limit_percent: integer (default 50)"
+    returns:
+      type: Sandbox
+      description: "Created sandbox object"
+      schema:
+        properties:
+          id:
+            type: string
+          project_path:
+            type: string
+          venv_path:
+            type: string
+          python_path:
+            type: string
+          created_at:
+            type: datetime
+          status:
+            type: string
+            enum: [ready, initializing, error]
+    throws:
+      - type: SandboxError
+        condition: "Failed to create sandbox"
+      - type: ValidationError
+        condition: "Invalid project path"
+
+  contract:
+    preconditions:
+      - "project_path exists and is valid project"
+      - "Sufficient disk space for venv"
+      - "Python is available on system"
+    postconditions:
+      - "Virtual environment is created"
+      - "Requested packages are installed"
+      - "Sandbox is ready for execution"
+    invariants:
+      - "Sandbox is isolated from system Python"
+      - "Sandbox cannot access other projects"
+    side_effects:
+      - type: io_operation
+        description: "Creates virtual environment directory"
+        scope: "project_path/.venv/"
+      - type: process_execution
+        description: "Runs pip to install packages"
+        scope: "Subprocess"
+
+  algorithm:
+    description: |
+      1. Validate project path
+      2. Generate sandbox ID
+      3. Create venv directory path
+      4. Create virtual environment
+      5. Install base packages
+      6. Install requested packages
+      7. Configure sandbox metadata
+      8. Return sandbox object
+
+    steps:
+      - step: 1
+        action: "Validate project_path exists and is directory"
+        rationale: "Ensure valid project"
+      - step: 2
+        action: "Generate UUID for sandbox ID"
+        rationale: "Unique identifier"
+      - step: 3
+        action: "Set venv_path = project_path/.venv"
+        rationale: "Standard location"
+      - step: 4
+        action: "Run python -m venv {venv_path}"
+        rationale: "Create isolated environment"
+      - step: 5
+        action: "Upgrade pip in venv"
+        rationale: "Ensure latest pip"
+      - step: 6
+        action: "Install requested packages via pip"
+        rationale: "Add dependencies"
+      - step: 7
+        action: "Write sandbox metadata to .venv/sandbox.json"
+        rationale: "Track sandbox config"
+      - step: 8
+        action: "Return Sandbox object"
+        rationale: "Provide sandbox reference"
+
+    fol_specification: |
+      forall path in Path, opts in SandboxOptions:
+        ValidProject(path) implies
+          let sandbox = create_sandbox(path, opts) in
+          DirectoryExists(sandbox.venv_path) and
+          FileExists(sandbox.python_path) and
+          sandbox.status = 'ready' and
+          forall pkg in opts.packages:
+            Installed(pkg, sandbox.venv_path)
+
+    pseudocode: |
+      def create_sandbox(project_path: str, options: dict = {}):
+          # Step 1: Validate
+          project_path = os.path.realpath(project_path)
+          if not os.path.isdir(project_path):
+              raise ValidationError("Invalid project path")
+          
+          # Step 2: Generate ID
+          sandbox_id = str(uuid.uuid4())
+          
+          # Step 3: Set paths
+          venv_path = os.path.join(project_path, '.venv')
+          python_path = os.path.join(venv_path, 'bin', 'python')
+          
+          # Check if venv already exists
+          if os.path.exists(venv_path):
+              # Validate existing venv
+              if os.path.exists(python_path):
+                  return load_existing_sandbox(venv_path)
+              else:
+                  # Corrupted, recreate
+                  shutil.rmtree(venv_path)
+          
+          # Step 4: Create venv
+          try:
+              subprocess.run(
+                  [sys.executable, '-m', 'venv', venv_path],
+                  check=True,
+                  capture_output=True
+              )
+          except subprocess.CalledProcessError as e:
+              raise SandboxError(f"Failed to create venv: {e.stderr}")
+          
+          # Step 5: Upgrade pip
+          pip_path = os.path.join(venv_path, 'bin', 'pip')
+          subprocess.run(
+              [pip_path, 'install', '--upgrade', 'pip'],
+              capture_output=True
+          )
+          
+          # Step 6: Install packages
+          packages = options.get('packages', [])
+          if packages:
+              try:
+                  subprocess.run(
+                      [pip_path, 'install'] + packages,
+                      check=True,
+                      capture_output=True,
+                      timeout=300  # 5 min timeout for installs
+                  )
+              except subprocess.CalledProcessError as e:
+                  raise SandboxError(f"Failed to install packages: {e.stderr}")
+          
+          # Step 7: Write metadata
+          metadata = {
+              'id': sandbox_id,
+              'project_path': project_path,
+              'created_at': datetime.now().isoformat(),
+              'packages': packages,
+              'python_version': get_python_version(python_path)
+          }
+          
+          with open(os.path.join(venv_path, 'sandbox.json'), 'w') as f:
+              json.dump(metadata, f, indent=2)
+          
+          # Step 8: Return
+          return {
+              'id': sandbox_id,
+              'project_path': project_path,
+              'venv_path': venv_path,
+              'python_path': python_path,
+              'created_at': metadata['created_at'],
+              'status': 'ready'
+          }
+
+  complexity:
+    time: "O(p)"
+    space: "O(s)"
+    analysis: |
+      Time:
+        - Venv creation: O(1) fixed time (~5-10 seconds)
+        - Package installation: O(p) where p = packages to install
+      
+      Space:
+        - Venv size: O(s) where s = total package size
+        - Typically 50-500 MB depending on packages
+
+  data_access:
+    reads:
+      - entity: Project
+        operations: [read_path]
+    writes:
+      - entity: Sandbox
+        operations: [create]
+    transactions: false
+
+  error_handling:
+    validation:
+      - parameter: project_path
+        validation: "Must be valid directory"
+        error_code: "INVALID_PATH"
+    error_cases:
+      - condition: "Venv creation fails"
+        error_type: SandboxError
+        recovery: "Clean up partial venv"
+      - condition: "Package install fails"
+        error_type: SandboxError
+        recovery: "Return error with details"
+      - condition: "Disk space insufficient"
+        error_type: SandboxError
+        recovery: propagate
+
+  testing:
+    unit_tests:
+      - name: "creates new sandbox"
+        scenario: "Fresh project"
+        inputs:
+          project_path: "/tmp/test_project"
+        expected_output:
+          status: "ready"
+          venv_path: "/tmp/test_project/.venv"
+        expected_side_effects:
+          - "Venv directory created"
+          - "Python executable exists"
+
+      - name: "installs packages"
+        scenario: "With package list"
+        inputs:
+          project_path: "/tmp/test_project"
+          options:
+            packages: ["requests", "pyyaml"]
+        expected_output:
+          status: "ready"
+        expected_side_effects:
+          - "Packages installed in venv"
+
+      - name: "reuses existing sandbox"
+        scenario: "Venv already exists"
+        inputs:
+          project_path: "/tmp/test_project"
+        expected_output:
+          status: "ready"
+        expected_side_effects:
+          - "No new venv created"
+
+      - name: "handles invalid path"
+        scenario: "Non-existent directory"
+        inputs:
+          project_path: "/nonexistent/path"
+        expected_output:
+          error: ValidationError
+
+    edge_cases:
+      - "Project path with spaces"
+      - "Very long package list"
+      - "Package with version constraint"
+      - "Package that fails to install"
+      - "Corrupted existing venv"
+
+    integration_tests:
+      - "Create sandbox and execute code"
+      - "Create sandbox with packages and import them"
+      - "Verify isolation from system packages"
+
+  llm_guidance:
+    implementation_hints: |
+      1. Use venv module for virtual environment creation
+      2. Cache sandbox objects for reuse
+      3. Implement cleanup for old/unused sandboxes
+      4. Consider using virtualenv for more features
+      5. Log sandbox creation for debugging
+
+    key_considerations:
+      - "Reuse existing venv when possible"
+      - "Handle corrupted venv gracefully"
+      - "Set reasonable timeout for package installs"
+      - "Track installed packages for reproducibility"
+      - "Clean up on failure"
+
+    example_code: |
+      import os
+      import sys
+      import json
+      import uuid
+      import shutil
+      import subprocess
+      from datetime import datetime
+      from typing import Optional, Dict, List
+      
+      class SandboxManager:
+          def __init__(self):
+              self._cache: Dict[str, dict] = {}
+          
+          def create_sandbox(
+              self,
+              project_path: str,
+              options: Optional[dict] = None
+          ) -> dict:
+              options = options or {}
+              project_path = os.path.realpath(project_path)
+              
+              # Validate
+              if not os.path.isdir(project_path):
+                  raise ValidationError("Invalid project path")
+              
+              # Check cache
+              if project_path in self._cache:
+                  sandbox = self._cache[project_path]
+                  if self._validate_sandbox(sandbox):
+                      return sandbox
+              
+              # Setup paths
+              venv_path = os.path.join(project_path, '.venv')
+              python_path = os.path.join(venv_path, 'bin', 'python')
+              pip_path = os.path.join(venv_path, 'bin', 'pip')
+              
+              # Check existing
+              if os.path.exists(venv_path):
+                  if os.path.exists(python_path):
+                      sandbox = self._load_sandbox(venv_path)
+                      self._cache[project_path] = sandbox
+                      return sandbox
+                  else:
+                      shutil.rmtree(venv_path)
+              
+              # Create venv
+              sandbox_id = str(uuid.uuid4())
+              
+              try:
+                  subprocess.run(
+                      [sys.executable, '-m', 'venv', venv_path],
+                      check=True,
+                      capture_output=True,
+                      timeout=60
+                  )
+              except subprocess.CalledProcessError as e:
+                  raise SandboxError(f"Venv creation failed: {e.stderr.decode()}")
+              
+              # Upgrade pip
+              subprocess.run(
+                  [pip_path, 'install', '--upgrade', 'pip', '-q'],
+                  capture_output=True,
+                  timeout=120
+              )
+              
+              # Install packages
+              packages = options.get('packages', [])
+              if packages:
+                  try:
+                      subprocess.run(
+                          [pip_path, 'install', '-q'] + packages,
+                          check=True,
+                          capture_output=True,
+                          timeout=300
+                      )
+                  except subprocess.CalledProcessError as e:
+                      raise SandboxError(f"Package install failed: {e.stderr.decode()}")
+              
+              # Save metadata
+              metadata = {
+                  'id': sandbox_id,
+                  'project_path': project_path,
+                  'created_at': datetime.now().isoformat(),
+                  'packages': packages
+              }
+              
+              with open(os.path.join(venv_path, 'sandbox.json'), 'w') as f:
+                  json.dump(metadata, f, indent=2)
+              
+              sandbox = {
+                  'id': sandbox_id,
+                  'project_path': project_path,
+                  'venv_path': venv_path,
+                  'python_path': python_path,
+                  'created_at': metadata['created_at'],
+                  'status': 'ready'
+              }
+              
+              self._cache[project_path] = sandbox
+              return sandbox
+          
+          def _validate_sandbox(self, sandbox: dict) -> bool:
+              return os.path.exists(sandbox['python_path'])
+          
+          def _load_sandbox(self, venv_path: str) -> dict:
+              metadata_path = os.path.join(venv_path, 'sandbox.json')
+              if os.path.exists(metadata_path):
+                  with open(metadata_path) as f:
+                      metadata = json.load(f)
+              else:
+                  metadata = {'id': str(uuid.uuid4())}
+              
+              return {
+                  'id': metadata.get('id'),
+                  'project_path': os.path.dirname(venv_path),
+                  'venv_path': venv_path,
+                  'python_path': os.path.join(venv_path, 'bin', 'python'),
+                  'created_at': metadata.get('created_at'),
+                  'status': 'ready'
+              }
+
+    common_mistakes:
+      - "Not reusing existing venv"
+      - "No timeout on package installs"
+      - "Not handling corrupted venv"
+      - "Not cleaning up on failure"
+      - "Hardcoding Python path"
+
+  references:
+    - "https://docs.python.org/3/library/venv.html"
+    - "spec/modules/backend_python_tools.yaml"

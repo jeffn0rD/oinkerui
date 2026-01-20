@@ -1,0 +1,473 @@
+# =============================================================================
+# Function Specification: getStats
+# =============================================================================
+
+function:
+  id: logging_and_metrics.get_stats
+  name: getStats
+  module: logging_and_metrics
+  purpose: |
+    Retrieve usage statistics and metrics for a project, chat, or globally.
+    Aggregates data from LLM request logs to provide insights on token usage,
+    request counts, latency, costs, and error rates.
+
+  signature:
+    parameters:
+      - name: scope
+        type: StatsScope
+        required: true
+        description: "Scope for statistics"
+        constraints:
+          - "type: 'project' | 'chat' | 'global'"
+          - "projectId: required for project/chat scope"
+          - "chatId: required for chat scope"
+      - name: options
+        type: StatsOptions
+        required: false
+        default: {}
+        description: "Statistics options"
+        constraints:
+          - "fromDate: start date filter"
+          - "toDate: end date filter"
+          - "groupBy: 'day' | 'week' | 'month' | 'model'"
+    returns:
+      type: Stats
+      description: "Aggregated statistics"
+      schema:
+        properties:
+          scope:
+            type: object
+          period:
+            type: object
+            properties:
+              from:
+                type: datetime
+              to:
+                type: datetime
+          summary:
+            type: object
+            properties:
+              totalRequests:
+                type: integer
+              successfulRequests:
+                type: integer
+              failedRequests:
+                type: integer
+              totalTokens:
+                type: integer
+              promptTokens:
+                type: integer
+              completionTokens:
+                type: integer
+              averageLatencyMs:
+                type: number
+              estimatedCost:
+                type: number
+          breakdown:
+            type: array
+            items:
+              type: object
+          models:
+            type: object
+    throws:
+      - type: ValidationError
+        condition: "Invalid scope"
+      - type: NotFoundError
+        condition: "Project or chat not found"
+
+  contract:
+    preconditions:
+      - "scope.type is valid"
+      - "If project scope, projectId exists"
+      - "If chat scope, chatId exists"
+    postconditions:
+      - "Returns accurate aggregated statistics"
+      - "All counts are non-negative"
+      - "Averages are correctly calculated"
+    invariants:
+      - "totalRequests = successfulRequests + failedRequests"
+      - "totalTokens = promptTokens + completionTokens"
+    side_effects: []
+
+  algorithm:
+    description: |
+      1. Validate scope parameters
+      2. Determine log files to read
+      3. Load and filter log entries
+      4. Aggregate statistics
+      5. Calculate averages and estimates
+      6. Group by requested dimension
+      7. Return Stats object
+
+    steps:
+      - step: 1
+        action: "Validate scope type and required IDs"
+        rationale: "Ensure valid query"
+      - step: 2
+        action: "Get log file paths based on scope"
+        rationale: "Determine data sources"
+      - step: 3
+        action: "Read JSONL files, parse entries"
+        rationale: "Load raw data"
+      - step: 4
+        action: "Filter by date range if specified"
+        rationale: "Apply time filter"
+      - step: 5
+        action: "Aggregate: sum tokens, count requests, etc."
+        rationale: "Calculate totals"
+      - step: 6
+        action: "Calculate averages and cost estimates"
+        rationale: "Derived metrics"
+      - step: 7
+        action: "Group by dimension if requested"
+        rationale: "Breakdown analysis"
+      - step: 8
+        action: "Return Stats object"
+        rationale: "Provide results"
+
+    fol_specification: |
+      forall scope in StatsScope, opts in StatsOptions:
+        ValidScope(scope) implies
+          let stats = getStats(scope, opts) in
+          stats.summary.totalRequests >= 0 and
+          stats.summary.totalRequests = 
+            stats.summary.successfulRequests + stats.summary.failedRequests and
+          stats.summary.totalTokens = 
+            stats.summary.promptTokens + stats.summary.completionTokens and
+          (stats.summary.totalRequests > 0 implies
+            stats.summary.averageLatencyMs = 
+              TotalLatency / stats.summary.totalRequests)
+
+    pseudocode: |
+      function getStats(scope, options = {}):
+          // Step 1: Validate
+          if scope.type not in ['project', 'chat', 'global']:
+              throw ValidationError("Invalid scope type")
+          
+          if scope.type == 'project' and not scope.projectId:
+              throw ValidationError("projectId required for project scope")
+          
+          if scope.type == 'chat' and (not scope.projectId or not scope.chatId):
+              throw ValidationError("projectId and chatId required for chat scope")
+          
+          // Step 2: Get log files
+          logFiles = []
+          if scope.type == 'global':
+              logFiles = getAllProjectLogFiles()
+          else:
+              projectPath = getProjectPath(scope.projectId)
+              logFiles = [path.join(projectPath, 'logs', 'llm_requests.jsonl')]
+          
+          // Step 3: Load entries
+          entries = []
+          for logFile in logFiles:
+              if fs.existsSync(logFile):
+                  lines = fs.readFileSync(logFile, 'utf8').split('\n')
+                  for line in lines:
+                      if line.trim():
+                          entries.push(JSON.parse(line))
+          
+          // Step 4: Filter
+          if scope.type == 'chat':
+              entries = entries.filter(e => e.chat_id == scope.chatId)
+          
+          if options.fromDate:
+              entries = entries.filter(e => e.timestamp_start >= options.fromDate)
+          if options.toDate:
+              entries = entries.filter(e => e.timestamp_start <= options.toDate)
+          
+          // Step 5: Aggregate
+          summary = {
+              totalRequests: entries.length,
+              successfulRequests: entries.filter(e => e.status == 'success').length,
+              failedRequests: entries.filter(e => e.status != 'success').length,
+              totalTokens: 0,
+              promptTokens: 0,
+              completionTokens: 0,
+              totalLatencyMs: 0
+          }
+          
+          for entry in entries:
+              if entry.usage:
+                  summary.promptTokens += entry.usage.prompt_tokens || 0
+                  summary.completionTokens += entry.usage.completion_tokens || 0
+                  summary.totalTokens += entry.usage.total_tokens || 0
+              if entry.timings:
+                  summary.totalLatencyMs += entry.timings.latency_ms || 0
+          
+          // Step 6: Calculate averages
+          if summary.totalRequests > 0:
+              summary.averageLatencyMs = summary.totalLatencyMs / summary.totalRequests
+          else:
+              summary.averageLatencyMs = 0
+          
+          // Estimate cost (rough estimate based on typical pricing)
+          summary.estimatedCost = estimateCost(entries)
+          
+          // Step 7: Group by
+          breakdown = []
+          if options.groupBy:
+              breakdown = groupEntries(entries, options.groupBy)
+          
+          // Model breakdown
+          models = {}
+          for entry in entries:
+              model = entry.model
+              if model not in models:
+                  models[model] = { requests: 0, tokens: 0 }
+              models[model].requests++
+              models[model].tokens += entry.usage?.total_tokens || 0
+          
+          // Step 8: Return
+          return {
+              scope: scope,
+              period: {
+                  from: options.fromDate || getEarliestDate(entries),
+                  to: options.toDate || getLatestDate(entries)
+              },
+              summary: summary,
+              breakdown: breakdown,
+              models: models
+          }
+
+  complexity:
+    time: "O(n)"
+    space: "O(n)"
+    analysis: |
+      Time:
+        - File reading: O(n) where n = total log entries
+        - Filtering: O(n)
+        - Aggregation: O(n)
+        - Grouping: O(n)
+      
+      Space:
+        - Entries array: O(n)
+        - Summary object: O(1)
+        - Breakdown array: O(g) where g = groups
+
+  data_access:
+    reads:
+      - entity: LLMRequestLogEntry
+        operations: [read_all, filter]
+      - entity: Project
+        operations: [list_all]
+    writes: []
+    transactions: false
+
+  error_handling:
+    validation:
+      - parameter: scope.type
+        validation: "Must be project, chat, or global"
+        error_code: "INVALID_SCOPE"
+    error_cases:
+      - condition: "Project not found"
+        error_type: NotFoundError
+        recovery: propagate
+      - condition: "Log file corrupted"
+        error_type: ParseError
+        recovery: "Skip invalid lines"
+
+  testing:
+    unit_tests:
+      - name: "gets project stats"
+        scenario: "Project with requests"
+        inputs:
+          scope:
+            type: "project"
+            projectId: "proj-123"
+        expected_output:
+          summary:
+            totalRequests: 10
+            totalTokens: 5000
+
+      - name: "gets chat stats"
+        scenario: "Specific chat"
+        inputs:
+          scope:
+            type: "chat"
+            projectId: "proj-123"
+            chatId: "chat-456"
+        expected_output:
+          summary:
+            totalRequests: 5
+
+      - name: "filters by date"
+        scenario: "Date range filter"
+        inputs:
+          scope:
+            type: "project"
+            projectId: "proj-123"
+          options:
+            fromDate: "2024-01-01"
+            toDate: "2024-01-31"
+        expected_output:
+          period:
+            from: "2024-01-01"
+            to: "2024-01-31"
+
+      - name: "groups by model"
+        scenario: "Model breakdown"
+        inputs:
+          scope:
+            type: "project"
+            projectId: "proj-123"
+          options:
+            groupBy: "model"
+        expected_output:
+          models:
+            "gpt-4":
+              requests: 5
+            "gpt-3.5-turbo":
+              requests: 5
+
+      - name: "handles empty logs"
+        scenario: "No requests"
+        inputs:
+          scope:
+            type: "project"
+            projectId: "empty-proj"
+        expected_output:
+          summary:
+            totalRequests: 0
+            averageLatencyMs: 0
+
+    edge_cases:
+      - "No log file exists"
+      - "Corrupted log entries"
+      - "Very large log file"
+      - "All requests failed"
+      - "Missing usage data"
+
+    integration_tests:
+      - "Log requests and verify stats"
+      - "Filter by date and verify counts"
+      - "Group by day and verify breakdown"
+
+  llm_guidance:
+    implementation_hints: |
+      1. Cache aggregated stats for performance
+      2. Use streaming for large log files
+      3. Handle missing/null fields gracefully
+      4. Provide cost estimates based on model pricing
+      5. Support multiple grouping dimensions
+
+    key_considerations:
+      - "Handle missing usage data"
+      - "Calculate averages correctly (avoid div by zero)"
+      - "Cache results for repeated queries"
+      - "Stream large files to avoid memory issues"
+      - "Provide meaningful cost estimates"
+
+    example_code: |
+      const fs = require('fs');
+      const path = require('path');
+      
+      // Rough cost estimates per 1K tokens
+      const MODEL_COSTS = {
+        'gpt-4': { prompt: 0.03, completion: 0.06 },
+        'gpt-4-turbo': { prompt: 0.01, completion: 0.03 },
+        'gpt-3.5-turbo': { prompt: 0.0005, completion: 0.0015 },
+        'claude-3-opus': { prompt: 0.015, completion: 0.075 },
+        'claude-3-sonnet': { prompt: 0.003, completion: 0.015 }
+      };
+      
+      function getStats(scope, options = {}) {
+        // Validate
+        if (!['project', 'chat', 'global'].includes(scope.type)) {
+          throw new ValidationError('Invalid scope type');
+        }
+        
+        // Load entries
+        const entries = loadEntries(scope);
+        
+        // Filter
+        let filtered = entries;
+        
+        if (scope.type === 'chat') {
+          filtered = filtered.filter(e => e.chat_id === scope.chatId);
+        }
+        
+        if (options.fromDate) {
+          filtered = filtered.filter(e => e.timestamp_start >= options.fromDate);
+        }
+        if (options.toDate) {
+          filtered = filtered.filter(e => e.timestamp_start <= options.toDate);
+        }
+        
+        // Aggregate
+        const summary = {
+          totalRequests: filtered.length,
+          successfulRequests: filtered.filter(e => e.status === 'success').length,
+          failedRequests: filtered.filter(e => e.status !== 'success').length,
+          totalTokens: 0,
+          promptTokens: 0,
+          completionTokens: 0,
+          totalLatencyMs: 0
+        };
+        
+        for (const entry of filtered) {
+          if (entry.usage) {
+            summary.promptTokens += entry.usage.prompt_tokens || 0;
+            summary.completionTokens += entry.usage.completion_tokens || 0;
+            summary.totalTokens += entry.usage.total_tokens || 0;
+          }
+          if (entry.timings) {
+            summary.totalLatencyMs += entry.timings.latency_ms || 0;
+          }
+        }
+        
+        summary.averageLatencyMs = summary.totalRequests > 0
+          ? summary.totalLatencyMs / summary.totalRequests
+          : 0;
+        
+        summary.estimatedCost = estimateCost(filtered);
+        
+        // Model breakdown
+        const models = {};
+        for (const entry of filtered) {
+          const model = entry.model;
+          if (!models[model]) {
+            models[model] = { requests: 0, tokens: 0, cost: 0 };
+          }
+          models[model].requests++;
+          models[model].tokens += entry.usage?.total_tokens || 0;
+        }
+        
+        return {
+          scope,
+          period: {
+            from: options.fromDate || getEarliestDate(filtered),
+            to: options.toDate || getLatestDate(filtered)
+          },
+          summary,
+          breakdown: options.groupBy ? groupEntries(filtered, options.groupBy) : [],
+          models
+        };
+      }
+      
+      function estimateCost(entries) {
+        let total = 0;
+        
+        for (const entry of entries) {
+          const costs = MODEL_COSTS[entry.model] || { prompt: 0.001, completion: 0.002 };
+          const promptTokens = entry.usage?.prompt_tokens || 0;
+          const completionTokens = entry.usage?.completion_tokens || 0;
+          
+          total += (promptTokens / 1000) * costs.prompt;
+          total += (completionTokens / 1000) * costs.completion;
+        }
+        
+        return Math.round(total * 100) / 100;
+      }
+
+    common_mistakes:
+      - "Division by zero for averages"
+      - "Not handling missing usage data"
+      - "Loading entire file into memory"
+      - "Not validating scope"
+      - "Incorrect cost calculations"
+
+  references:
+    - "spec/domain.yaml#LLMRequestLogEntry"
+    - "spec/modules/logging_and_metrics.yaml"
+    - "spec/apis.yaml#get_stats"

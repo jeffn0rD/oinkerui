@@ -1,0 +1,411 @@
+# =============================================================================
+# Function Specification: getDiff
+# =============================================================================
+
+function:
+  id: git_integration.get_diff
+  name: getDiff
+  module: git_integration
+  purpose: |
+    Get the diff for a file, commit, or range of commits. Returns formatted
+    diff output suitable for display in the UI or inclusion in LLM context.
+
+  signature:
+    parameters:
+      - name: projectPath
+        type: string
+        required: true
+        description: "Path to project directory"
+      - name: options
+        type: DiffOptions
+        required: true
+        description: "Diff options"
+        constraints:
+          - "file: specific file path"
+          - "commit: specific commit hash"
+          - "fromCommit: start of range"
+          - "toCommit: end of range (default HEAD)"
+          - "staged: boolean - show staged changes"
+          - "context: number of context lines (default 3)"
+    returns:
+      type: DiffResult
+      description: "Diff result"
+      schema:
+        properties:
+          diff:
+            type: string
+          files:
+            type: array
+            items:
+              type: object
+              properties:
+                path:
+                  type: string
+                status:
+                  type: string
+                additions:
+                  type: integer
+                deletions:
+                  type: integer
+          stats:
+            type: object
+            properties:
+              filesChanged:
+                type: integer
+              insertions:
+                type: integer
+              deletions:
+                type: integer
+    throws:
+      - type: GitError
+        condition: "Git diff fails"
+      - type: NotFoundError
+        condition: "File or commit not found"
+
+  contract:
+    preconditions:
+      - "projectPath is valid Git repository"
+      - "If commit specified, commit exists"
+      - "If file specified, file exists or existed"
+    postconditions:
+      - "Returns diff string"
+      - "File statistics are accurate"
+    invariants:
+      - "Diff format is consistent"
+    side_effects: []
+
+  algorithm:
+    description: |
+      1. Validate project is Git repository
+      2. Build git diff command based on options
+      3. Execute git diff
+      4. Parse diff output
+      5. Extract file statistics
+      6. Return result
+
+    steps:
+      - step: 1
+        action: "Verify .git directory exists"
+        rationale: "Ensure valid repository"
+      - step: 2
+        action: "Build diff arguments from options"
+        rationale: "Construct correct command"
+      - step: 3
+        action: "Execute git diff with arguments"
+        rationale: "Get diff output"
+      - step: 4
+        action: "Parse unified diff format"
+        rationale: "Structure the output"
+      - step: 5
+        action: "Count additions/deletions per file"
+        rationale: "Provide statistics"
+      - step: 6
+        action: "Return DiffResult"
+        rationale: "Provide complete result"
+
+    fol_specification: |
+      forall path in Path, opts in DiffOptions:
+        IsGitRepo(path) implies
+          let result = getDiff(path, opts) in
+          (opts.file implies result.files.length <= 1) and
+          result.stats.filesChanged = result.files.length and
+          result.stats.insertions = Sum(f.additions for f in result.files) and
+          result.stats.deletions = Sum(f.deletions for f in result.files)
+
+    pseudocode: |
+      async function getDiff(projectPath, options):
+          // Step 1: Validate
+          git = simpleGit(projectPath)
+          
+          isRepo = await git.checkIsRepo()
+          if not isRepo:
+              throw ValidationError("Not a Git repository")
+          
+          // Step 2: Build arguments
+          args = []
+          
+          // Context lines
+          contextLines = options.context || 3
+          args.push(`-U${contextLines}`)
+          
+          // Determine diff type
+          if options.staged:
+              args.push('--staged')
+          else if options.commit:
+              args.push(`${options.commit}^`, options.commit)
+          else if options.fromCommit:
+              toCommit = options.toCommit || 'HEAD'
+              args.push(options.fromCommit, toCommit)
+          
+          // Specific file
+          if options.file:
+              args.push('--', options.file)
+          
+          // Step 3: Execute
+          try:
+              diffOutput = await git.diff(args)
+          catch error:
+              if error.message.includes('unknown revision'):
+                  throw NotFoundError("Commit not found")
+              throw GitError(error.message)
+          
+          // Step 4-5: Parse output
+          files = parseDiffOutput(diffOutput)
+          
+          // Calculate stats
+          stats = {
+              filesChanged: files.length,
+              insertions: files.reduce((sum, f) => sum + f.additions, 0),
+              deletions: files.reduce((sum, f) => sum + f.deletions, 0)
+          }
+          
+          // Step 6: Return
+          return {
+              diff: diffOutput,
+              files: files,
+              stats: stats
+          }
+      
+      function parseDiffOutput(diffOutput):
+          files = []
+          currentFile = null
+          
+          for line in diffOutput.split('\n'):
+              if line.startsWith('diff --git'):
+                  // New file
+                  match = line.match(/diff --git a\/(.*) b\/(.*)/)
+                  if match:
+                      if currentFile:
+                          files.push(currentFile)
+                      currentFile = {
+                          path: match[2],
+                          status: 'modified',
+                          additions: 0,
+                          deletions: 0
+                      }
+              else if line.startsWith('new file'):
+                  if currentFile:
+                      currentFile.status = 'added'
+              else if line.startsWith('deleted file'):
+                  if currentFile:
+                      currentFile.status = 'deleted'
+              else if line.startsWith('+') and not line.startsWith('+++'):
+                  if currentFile:
+                      currentFile.additions++
+              else if line.startsWith('-') and not line.startsWith('---'):
+                  if currentFile:
+                      currentFile.deletions++
+          
+          if currentFile:
+              files.push(currentFile)
+          
+          return files
+
+  complexity:
+    time: "O(d)"
+    space: "O(d)"
+    analysis: |
+      Time:
+        - Git diff: O(d) where d = diff size
+        - Parsing: O(d)
+      
+      Space:
+        - Diff output: O(d)
+        - Parsed files: O(f) where f = files changed
+
+  data_access:
+    reads:
+      - entity: GitRepository
+        operations: [diff]
+    writes: []
+    transactions: false
+
+  error_handling:
+    validation:
+      - parameter: projectPath
+        validation: "Must be Git repository"
+        error_code: "NOT_GIT_REPO"
+    error_cases:
+      - condition: "Not a repository"
+        error_type: ValidationError
+        recovery: propagate
+      - condition: "Commit not found"
+        error_type: NotFoundError
+        recovery: propagate
+      - condition: "File not found"
+        error_type: NotFoundError
+        recovery: "Return empty diff"
+
+  testing:
+    unit_tests:
+      - name: "gets working directory diff"
+        scenario: "Uncommitted changes"
+        inputs:
+          projectPath: "/tmp/test_repo"
+          options: {}
+        expected_output:
+          diff: "contains diff output"
+          files:
+            - path: "modified.txt"
+              status: "modified"
+
+      - name: "gets staged diff"
+        scenario: "Staged changes"
+        inputs:
+          projectPath: "/tmp/test_repo"
+          options:
+            staged: true
+        expected_output:
+          diff: "contains staged changes"
+
+      - name: "gets commit diff"
+        scenario: "Specific commit"
+        inputs:
+          projectPath: "/tmp/test_repo"
+          options:
+            commit: "abc123"
+        expected_output:
+          diff: "contains commit changes"
+
+      - name: "gets file diff"
+        scenario: "Specific file"
+        inputs:
+          projectPath: "/tmp/test_repo"
+          options:
+            file: "src/main.js"
+        expected_output:
+          files:
+            - path: "src/main.js"
+
+      - name: "calculates stats"
+        scenario: "Multiple files changed"
+        inputs:
+          projectPath: "/tmp/test_repo"
+          options: {}
+        expected_output:
+          stats:
+            filesChanged: 2
+            insertions: 10
+            deletions: 5
+
+    edge_cases:
+      - "No changes (empty diff)"
+      - "Binary file changes"
+      - "Renamed file"
+      - "Very large diff"
+      - "File with no newline at end"
+
+    integration_tests:
+      - "Get diff and display in UI"
+      - "Get diff for LLM context"
+      - "Compare two commits"
+
+  llm_guidance:
+    implementation_hints: |
+      1. Use simple-git diff method
+      2. Parse unified diff format
+      3. Handle binary files gracefully
+      4. Limit diff size for large changes
+      5. Support various diff options
+
+    key_considerations:
+      - "Handle empty diff gracefully"
+      - "Parse file statistics accurately"
+      - "Support commit ranges"
+      - "Limit output size for UI"
+      - "Handle binary files"
+
+    example_code: |
+      const simpleGit = require('simple-git');
+      
+      async function getDiff(projectPath, options) {
+        const git = simpleGit(projectPath);
+        
+        // Validate
+        const isRepo = await git.checkIsRepo();
+        if (!isRepo) {
+          throw new ValidationError('Not a Git repository');
+        }
+        
+        // Build arguments
+        const args = [];
+        const contextLines = options.context || 3;
+        args.push(`-U${contextLines}`);
+        
+        if (options.staged) {
+          args.push('--staged');
+        } else if (options.commit) {
+          args.push(`${options.commit}^`, options.commit);
+        } else if (options.fromCommit) {
+          const toCommit = options.toCommit || 'HEAD';
+          args.push(options.fromCommit, toCommit);
+        }
+        
+        if (options.file) {
+          args.push('--', options.file);
+        }
+        
+        // Execute
+        let diffOutput;
+        try {
+          diffOutput = await git.diff(args);
+        } catch (error) {
+          if (error.message.includes('unknown revision')) {
+            throw new NotFoundError('Commit not found');
+          }
+          throw new GitError(error.message);
+        }
+        
+        // Parse
+        const files = parseDiffOutput(diffOutput);
+        
+        const stats = {
+          filesChanged: files.length,
+          insertions: files.reduce((sum, f) => sum + f.additions, 0),
+          deletions: files.reduce((sum, f) => sum + f.deletions, 0)
+        };
+        
+        return { diff: diffOutput, files, stats };
+      }
+      
+      function parseDiffOutput(diffOutput) {
+        const files = [];
+        let currentFile = null;
+        
+        for (const line of diffOutput.split('\n')) {
+          if (line.startsWith('diff --git')) {
+            const match = line.match(/diff --git a\/(.*) b\/(.*)/);
+            if (match) {
+              if (currentFile) files.push(currentFile);
+              currentFile = {
+                path: match[2],
+                status: 'modified',
+                additions: 0,
+                deletions: 0
+              };
+            }
+          } else if (line.startsWith('new file') && currentFile) {
+            currentFile.status = 'added';
+          } else if (line.startsWith('deleted file') && currentFile) {
+            currentFile.status = 'deleted';
+          } else if (line.startsWith('+') && !line.startsWith('+++') && currentFile) {
+            currentFile.additions++;
+          } else if (line.startsWith('-') && !line.startsWith('---') && currentFile) {
+            currentFile.deletions++;
+          }
+        }
+        
+        if (currentFile) files.push(currentFile);
+        return files;
+      }
+
+    common_mistakes:
+      - "Not handling empty diff"
+      - "Incorrect line counting"
+      - "Not supporting commit ranges"
+      - "Ignoring binary files"
+      - "Not parsing file status"
+
+  references:
+    - "spec/modules/git_integration.yaml"
+    - "https://git-scm.com/docs/git-diff"

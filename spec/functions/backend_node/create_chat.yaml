@@ -1,0 +1,443 @@
+# =============================================================================
+# Function Specification: createChat
+# =============================================================================
+
+function:
+  id: backend_node.create_chat
+  name: createChat
+  module: backend_node
+  purpose: |
+    Create a new chat within a project. Initializes the chat storage file,
+    sets up the system prelude, and registers the chat with the project.
+    Chats are the primary interface for LLM conversations.
+
+  signature:
+    parameters:
+      - name: projectId
+        type: string
+        required: true
+        description: "UUID of the parent project"
+        constraints:
+          - "Must be valid UUID"
+          - "Project must exist and be active"
+      - name: options
+        type: CreateChatOptions
+        required: false
+        default: {}
+        description: "Optional chat configuration"
+        constraints:
+          - "name: string, max 200 chars"
+          - "system_prelude: string or template reference"
+    returns:
+      type: Chat
+      description: "Created chat object with ID and metadata"
+      schema:
+        $ref: "spec/domain.yaml#Chat"
+    throws:
+      - type: NotFoundError
+        condition: "Project does not exist"
+        description: "Referenced project not found"
+      - type: ValidationError
+        condition: "Project is not active"
+        description: "Cannot create chat in archived/deleted project"
+      - type: FileSystemError
+        condition: "Cannot create chat storage file"
+        description: "File system operation failed"
+
+  contract:
+    preconditions:
+      - "projectId is a valid UUID"
+      - "Project with projectId exists"
+      - "Project status is 'active'"
+      - "Project directory is writable"
+    postconditions:
+      - "Chat storage file exists at project/chats/{chat_id}.jsonl"
+      - "Chat is registered in project's chat index"
+      - "Chat status is 'active'"
+      - "System prelude message is written if provided"
+      - "Returns valid Chat object with unique ID"
+    invariants:
+      - "Chat ID is unique across all chats"
+      - "Chat belongs to exactly one project"
+    side_effects:
+      - type: io_operation
+        description: "Creates JSONL storage file"
+        scope: "project/chats/{chat_id}.jsonl"
+      - type: state_mutation
+        description: "Updates project's chat list"
+        scope: "Project entity"
+      - type: event_emission
+        description: "Emits chat_created event"
+        scope: "Logging system"
+
+  algorithm:
+    description: |
+      1. Validate projectId format
+      2. Load and verify project exists and is active
+      3. Generate unique chat ID
+      4. Generate chat name if not provided
+      5. Resolve system prelude (inline or template)
+      6. Create chat storage file
+      7. Write system prelude as first message if present
+      8. Update project's chat index
+      9. Log chat creation event
+      10. Return chat object
+
+    steps:
+      - step: 1
+        action: "Validate projectId is valid UUID format"
+        rationale: "Fail fast on invalid input"
+      - step: 2
+        action: "Load project from index, verify status is 'active'"
+        rationale: "Ensure parent project is valid"
+      - step: 3
+        action: "Generate UUID v4 for chat ID"
+        rationale: "Ensure globally unique identifier"
+      - step: 4
+        action: "Generate default name 'Chat {timestamp}' if not provided"
+        rationale: "Ensure chat has displayable name"
+      - step: 5
+        action: "Resolve system_prelude from template if template_id provided"
+        rationale: "Support both inline and template-based preludes"
+      - step: 6
+        action: "Create empty JSONL file at chats/{chat_id}.jsonl"
+        rationale: "Initialize persistent storage"
+      - step: 7
+        action: "If system_prelude exists, write as first message with role='system'"
+        rationale: "Establish chat context"
+      - step: 8
+        action: "Add chat to project's chat list"
+        rationale: "Register chat with parent"
+      - step: 9
+        action: "Log chat_created event"
+        rationale: "Audit trail"
+      - step: 10
+        action: "Return Chat object"
+        rationale: "Provide caller with chat reference"
+
+    fol_specification: |
+      forall projectId in UUID, opts in Options:
+        ValidUUID(projectId) and 
+        exists p in Projects: (p.id = projectId and p.status = 'active') implies
+          exists chatId in UUID, c in Chat:
+            c.id = chatId and
+            c.project_id = projectId and
+            c.status = 'active' and
+            c.created_at = now() and
+            FileExists(p.paths.chats_dir + "/" + chatId + ".jsonl") and
+            c in p.chats
+
+    pseudocode: |
+      function createChat(projectId, options = {}):
+        // Step 1-2: Validate and load project
+        if not isValidUUID(projectId):
+          throw ValidationError("Invalid project ID")
+        
+        project = loadProject(projectId)
+        if project is null:
+          throw NotFoundError("Project not found")
+        if project.status != "active":
+          throw ValidationError("Project is not active")
+        
+        // Step 3-4: Generate ID and name
+        chatId = generateUUID()
+        chatName = options.name || "Chat " + formatDate(now())
+        
+        // Step 5: Resolve system prelude
+        systemPrelude = null
+        if options.system_prelude:
+          if options.system_prelude.template_id:
+            template = loadTemplate(options.system_prelude.template_id)
+            systemPrelude = {
+              source_type: "template",
+              template_id: options.system_prelude.template_id,
+              content: renderTemplate(template, options.system_prelude.variables)
+            }
+          else:
+            systemPrelude = {
+              source_type: "inline",
+              content: options.system_prelude.content
+            }
+        
+        // Step 6: Create storage file
+        storagePath = join(project.paths.root, "chats", chatId + ".jsonl")
+        createFile(storagePath)
+        
+        // Step 7: Write system message if prelude exists
+        if systemPrelude and systemPrelude.content:
+          systemMessage = {
+            id: generateUUID(),
+            chat_id: chatId,
+            project_id: projectId,
+            role: "system",
+            content: systemPrelude.content,
+            status: "complete",
+            created_at: now(),
+            include_in_context: true
+          }
+          appendJSONL(storagePath, systemMessage)
+        
+        // Step 8: Create chat object and update project
+        chat = {
+          id: chatId,
+          project_id: projectId,
+          name: chatName,
+          status: "active",
+          created_at: now(),
+          updated_at: now(),
+          system_prelude: systemPrelude,
+          storage_path: "chats/" + chatId + ".jsonl"
+        }
+        
+        addChatToProject(project, chat)
+        
+        // Step 9: Log event
+        logChatEvent("chat_created", chat)
+        
+        // Step 10: Return
+        return chat
+
+  complexity:
+    time: "O(1)"
+    space: "O(1)"
+    analysis: |
+      Time: All operations are constant time:
+        - UUID validation: O(1)
+        - Project lookup: O(1) with hash index
+        - File creation: O(1)
+        - JSONL append: O(1)
+      
+      Space: Fixed size allocations:
+        - Chat object: O(1) fixed fields
+        - System message: O(m) where m is prelude length
+      
+      Note: Template rendering could be O(t) where t is template size,
+      but templates are typically small.
+
+  data_access:
+    reads:
+      - entity: Project
+        operations: [read, verify_status]
+      - entity: Template
+        operations: [read]
+    writes:
+      - entity: Chat
+        operations: [create]
+      - entity: Message
+        operations: [create]
+      - entity: Project
+        operations: [update_chat_list]
+    transactions: false
+
+  error_handling:
+    validation:
+      - parameter: projectId
+        validation: "Must be valid UUID v4 format"
+        error_code: "INVALID_PROJECT_ID"
+      - parameter: options.name
+        validation: "Must be string with length <= 200"
+        error_code: "INVALID_CHAT_NAME"
+    error_cases:
+      - condition: "Project ID is not valid UUID"
+        error_type: ValidationError
+        recovery: propagate
+      - condition: "Project does not exist"
+        error_type: NotFoundError
+        recovery: propagate
+      - condition: "Project is not active"
+        error_type: ValidationError
+        recovery: propagate
+      - condition: "Template not found"
+        error_type: NotFoundError
+        recovery: propagate
+      - condition: "Cannot create storage file"
+        error_type: FileSystemError
+        recovery: propagate
+
+  testing:
+    unit_tests:
+      - name: "creates chat with default name"
+        scenario: "Happy path without options"
+        inputs:
+          projectId: "valid-project-uuid"
+          options: {}
+        expected_output:
+          type: Chat
+          properties:
+            project_id: "valid-project-uuid"
+            status: "active"
+        expected_side_effects:
+          - "Storage file created"
+          - "Chat added to project"
+
+      - name: "creates chat with custom name"
+        scenario: "Custom name provided"
+        inputs:
+          projectId: "valid-project-uuid"
+          options:
+            name: "My Custom Chat"
+        expected_output:
+          type: Chat
+          properties:
+            name: "My Custom Chat"
+
+      - name: "creates chat with inline system prelude"
+        scenario: "Inline system prelude provided"
+        inputs:
+          projectId: "valid-project-uuid"
+          options:
+            system_prelude:
+              content: "You are a helpful assistant."
+        expected_output:
+          type: Chat
+        expected_side_effects:
+          - "System message written to storage"
+
+      - name: "throws error for non-existent project"
+        scenario: "Project ID doesn't exist"
+        inputs:
+          projectId: "non-existent-uuid"
+        expected_output:
+          error: NotFoundError
+
+      - name: "throws error for archived project"
+        scenario: "Project is archived"
+        inputs:
+          projectId: "archived-project-uuid"
+        expected_output:
+          error: ValidationError
+
+    edge_cases:
+      - "Empty project ID"
+      - "Invalid UUID format"
+      - "Very long chat name (>200 chars)"
+      - "Empty system prelude content"
+      - "Non-existent template ID"
+      - "Project directory not writable"
+
+    integration_tests:
+      - "Create chat and verify storage file exists"
+      - "Create chat with prelude and verify system message"
+      - "Create multiple chats in same project"
+      - "Create chat and verify in chat list"
+
+  llm_guidance:
+    implementation_hints: |
+      1. Use uuid library for ID generation
+      2. Use date-fns for timestamp formatting in default name
+      3. Storage file should be created with empty content initially
+      4. JSONL format: one JSON object per line, newline terminated
+      5. System message should have all required Message fields
+      6. Consider using a write lock for concurrent chat creation
+
+    key_considerations:
+      - "Validate project exists and is active before any writes"
+      - "Handle template resolution errors gracefully"
+      - "Ensure storage file is created atomically"
+      - "System prelude is optional - handle null case"
+
+    example_code: |
+      async function createChat(projectId, options = {}) {
+        // Validate project ID
+        if (!isValidUUID(projectId)) {
+          throw new ValidationError('Invalid project ID');
+        }
+        
+        // Load and verify project
+        const project = await projectStore.getById(projectId);
+        if (!project) {
+          throw new NotFoundError('Project not found');
+        }
+        if (project.status !== 'active') {
+          throw new ValidationError('Project is not active');
+        }
+        
+        // Generate chat ID and name
+        const chatId = uuidv4();
+        const chatName = options.name || `Chat ${format(new Date(), 'MMM d, HH:mm')}`;
+        
+        // Resolve system prelude
+        let systemPrelude = null;
+        if (options.system_prelude) {
+          if (options.system_prelude.template_id) {
+            const template = await templateStore.getById(options.system_prelude.template_id);
+            if (!template) throw new NotFoundError('Template not found');
+            systemPrelude = {
+              source_type: 'template',
+              template_id: options.system_prelude.template_id,
+              content: await renderTemplate(template, options.system_prelude.variables || {})
+            };
+          } else {
+            systemPrelude = {
+              source_type: 'inline',
+              content: options.system_prelude.content
+            };
+          }
+        }
+        
+        // Create storage file
+        const storagePath = path.join(project.paths.root, 'chats', `${chatId}.jsonl`);
+        await fs.writeFile(storagePath, '');
+        
+        // Write system message if prelude exists
+        if (systemPrelude?.content) {
+          const systemMessage = {
+            id: uuidv4(),
+            chat_id: chatId,
+            project_id: projectId,
+            role: 'system',
+            content: systemPrelude.content,
+            status: 'complete',
+            created_at: new Date().toISOString(),
+            include_in_context: true
+          };
+          await fs.appendFile(storagePath, JSON.stringify(systemMessage) + '\n');
+        }
+        
+        // Create chat object
+        const chat = {
+          id: chatId,
+          project_id: projectId,
+          name: chatName,
+          status: 'active',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          system_prelude: systemPrelude,
+          storage_path: `chats/${chatId}.jsonl`
+        };
+        
+        // Update project
+        await projectStore.addChat(projectId, chat);
+        
+        // Log event
+        logger.info({ event: 'chat_created', chatId, projectId });
+        
+        return chat;
+      }
+
+    common_mistakes:
+      - "Not validating project status before creating chat"
+      - "Forgetting to write system message to storage"
+      - "Not handling template resolution errors"
+      - "Using wrong path separator on Windows"
+      - "Not including all required Message fields in system message"
+
+    dependencies:
+      - "uuid - for ID generation"
+      - "date-fns - for date formatting"
+      - "fs/promises - for file operations"
+      - "path - for path manipulation"
+
+  references:
+    - type: entity
+      id: Chat
+      file: "spec/domain.yaml#Chat"
+    - type: entity
+      id: Message
+      file: "spec/domain.yaml#Message"
+    - type: entity
+      id: Project
+      file: "spec/domain.yaml#Project"
+    - type: module
+      id: backend_node
+      file: "spec/modules/backend_node.yaml"

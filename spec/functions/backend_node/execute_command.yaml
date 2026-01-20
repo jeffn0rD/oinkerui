@@ -1,0 +1,475 @@
+# =============================================================================
+# Function Specification: executeCommand
+# =============================================================================
+
+function:
+  id: backend_node.execute_command
+  name: executeCommand
+  module: backend_node
+  purpose: |
+    Execute a parsed slash command and return the result. Dispatches to the
+    appropriate command handler based on command name. Handles command-specific
+    logic, validation, and side effects.
+
+  signature:
+    parameters:
+      - name: parsedCommand
+        type: ParsedCommand
+        required: true
+        description: "Parsed command from parseSlashCommand"
+      - name: context
+        type: CommandContext
+        required: true
+        description: "Execution context with project, chat, user info"
+        constraints:
+          - "project: valid Project object"
+          - "chat: valid Chat object"
+    returns:
+      type: CommandResult
+      description: "Result of command execution"
+      schema:
+        properties:
+          success:
+            type: boolean
+          message:
+            type: string
+          data:
+            type: object
+            nullable: true
+          side_effects:
+            type: array
+            items:
+              type: string
+    throws:
+      - type: CommandError
+        condition: "Command execution fails"
+      - type: ValidationError
+        condition: "Invalid command arguments"
+      - type: PermissionError
+        condition: "User lacks permission"
+
+  contract:
+    preconditions:
+      - "parsedCommand is valid ParsedCommand object"
+      - "parsedCommand.command is registered command"
+      - "context.project is valid and active"
+      - "context.chat is valid and active"
+    postconditions:
+      - "Returns CommandResult with success status"
+      - "Side effects are documented in result"
+      - "Command-specific postconditions are met"
+    invariants:
+      - "Command execution is atomic (all or nothing)"
+    side_effects:
+      - type: varies
+        description: "Depends on specific command"
+        scope: "Command-specific"
+
+  algorithm:
+    description: |
+      1. Validate parsed command structure
+      2. Look up command handler
+      3. Validate command arguments against definition
+      4. Check permissions if required
+      5. Execute command handler
+      6. Collect side effects
+      7. Return CommandResult
+
+    steps:
+      - step: 1
+        action: "Validate parsedCommand has required fields"
+        rationale: "Ensure valid input"
+      - step: 2
+        action: "Get handler function from COMMAND_HANDLERS map"
+        rationale: "Dispatch to correct handler"
+      - step: 3
+        action: "Validate args against command definition"
+        rationale: "Ensure correct usage"
+      - step: 4
+        action: "Check user permissions if command requires them"
+        rationale: "Security enforcement"
+      - step: 5
+        action: "Call handler(parsedCommand, context)"
+        rationale: "Execute command logic"
+      - step: 6
+        action: "Collect and document side effects"
+        rationale: "Transparency for caller"
+      - step: 7
+        action: "Return CommandResult"
+        rationale: "Provide execution result"
+
+    fol_specification: |
+      forall cmd in ParsedCommand, ctx in CommandContext:
+        ValidCommand(cmd) and ValidContext(ctx) implies
+          exists result in CommandResult:
+            result.success = HandlerSucceeds(cmd.command, cmd.args, ctx) and
+            result.side_effects = CollectSideEffects(cmd.command)
+
+    pseudocode: |
+      function executeCommand(parsedCommand, context):
+        // Step 1: Validate
+        if not parsedCommand.command:
+          throw ValidationError("Invalid parsed command")
+        
+        // Step 2: Get handler
+        handler = COMMAND_HANDLERS.get(parsedCommand.command)
+        if not handler:
+          throw CommandError(`No handler for: ${parsedCommand.command}`)
+        
+        // Step 3: Validate arguments
+        definition = COMMAND_DEFINITIONS.get(parsedCommand.command)
+        validateArgs(parsedCommand.args, definition.args)
+        
+        // Step 4: Check permissions
+        if definition.requires_permission:
+          if not hasPermission(context.user, definition.requires_permission):
+            throw PermissionError("Insufficient permissions")
+        
+        // Step 5: Execute
+        try:
+          result = await handler(parsedCommand, context)
+        catch error:
+          throw CommandError(`Command failed: ${error.message}`)
+        
+        // Step 6-7: Return result
+        return {
+          success: true,
+          message: result.message || `Command ${parsedCommand.command} executed`,
+          data: result.data || null,
+          side_effects: result.side_effects || []
+        }
+
+  complexity:
+    time: "O(1) + handler complexity"
+    space: "O(1) + handler space"
+    analysis: |
+      Time and space complexity depend on the specific command handler.
+      Dispatch overhead is O(1) with hash map lookup.
+
+  data_access:
+    reads:
+      - entity: CommandRegistry
+        operations: [lookup_handler, lookup_definition]
+    writes:
+      - entity: varies
+        operations: "Depends on command"
+    transactions: "Command-specific"
+
+  error_handling:
+    validation:
+      - parameter: parsedCommand
+        validation: "Must have command field"
+        error_code: "INVALID_COMMAND"
+      - parameter: context
+        validation: "Must have project and chat"
+        error_code: "INVALID_CONTEXT"
+    error_cases:
+      - condition: "No handler for command"
+        error_type: CommandError
+        recovery: propagate
+      - condition: "Invalid arguments"
+        error_type: ValidationError
+        recovery: "Return usage hint"
+      - condition: "Permission denied"
+        error_type: PermissionError
+        recovery: propagate
+      - condition: "Handler throws"
+        error_type: CommandError
+        recovery: propagate
+
+  # Command Handlers Specification
+  command_handlers:
+    help:
+      description: "Display help information"
+      args: "[command_name]"
+      handler: |
+        if args[0]:
+          return getCommandHelp(args[0])
+        else:
+          return getAllCommandsHelp()
+      side_effects: []
+
+    aside:
+      description: "Send message as aside (excluded from future context)"
+      args: "<content>"
+      handler: |
+        // Set is_aside flag on the message
+        return { 
+          action: 'modify_message',
+          modifications: { is_aside: true }
+        }
+      side_effects:
+        - "Message marked as aside"
+
+    pure_aside:
+      description: "Send message ignoring all history"
+      args: "<content>"
+      handler: |
+        return {
+          action: 'modify_message',
+          modifications: { pure_aside: true, is_aside: true }
+        }
+      side_effects:
+        - "Message sent with minimal context"
+
+    pin:
+      description: "Pin a message to always include in context"
+      args: "<message_id>"
+      handler: |
+        message = getMessage(args[0])
+        message.is_pinned = true
+        saveMessage(message)
+        return { message: `Pinned message ${args[0]}` }
+      side_effects:
+        - "Message pinned"
+
+    unpin:
+      description: "Unpin a previously pinned message"
+      args: "<message_id>"
+      handler: |
+        message = getMessage(args[0])
+        message.is_pinned = false
+        saveMessage(message)
+        return { message: `Unpinned message ${args[0]}` }
+      side_effects:
+        - "Message unpinned"
+
+    discard:
+      description: "Discard a message from context"
+      args: "<message_id>"
+      handler: |
+        message = getMessage(args[0])
+        message.is_discarded = true
+        message.include_in_context = false
+        saveMessage(message)
+        return { message: `Discarded message ${args[0]}` }
+      side_effects:
+        - "Message discarded"
+
+    template:
+      description: "Template operations"
+      args: "<action> [template_name] [variables...]"
+      actions:
+        list: "List available templates"
+        use: "Use a template"
+        preview: "Preview template with variables"
+      handler: |
+        switch args[0]:
+          case 'list':
+            return listTemplates(context.project)
+          case 'use':
+            return useTemplate(args[1], args.slice(2), context)
+          case 'preview':
+            return previewTemplate(args[1], args.slice(2), context)
+      side_effects:
+        - "Template may be rendered"
+
+    model:
+      description: "Model operations"
+      args: "<action> [model_id]"
+      actions:
+        list: "List available models"
+        set: "Set default model for chat"
+        info: "Get model information"
+      handler: |
+        switch args[0]:
+          case 'list':
+            return listModels()
+          case 'set':
+            return setModel(args[1], context.chat)
+          case 'info':
+            return getModelInfo(args[1])
+      side_effects:
+        - "May update chat default model"
+
+    fork:
+      description: "Fork chat at a specific message"
+      args: "<message_id>"
+      handler: |
+        newChat = forkChat(context.chat, args[0])
+        return { 
+          message: `Forked to new chat: ${newChat.name}`,
+          data: { chat_id: newChat.id }
+        }
+      side_effects:
+        - "New chat created"
+        - "Messages copied up to fork point"
+
+    clear:
+      description: "Clear chat history (mark all as discarded)"
+      args: "[--confirm]"
+      handler: |
+        if not options.confirm:
+          return { message: "Use --confirm to clear history" }
+        clearChatHistory(context.chat)
+        return { message: "Chat history cleared" }
+      side_effects:
+        - "All messages marked as discarded"
+
+    export:
+      description: "Export chat to file"
+      args: "<format>"
+      formats: ["json", "markdown", "txt"]
+      handler: |
+        content = exportChat(context.chat, args[0])
+        return {
+          message: `Exported as ${args[0]}`,
+          data: { content, format: args[0] }
+        }
+      side_effects: []
+
+  testing:
+    unit_tests:
+      - name: "executes help command"
+        scenario: "Help with no args"
+        inputs:
+          parsedCommand:
+            command: "help"
+            args: []
+          context:
+            project: "valid-project"
+            chat: "valid-chat"
+        expected_output:
+          success: true
+          message: "contains command list"
+
+      - name: "executes aside command"
+        scenario: "Mark message as aside"
+        inputs:
+          parsedCommand:
+            command: "aside"
+            args: []
+          context:
+            project: "valid-project"
+            chat: "valid-chat"
+        expected_output:
+          success: true
+          data:
+            action: "modify_message"
+            modifications:
+              is_aside: true
+
+      - name: "executes pin command"
+        scenario: "Pin a message"
+        inputs:
+          parsedCommand:
+            command: "pin"
+            args: ["msg-123"]
+          context:
+            project: "valid-project"
+            chat: "valid-chat"
+        expected_output:
+          success: true
+        expected_side_effects:
+          - "Message msg-123 is_pinned = true"
+
+      - name: "validates required args"
+        scenario: "Pin without message_id"
+        inputs:
+          parsedCommand:
+            command: "pin"
+            args: []
+          context:
+            project: "valid-project"
+            chat: "valid-chat"
+        expected_output:
+          error: ValidationError
+
+    edge_cases:
+      - "Command with too many arguments"
+      - "Pin non-existent message"
+      - "Fork at invalid message"
+      - "Export with invalid format"
+      - "Clear without confirmation"
+
+    integration_tests:
+      - "Execute /pin and verify message is pinned"
+      - "Execute /fork and verify new chat created"
+      - "Execute /export and verify output format"
+
+  llm_guidance:
+    implementation_hints: |
+      1. Use a command handler registry pattern
+      2. Validate arguments before execution
+      3. Return consistent CommandResult structure
+      4. Document all side effects
+      5. Provide helpful error messages with usage hints
+
+    key_considerations:
+      - "Commands should be atomic"
+      - "Side effects must be documented"
+      - "Provide usage hints on validation errors"
+      - "Some commands need confirmation (clear)"
+      - "Fork creates new chat, doesn't modify original"
+
+    example_code: |
+      const COMMAND_HANDLERS = new Map([
+        ['help', handleHelp],
+        ['aside', handleAside],
+        ['pin', handlePin],
+        ['unpin', handleUnpin],
+        ['discard', handleDiscard],
+        ['template', handleTemplate],
+        ['model', handleModel],
+        ['fork', handleFork],
+        ['clear', handleClear],
+        ['export', handleExport]
+      ]);
+      
+      async function executeCommand(parsedCommand, context) {
+        const handler = COMMAND_HANDLERS.get(parsedCommand.command);
+        
+        if (!handler) {
+          throw new CommandError(`No handler for: ${parsedCommand.command}`);
+        }
+        
+        try {
+          const result = await handler(parsedCommand, context);
+          
+          return {
+            success: true,
+            message: result.message || `Executed: ${parsedCommand.command}`,
+            data: result.data || null,
+            side_effects: result.side_effects || []
+          };
+        } catch (error) {
+          if (error instanceof ValidationError) {
+            const usage = getCommandUsage(parsedCommand.command);
+            throw new ValidationError(`${error.message}\nUsage: ${usage}`);
+          }
+          throw new CommandError(`Command failed: ${error.message}`);
+        }
+      }
+      
+      async function handlePin(parsedCommand, context) {
+        const messageId = parsedCommand.args[0];
+        
+        if (!messageId) {
+          throw new ValidationError('Message ID required');
+        }
+        
+        const message = await getMessage(context.chat.id, messageId);
+        
+        if (!message) {
+          throw new CommandError(`Message not found: ${messageId}`);
+        }
+        
+        message.is_pinned = true;
+        await saveMessage(message);
+        
+        return {
+          message: `Pinned message ${messageId}`,
+          side_effects: ['Message pinned']
+        };
+      }
+
+    common_mistakes:
+      - "Not validating required arguments"
+      - "Not documenting side effects"
+      - "Inconsistent return structure"
+      - "Not handling handler errors"
+      - "Missing usage hints in errors"
+
+  references:
+    - "spec/commands.yaml - Command definitions"
+    - "spec/functions/backend_node/parse_slash_command.yaml"

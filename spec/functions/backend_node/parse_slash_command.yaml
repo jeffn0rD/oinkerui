@@ -1,0 +1,394 @@
+# =============================================================================
+# Function Specification: parseSlashCommand
+# =============================================================================
+
+function:
+  id: backend_node.parse_slash_command
+  name: parseSlashCommand
+  module: backend_node
+  purpose: |
+    Parse a slash command from user input text. Extracts the command name,
+    arguments, and validates against the registered command definitions.
+    Returns a structured command object for execution.
+
+  signature:
+    parameters:
+      - name: input
+        type: string
+        required: true
+        description: "Raw user input starting with '/'"
+        constraints:
+          - "Must start with '/'"
+          - "Must be non-empty after '/'"
+    returns:
+      type: ParsedCommand
+      description: "Parsed command with name and arguments"
+      schema:
+        properties:
+          command:
+            type: string
+            description: "Command name (lowercase)"
+          args:
+            type: array
+            items:
+              type: string
+            description: "Positional arguments"
+          options:
+            type: object
+            description: "Named options (--key=value)"
+          raw_args:
+            type: string
+            description: "Everything after command name"
+    throws:
+      - type: ValidationError
+        condition: "Input doesn't start with '/'"
+      - type: UnknownCommandError
+        condition: "Command not registered"
+
+  contract:
+    preconditions:
+      - "input is non-empty string"
+      - "input starts with '/'"
+    postconditions:
+      - "Returns ParsedCommand with valid command name"
+      - "Command name is lowercase"
+      - "Arguments are properly split"
+      - "Options are parsed from --key=value format"
+    invariants:
+      - "Command name matches registered command"
+    side_effects: []
+
+  algorithm:
+    description: |
+      1. Validate input starts with '/'
+      2. Remove leading '/' and trim
+      3. Split into command and rest
+      4. Normalize command name to lowercase
+      5. Validate command is registered
+      6. Parse arguments and options from rest
+      7. Return ParsedCommand object
+
+    steps:
+      - step: 1
+        action: "Check input starts with '/'"
+        rationale: "Validate slash command format"
+      - step: 2
+        action: "Remove '/' prefix, trim whitespace"
+        rationale: "Normalize input"
+      - step: 3
+        action: "Split on first whitespace to get command and rest"
+        rationale: "Separate command from arguments"
+      - step: 4
+        action: "Convert command to lowercase"
+        rationale: "Case-insensitive commands"
+      - step: 5
+        action: "Check command exists in REGISTERED_COMMANDS"
+        rationale: "Validate known command"
+      - step: 6
+        action: "Parse rest into args and options"
+        rationale: "Extract structured arguments"
+      - step: 7
+        action: "Return ParsedCommand"
+        rationale: "Provide structured result"
+
+    fol_specification: |
+      forall input in String:
+        StartsWith(input, '/') and Length(input) > 1 implies
+          let parsed = parseSlashCommand(input) in
+          exists cmd in REGISTERED_COMMANDS:
+            parsed.command = Lowercase(cmd.name) and
+            parsed.raw_args = Substring(input, Length(cmd.name) + 2)
+
+    pseudocode: |
+      function parseSlashCommand(input):
+        // Step 1: Validate
+        if not input.startsWith('/'):
+          throw ValidationError("Input must start with '/'")
+        
+        // Step 2: Normalize
+        content = input.slice(1).trim()
+        if content.length == 0:
+          throw ValidationError("Empty command")
+        
+        // Step 3: Split command and rest
+        spaceIndex = content.indexOf(' ')
+        if spaceIndex == -1:
+          command = content
+          rest = ''
+        else:
+          command = content.slice(0, spaceIndex)
+          rest = content.slice(spaceIndex + 1).trim()
+        
+        // Step 4: Normalize command
+        command = command.toLowerCase()
+        
+        // Step 5: Validate command
+        if command not in REGISTERED_COMMANDS:
+          throw UnknownCommandError(`Unknown command: ${command}`)
+        
+        // Step 6: Parse arguments
+        args = []
+        options = {}
+        
+        if rest:
+          tokens = tokenize(rest)  // Handle quoted strings
+          for token in tokens:
+            if token.startsWith('--'):
+              // Parse --key=value or --flag
+              if '=' in token:
+                [key, value] = token.slice(2).split('=', 2)
+                options[key] = value
+              else:
+                options[token.slice(2)] = true
+            else:
+              args.push(token)
+        
+        // Step 7: Return
+        return {
+          command: command,
+          args: args,
+          options: options,
+          raw_args: rest
+        }
+
+  complexity:
+    time: "O(n)"
+    space: "O(n)"
+    analysis: |
+      Time:
+        - String operations: O(n) where n = input length
+        - Tokenization: O(n)
+        - Command lookup: O(1) with hash map
+      
+      Space:
+        - Tokens array: O(k) where k = number of tokens
+        - Options object: O(m) where m = number of options
+
+  data_access:
+    reads:
+      - entity: CommandRegistry
+        operations: [lookup]
+    writes: []
+    transactions: false
+
+  error_handling:
+    validation:
+      - parameter: input
+        validation: "Must start with '/'"
+        error_code: "INVALID_COMMAND_FORMAT"
+      - parameter: input
+        validation: "Must have command name after '/'"
+        error_code: "EMPTY_COMMAND"
+    error_cases:
+      - condition: "Unknown command"
+        error_type: UnknownCommandError
+        recovery: "Return error with suggestions"
+      - condition: "Malformed options"
+        error_type: ValidationError
+        recovery: "Return error with usage hint"
+
+  testing:
+    unit_tests:
+      - name: "parses simple command"
+        scenario: "Command with no arguments"
+        inputs:
+          input: "/help"
+        expected_output:
+          command: "help"
+          args: []
+          options: {}
+          raw_args: ""
+
+      - name: "parses command with args"
+        scenario: "Command with positional arguments"
+        inputs:
+          input: "/template use my-template"
+        expected_output:
+          command: "template"
+          args: ["use", "my-template"]
+          options: {}
+          raw_args: "use my-template"
+
+      - name: "parses command with options"
+        scenario: "Command with --key=value options"
+        inputs:
+          input: "/model set --name=gpt-4 --temp=0.7"
+        expected_output:
+          command: "model"
+          args: ["set"]
+          options:
+            name: "gpt-4"
+            temp: "0.7"
+
+      - name: "handles quoted strings"
+        scenario: "Arguments with spaces in quotes"
+        inputs:
+          input: '/aside "This is a multi-word aside"'
+        expected_output:
+          command: "aside"
+          args: ["This is a multi-word aside"]
+
+      - name: "throws on unknown command"
+        scenario: "Unregistered command"
+        inputs:
+          input: "/unknowncommand"
+        expected_output:
+          error: UnknownCommandError
+
+      - name: "case insensitive"
+        scenario: "Uppercase command"
+        inputs:
+          input: "/HELP"
+        expected_output:
+          command: "help"
+
+    edge_cases:
+      - "Command with only whitespace after '/'"
+      - "Multiple spaces between arguments"
+      - "Unclosed quotes"
+      - "Empty --key= value"
+      - "Command with special characters"
+
+    integration_tests:
+      - "Parse and execute /help command"
+      - "Parse and execute /aside with content"
+      - "Parse and execute /template with args"
+
+  llm_guidance:
+    implementation_hints: |
+      1. Use a tokenizer that handles quoted strings
+      2. Store registered commands in a Map for O(1) lookup
+      3. Provide helpful error messages with command suggestions
+      4. Support both --key=value and --key value formats
+      5. Consider command aliases (e.g., /h for /help)
+
+    key_considerations:
+      - "Commands should be case-insensitive"
+      - "Handle quoted strings with spaces"
+      - "Validate against registered commands"
+      - "Provide usage hints on error"
+      - "Support flag-style options (--verbose)"
+
+    example_code: |
+      const REGISTERED_COMMANDS = new Map([
+        ['help', { description: 'Show help', args: [] }],
+        ['aside', { description: 'Send aside message', args: ['content'] }],
+        ['template', { description: 'Template operations', args: ['action', 'name'] }],
+        ['model', { description: 'Model operations', args: ['action'] }],
+        ['pin', { description: 'Pin a message', args: ['message_id'] }],
+        ['discard', { description: 'Discard a message', args: ['message_id'] }],
+        ['fork', { description: 'Fork chat at message', args: ['message_id'] }],
+        ['clear', { description: 'Clear chat history', args: [] }],
+        ['export', { description: 'Export chat', args: ['format'] }]
+      ]);
+      
+      function parseSlashCommand(input) {
+        // Validate
+        if (!input.startsWith('/')) {
+          throw new ValidationError('Input must start with /');
+        }
+        
+        const content = input.slice(1).trim();
+        if (!content) {
+          throw new ValidationError('Empty command');
+        }
+        
+        // Split command and rest
+        const spaceIndex = content.indexOf(' ');
+        let command, rest;
+        
+        if (spaceIndex === -1) {
+          command = content;
+          rest = '';
+        } else {
+          command = content.slice(0, spaceIndex);
+          rest = content.slice(spaceIndex + 1).trim();
+        }
+        
+        // Normalize
+        command = command.toLowerCase();
+        
+        // Validate
+        if (!REGISTERED_COMMANDS.has(command)) {
+          const suggestions = findSimilarCommands(command);
+          throw new UnknownCommandError(
+            `Unknown command: ${command}`,
+            { suggestions }
+          );
+        }
+        
+        // Parse arguments
+        const args = [];
+        const options = {};
+        
+        if (rest) {
+          const tokens = tokenize(rest);
+          
+          for (const token of tokens) {
+            if (token.startsWith('--')) {
+              const eqIndex = token.indexOf('=');
+              if (eqIndex !== -1) {
+                const key = token.slice(2, eqIndex);
+                const value = token.slice(eqIndex + 1);
+                options[key] = value;
+              } else {
+                options[token.slice(2)] = true;
+              }
+            } else {
+              args.push(token);
+            }
+          }
+        }
+        
+        return {
+          command,
+          args,
+          options,
+          raw_args: rest
+        };
+      }
+      
+      function tokenize(input) {
+        const tokens = [];
+        let current = '';
+        let inQuotes = false;
+        let quoteChar = null;
+        
+        for (const char of input) {
+          if ((char === '"' || char === "'") && !inQuotes) {
+            inQuotes = true;
+            quoteChar = char;
+          } else if (char === quoteChar && inQuotes) {
+            inQuotes = false;
+            quoteChar = null;
+            if (current) {
+              tokens.push(current);
+              current = '';
+            }
+          } else if (char === ' ' && !inQuotes) {
+            if (current) {
+              tokens.push(current);
+              current = '';
+            }
+          } else {
+            current += char;
+          }
+        }
+        
+        if (current) {
+          tokens.push(current);
+        }
+        
+        return tokens;
+      }
+
+    common_mistakes:
+      - "Not handling quoted strings"
+      - "Case-sensitive command matching"
+      - "Not trimming whitespace"
+      - "Missing validation for registered commands"
+      - "Not providing helpful error messages"
+
+  references:
+    - "spec/commands.yaml - Command definitions"
+    - "spec/apis.yaml - API endpoint for commands"

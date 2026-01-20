@@ -1,0 +1,450 @@
+# =============================================================================
+# Function Specification: createProject
+# =============================================================================
+
+function:
+  id: backend_node.create_project
+  name: createProject
+  module: backend_node
+  purpose: |
+    Create a new project with the given name and configuration.
+    Initializes the project directory structure, Git repository,
+    and creates the initial project metadata. This is the entry point
+    for all new projects in the system.
+
+  signature:
+    parameters:
+      - name: projectName
+        type: string
+        required: true
+        description: "Human-readable name of the project"
+        constraints:
+          - "Length between 1 and 100 characters"
+          - "Must match pattern: ^[a-zA-Z0-9][a-zA-Z0-9_\\- ]*$"
+      - name: options
+        type: CreateProjectOptions
+        required: false
+        default: {}
+        description: "Optional project configuration"
+        constraints:
+          - "Must conform to CreateProjectOptions schema"
+    returns:
+      type: Project
+      description: "Created project object with ID and metadata"
+      schema:
+        $ref: "spec/domain.yaml#Project"
+    throws:
+      - type: ValidationError
+        condition: "projectName is invalid"
+        description: "Project name doesn't meet constraints"
+      - type: ConflictError
+        condition: "Project with slug already exists"
+        description: "A project with this slug already exists"
+      - type: FileSystemError
+        condition: "Cannot create project directory"
+        description: "File system operation failed"
+      - type: GitError
+        condition: "Git initialization fails"
+        description: "Git repository could not be initialized"
+
+  contract:
+    preconditions:
+      - "projectName is a non-empty string"
+      - "projectName matches the allowed pattern"
+      - "No active/archived project with same slug exists"
+      - "Workspace root directory exists and is writable"
+    postconditions:
+      - "Project directory exists at workspace_root/projects/{slug}/"
+      - "Git repository is initialized in project directory"
+      - "Project metadata file (project.json) exists"
+      - "Project is added to global project index"
+      - "Project status is 'active'"
+      - "Returns valid Project object with unique ID"
+    invariants:
+      - "Project ID is unique across all projects"
+      - "Project slug is unique among active/archived projects"
+      - "Project directory structure matches template"
+    side_effects:
+      - type: io_operation
+        description: "Creates directory structure on file system"
+        scope: "workspace_root/projects/{slug}/"
+      - type: external_call
+        description: "Initializes Git repository via simple-git"
+        scope: "Git command execution"
+      - type: state_mutation
+        description: "Updates global project index file"
+        scope: "workspace_root/projects/index.json"
+      - type: event_emission
+        description: "Emits project_created event"
+        scope: "Logging system"
+
+  algorithm:
+    description: |
+      1. Validate project name against constraints
+      2. Generate slug from project name
+      3. Check for slug conflicts
+      4. Generate unique project ID
+      5. Create project directory structure
+      6. Initialize Git repository
+      7. Create project metadata file
+      8. Update global project index
+      9. Log project creation event
+      10. Return project object
+
+    steps:
+      - step: 1
+        action: "Validate projectName against pattern and length constraints"
+        rationale: "Ensure data integrity before any side effects"
+      - step: 2
+        action: "Generate URL-safe slug from projectName using slugify"
+        rationale: "Create filesystem-safe identifier"
+      - step: 3
+        action: "Check if project with slug exists in index (active or archived)"
+        rationale: "Prevent duplicate projects"
+      - step: 4
+        action: "Generate UUID v4 for project ID"
+        rationale: "Ensure globally unique identifier"
+      - step: 5
+        action: "Create directory structure: chats/, data/, logs/, public/"
+        rationale: "Establish standard project workspace"
+      - step: 6
+        action: "Execute git init in project directory"
+        rationale: "Enable version control from start"
+      - step: 7
+        action: "Write project.json with metadata"
+        rationale: "Persist project configuration"
+      - step: 8
+        action: "Add project to global index.json"
+        rationale: "Make project discoverable"
+      - step: 9
+        action: "Log project_created event"
+        rationale: "Audit trail and observability"
+      - step: 10
+        action: "Return Project object"
+        rationale: "Provide caller with project reference"
+
+    fol_specification: |
+      forall name in String, opts in Options:
+        Valid(name) and not ExistsSlug(slugify(name)) implies
+          exists id in UUID, p in Project:
+            p.id = id and
+            p.name = name and
+            p.slug = slugify(name) and
+            p.status = 'active' and
+            p.created_at = now() and
+            DirExists(workspace_root/projects/p.slug) and
+            GitInitialized(workspace_root/projects/p.slug) and
+            InIndex(p)
+
+    pseudocode: |
+      function createProject(projectName, options = {}):
+        // Step 1: Validation
+        if not isValidProjectName(projectName):
+          throw ValidationError("Invalid project name")
+        
+        // Step 2: Generate slug
+        slug = slugify(projectName, { lower: true, strict: true })
+        
+        // Step 3: Check conflicts
+        if projectExistsBySlug(slug):
+          throw ConflictError("Project with this name already exists")
+        
+        // Step 4: Generate ID
+        projectId = generateUUID()
+        
+        // Step 5: Create directory structure
+        projectPath = join(workspaceRoot, "projects", slug)
+        createDirectory(projectPath)
+        createDirectory(join(projectPath, "chats"))
+        createDirectory(join(projectPath, "data"))
+        createDirectory(join(projectPath, "logs"))
+        createDirectory(join(projectPath, "public"))
+        
+        try:
+          // Step 6: Initialize Git
+          git = simpleGit(projectPath)
+          await git.init()
+          await git.addConfig('user.name', 'OinkerUI')
+          await git.addConfig('user.email', 'oinkerui@local')
+          
+          // Step 7: Create metadata
+          project = {
+            id: projectId,
+            name: projectName,
+            slug: slug,
+            description: options.description || "",
+            status: "active",
+            created_at: now(),
+            updated_at: now(),
+            default_model: options.default_model || config.defaultModel,
+            settings: mergeDefaults(options.settings),
+            paths: {
+              root: projectPath,
+              chats_dir: "chats",
+              data_dir: "data",
+              logs_dir: "logs",
+              public_dir: "public"
+            }
+          }
+          
+          writeJSON(join(projectPath, "project.json"), project)
+          
+          // Step 8: Update index
+          addToProjectIndex(project)
+          
+          // Step 9: Log event
+          logProjectEvent("project_created", project)
+          
+          // Step 10: Return
+          return project
+          
+        catch error:
+          // Cleanup on failure
+          removeDirectory(projectPath)
+          throw error
+
+  complexity:
+    time: "O(1)"
+    space: "O(1)"
+    analysis: |
+      Time: All operations are constant time:
+        - Validation: O(1) string operations
+        - UUID generation: O(1)
+        - File system operations: O(1) for fixed number of directories
+        - Git init: O(1) for empty repository
+        - Index update: O(1) append operation
+      
+      Space: Fixed size allocations:
+        - Project object: O(1) fixed fields
+        - Directory structure: O(1) fixed number of directories
+      
+      Note: Index lookup could be O(n) if implemented as linear search,
+      but should use hash map for O(1) lookup.
+
+  data_access:
+    reads:
+      - entity: Project
+        operations: [check_exists_by_slug]
+      - entity: Configuration
+        operations: [read_defaults]
+    writes:
+      - entity: Project
+        operations: [create, index]
+    transactions: false
+
+  error_handling:
+    validation:
+      - parameter: projectName
+        validation: "Must match ^[a-zA-Z0-9][a-zA-Z0-9_\\- ]*$ and length 1-100"
+        error_code: "INVALID_PROJECT_NAME"
+      - parameter: options.default_model
+        validation: "Must be valid model ID if provided"
+        error_code: "INVALID_MODEL"
+    error_cases:
+      - condition: "Project name is empty or null"
+        error_type: ValidationError
+        recovery: propagate
+      - condition: "Project name contains invalid characters"
+        error_type: ValidationError
+        recovery: propagate
+      - condition: "Project with slug already exists"
+        error_type: ConflictError
+        recovery: propagate
+      - condition: "Cannot create project directory"
+        error_type: FileSystemError
+        recovery: propagate
+      - condition: "Git init fails"
+        error_type: GitError
+        recovery: propagate
+      - condition: "Cannot write project metadata"
+        error_type: FileSystemError
+        recovery: propagate
+
+  testing:
+    unit_tests:
+      - name: "creates project with valid name"
+        scenario: "Happy path with valid project name"
+        inputs:
+          projectName: "my-project"
+          options: {}
+        expected_output:
+          type: Project
+          properties:
+            name: "my-project"
+            slug: "my-project"
+            status: "active"
+        expected_side_effects:
+          - "Directory created at workspace_root/projects/my-project/"
+          - "Git repository initialized"
+          - "Project added to index"
+
+      - name: "creates project with spaces in name"
+        scenario: "Project name with spaces converts to slug"
+        inputs:
+          projectName: "My Cool Project"
+          options: {}
+        expected_output:
+          type: Project
+          properties:
+            name: "My Cool Project"
+            slug: "my-cool-project"
+
+      - name: "throws error for invalid name"
+        scenario: "Project name with invalid characters"
+        inputs:
+          projectName: "my@project!"
+        expected_output:
+          error: ValidationError
+          code: "INVALID_PROJECT_NAME"
+
+      - name: "throws error for duplicate slug"
+        scenario: "Project with slug already exists"
+        inputs:
+          projectName: "existing-project"
+        expected_output:
+          error: ConflictError
+
+      - name: "applies default model from config"
+        scenario: "No default_model in options"
+        inputs:
+          projectName: "test-project"
+          options: {}
+        expected_output:
+          type: Project
+          properties:
+            default_model: "config.defaultModel"
+
+    edge_cases:
+      - "Empty project name"
+      - "Project name with only spaces"
+      - "Very long project name (>100 chars)"
+      - "Project name starting with number"
+      - "Project name with unicode characters"
+      - "Workspace root doesn't exist"
+      - "No write permissions on workspace"
+      - "Disk full during directory creation"
+
+    integration_tests:
+      - "Create project and verify Git repository is valid"
+      - "Create project and verify appears in project list"
+      - "Create multiple projects and verify unique IDs"
+      - "Create project, delete it, create with same name"
+
+  llm_guidance:
+    implementation_hints: |
+      1. Use slugify library with { lower: true, strict: true } options
+      2. Use uuid library (v4) for ID generation
+      3. Use simple-git library for Git operations
+      4. Use fs/promises for async file operations
+      5. Implement cleanup in catch block to prevent orphaned directories
+      6. Use a lock or mutex if concurrent project creation is possible
+      7. Validate early, fail fast before any side effects
+
+    key_considerations:
+      - "Ensure atomic operations - cleanup on any failure"
+      - "Validate inputs before any file system operations"
+      - "Use async/await consistently for all I/O"
+      - "Handle race conditions in slug uniqueness check"
+      - "Set up proper Git config for commits"
+
+    example_code: |
+      async function createProject(projectName, options = {}) {
+        // Validation
+        if (!projectName || typeof projectName !== 'string') {
+          throw new ValidationError('Project name is required');
+        }
+        
+        const namePattern = /^[a-zA-Z0-9][a-zA-Z0-9_\- ]*$/;
+        if (!namePattern.test(projectName) || projectName.length > 100) {
+          throw new ValidationError('Invalid project name');
+        }
+        
+        // Generate slug
+        const slug = slugify(projectName, { lower: true, strict: true });
+        
+        // Check conflicts
+        const existing = await projectIndex.findBySlug(slug);
+        if (existing && existing.status !== 'deleted') {
+          throw new ConflictError('Project already exists');
+        }
+        
+        // Generate ID and paths
+        const projectId = uuidv4();
+        const projectPath = path.join(config.workspaceRoot, 'projects', slug);
+        
+        // Create directory structure
+        await fs.mkdir(projectPath, { recursive: true });
+        await fs.mkdir(path.join(projectPath, 'chats'));
+        await fs.mkdir(path.join(projectPath, 'data'));
+        await fs.mkdir(path.join(projectPath, 'logs'));
+        await fs.mkdir(path.join(projectPath, 'public'));
+        
+        try {
+          // Initialize Git
+          const git = simpleGit(projectPath);
+          await git.init();
+          
+          // Create project object
+          const project = {
+            id: projectId,
+            name: projectName,
+            slug,
+            status: 'active',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            default_model: options.default_model || config.defaultModel,
+            settings: { ...defaultSettings, ...options.settings },
+            paths: {
+              root: projectPath,
+              chats_dir: 'chats',
+              data_dir: 'data',
+              logs_dir: 'logs',
+              public_dir: 'public'
+            }
+          };
+          
+          // Save metadata
+          await fs.writeFile(
+            path.join(projectPath, 'project.json'),
+            JSON.stringify(project, null, 2)
+          );
+          
+          // Update index
+          await projectIndex.add(project);
+          
+          // Log event
+          logger.info({ event: 'project_created', projectId, slug });
+          
+          return project;
+        } catch (error) {
+          // Cleanup on failure
+          await fs.rm(projectPath, { recursive: true, force: true });
+          throw error;
+        }
+      }
+
+    common_mistakes:
+      - "Not validating inputs before side effects"
+      - "Not cleaning up on failure (orphaned directories)"
+      - "Using sync file operations (blocks event loop)"
+      - "Not handling race conditions in uniqueness check"
+      - "Forgetting to set Git user config"
+      - "Not logging the creation event"
+
+    dependencies:
+      - "uuid - for ID generation"
+      - "slugify - for slug generation"
+      - "simple-git - for Git operations"
+      - "fs/promises - for file operations"
+      - "path - for path manipulation"
+
+  references:
+    - type: entity
+      id: Project
+      file: "spec/domain.yaml#Project"
+    - type: module
+      id: backend_node
+      file: "spec/modules/backend_node.yaml"
+    - type: state_machine
+      id: project_lifecycle
+      file: "spec/state_machines.yaml#project_lifecycle"

@@ -1,0 +1,332 @@
+# =============================================================================
+# Function Specification: saveMessage
+# =============================================================================
+
+function:
+  id: backend_node.save_message
+  name: saveMessage
+  module: backend_node
+  purpose: |
+    Persist a message to the chat's JSONL storage file. Handles both new
+    message creation (append) and existing message updates. Ensures data
+    integrity and proper file locking.
+
+  signature:
+    parameters:
+      - name: chatId
+        type: string
+        required: true
+        description: "UUID of the chat"
+      - name: message
+        type: Message
+        required: true
+        description: "Message object to save"
+      - name: options
+        type: SaveOptions
+        required: false
+        default: {}
+        description: "Save options"
+        constraints:
+          - "mode: 'append' | 'update'"
+    returns:
+      type: Message
+      description: "Saved message with any server-generated fields"
+      schema:
+        $ref: "spec/domain.yaml#Message"
+    throws:
+      - type: NotFoundError
+        condition: "Chat not found"
+      - type: FileSystemError
+        condition: "Cannot write to storage file"
+      - type: ValidationError
+        condition: "Invalid message data"
+
+  contract:
+    preconditions:
+      - "chatId is valid UUID"
+      - "Chat exists and has storage_path"
+      - "message has required fields (id, role, content)"
+      - "message.chat_id matches chatId"
+    postconditions:
+      - "Message is persisted to JSONL file"
+      - "If append: message is at end of file"
+      - "If update: message replaces existing entry"
+      - "File is valid JSONL after operation"
+    invariants:
+      - "Message order is preserved"
+      - "File integrity is maintained"
+    side_effects:
+      - type: io_operation
+        description: "Writes to chat JSONL file"
+        scope: "project/chats/{chat_id}.jsonl"
+
+  algorithm:
+    description: |
+      1. Validate chatId and message
+      2. Load chat to get storage_path
+      3. Validate message.chat_id matches
+      4. If append mode: append to file
+      5. If update mode: rewrite file with updated message
+      6. Return saved message
+
+    steps:
+      - step: 1
+        action: "Validate chatId is valid UUID"
+        rationale: "Fail fast on invalid input"
+      - step: 2
+        action: "Load chat from storage, get storage_path"
+        rationale: "Get file location"
+      - step: 3
+        action: "Validate message.chat_id == chatId"
+        rationale: "Ensure message belongs to chat"
+      - step: 4
+        action: "Set created_at if not present"
+        rationale: "Server-generated timestamp"
+      - step: 5
+        action: "Serialize message to JSON"
+        rationale: "Prepare for storage"
+      - step: 6
+        action: "Append JSON line to file (or rewrite for update)"
+        rationale: "Persist message"
+      - step: 7
+        action: "Return message"
+        rationale: "Confirm save"
+
+    fol_specification: |
+      forall chatId in UUID, msg in Message:
+        ValidChat(chatId) and
+        ValidMessage(msg) and
+        msg.chat_id = chatId implies
+          let saved = saveMessage(chatId, msg) in
+          Persisted(saved) and
+          saved.id = msg.id and
+          exists line in FileLines(chat.storage_path):
+            JSON.parse(line).id = saved.id
+
+    pseudocode: |
+      function saveMessage(chatId, message, options = {}):
+        // Step 1: Validate
+        if not isValidUUID(chatId):
+          throw ValidationError("Invalid chat ID")
+        
+        // Step 2: Load chat
+        chat = loadChat(chatId)
+        if not chat:
+          throw NotFoundError("Chat not found")
+        
+        // Step 3: Validate ownership
+        if message.chat_id and message.chat_id != chatId:
+          throw ValidationError("Message chat_id mismatch")
+        
+        // Step 4: Set defaults
+        message.chat_id = chatId
+        if not message.created_at:
+          message.created_at = new Date().toISOString()
+        
+        // Step 5: Serialize
+        jsonLine = JSON.stringify(message)
+        
+        // Step 6: Write
+        mode = options.mode || 'append'
+        
+        if mode == 'append':
+          appendToFile(chat.storage_path, jsonLine + '\n')
+        else if mode == 'update':
+          // Read all messages, replace matching, rewrite
+          messages = readAllMessages(chat.storage_path)
+          updated = false
+          for i, msg in messages:
+            if msg.id == message.id:
+              messages[i] = message
+              updated = true
+              break
+          if not updated:
+            throw NotFoundError("Message not found for update")
+          rewriteFile(chat.storage_path, messages)
+        
+        // Step 7: Return
+        return message
+
+  complexity:
+    time: "O(1) append, O(n) update"
+    space: "O(1) append, O(n) update"
+    analysis: |
+      Append mode:
+        - Time: O(1) - single file append
+        - Space: O(m) where m = message size
+      
+      Update mode:
+        - Time: O(n) - read all, find, rewrite
+        - Space: O(n) - all messages in memory
+      
+      Append is strongly preferred for performance.
+
+  data_access:
+    reads:
+      - entity: Chat
+        operations: [read_storage_path]
+      - entity: Message
+        operations: [read_all_for_update]
+    writes:
+      - entity: Message
+        operations: [create, update]
+    transactions: false
+
+  error_handling:
+    validation:
+      - parameter: chatId
+        validation: "Must be valid UUID"
+        error_code: "INVALID_CHAT_ID"
+      - parameter: message.id
+        validation: "Must be valid UUID"
+        error_code: "INVALID_MESSAGE_ID"
+      - parameter: message.role
+        validation: "Must be system|user|assistant|tool"
+        error_code: "INVALID_ROLE"
+    error_cases:
+      - condition: "Chat not found"
+        error_type: NotFoundError
+        recovery: propagate
+      - condition: "File write fails"
+        error_type: FileSystemError
+        recovery: propagate
+      - condition: "Message not found for update"
+        error_type: NotFoundError
+        recovery: propagate
+
+  testing:
+    unit_tests:
+      - name: "appends new message"
+        scenario: "Save new message to chat"
+        inputs:
+          chatId: "valid-chat-uuid"
+          message:
+            id: "msg-123"
+            role: "user"
+            content: "Hello"
+        expected_output:
+          id: "msg-123"
+          chat_id: "valid-chat-uuid"
+          created_at: "non-null"
+        expected_side_effects:
+          - "Message appended to JSONL file"
+
+      - name: "updates existing message"
+        scenario: "Update message flags"
+        inputs:
+          chatId: "valid-chat-uuid"
+          message:
+            id: "existing-msg"
+            is_pinned: true
+          options:
+            mode: "update"
+        expected_output:
+          id: "existing-msg"
+          is_pinned: true
+        expected_side_effects:
+          - "Message updated in JSONL file"
+
+      - name: "throws on chat not found"
+        scenario: "Invalid chat ID"
+        inputs:
+          chatId: "non-existent"
+          message:
+            id: "msg-123"
+            content: "Hello"
+        expected_output:
+          error: NotFoundError
+
+    edge_cases:
+      - "Very large message content"
+      - "Message with special characters"
+      - "Concurrent writes to same file"
+      - "Update non-existent message"
+      - "Empty content message"
+
+    integration_tests:
+      - "Save message and read back"
+      - "Update message and verify change"
+      - "Verify JSONL file integrity after multiple saves"
+
+  llm_guidance:
+    implementation_hints: |
+      1. Use fs.appendFile for append mode (atomic on most systems)
+      2. Consider file locking for concurrent access
+      3. Validate JSON serialization before write
+      4. Use streaming for large file updates
+      5. Implement backup before update mode
+
+    key_considerations:
+      - "Append is much faster than update"
+      - "JSONL format: one JSON object per line"
+      - "Handle concurrent writes carefully"
+      - "Validate message structure before save"
+      - "Set server-generated fields (created_at)"
+
+    example_code: |
+      const fs = require('fs').promises;
+      const path = require('path');
+      
+      async function saveMessage(chatId, message, options = {}) {
+        // Validate
+        if (!isValidUUID(chatId)) {
+          throw new ValidationError('Invalid chat ID');
+        }
+        
+        // Load chat
+        const chat = await chatStore.getById(chatId);
+        if (!chat) {
+          throw new NotFoundError('Chat not found');
+        }
+        
+        // Validate ownership
+        if (message.chat_id && message.chat_id !== chatId) {
+          throw new ValidationError('Message chat_id mismatch');
+        }
+        
+        // Set defaults
+        message.chat_id = chatId;
+        message.created_at = message.created_at || new Date().toISOString();
+        
+        const mode = options.mode || 'append';
+        const filePath = chat.storage_path;
+        
+        if (mode === 'append') {
+          // Append mode - fast
+          const jsonLine = JSON.stringify(message) + '\n';
+          await fs.appendFile(filePath, jsonLine, 'utf8');
+        } else if (mode === 'update') {
+          // Update mode - slower, read-modify-write
+          const content = await fs.readFile(filePath, 'utf8');
+          const lines = content.trim().split('\n');
+          
+          let updated = false;
+          const newLines = lines.map(line => {
+            const msg = JSON.parse(line);
+            if (msg.id === message.id) {
+              updated = true;
+              return JSON.stringify({ ...msg, ...message });
+            }
+            return line;
+          });
+          
+          if (!updated) {
+            throw new NotFoundError('Message not found for update');
+          }
+          
+          await fs.writeFile(filePath, newLines.join('\n') + '\n', 'utf8');
+        }
+        
+        return message;
+      }
+
+    common_mistakes:
+      - "Not adding newline after JSON"
+      - "Not handling concurrent writes"
+      - "Not validating message structure"
+      - "Using update mode when append suffices"
+      - "Not setting chat_id on message"
+
+  references:
+    - "spec/domain.yaml#Message - Message entity"
+    - "spec/domain.yaml#Chat - Chat entity"

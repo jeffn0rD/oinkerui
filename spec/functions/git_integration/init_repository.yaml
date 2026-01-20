@@ -1,0 +1,375 @@
+# =============================================================================
+# Function Specification: initRepository
+# =============================================================================
+
+function:
+  id: git_integration.init_repository
+  name: initRepository
+  module: git_integration
+  purpose: |
+    Initialize a new Git repository in a project directory. Creates the
+    repository, sets up initial configuration, creates .gitignore, and
+    optionally makes an initial commit.
+
+  signature:
+    parameters:
+      - name: projectPath
+        type: string
+        required: true
+        description: "Path to project directory"
+      - name: options
+        type: InitOptions
+        required: false
+        default: {}
+        description: "Initialization options"
+        constraints:
+          - "initialCommit: boolean (default true)"
+          - "gitignoreTemplate: string (default 'node')"
+          - "defaultBranch: string (default 'main')"
+    returns:
+      type: InitResult
+      description: "Initialization result"
+      schema:
+        properties:
+          success:
+            type: boolean
+          path:
+            type: string
+          branch:
+            type: string
+          initialCommitHash:
+            type: string
+            nullable: true
+    throws:
+      - type: GitError
+        condition: "Git initialization fails"
+      - type: ValidationError
+        condition: "Invalid project path"
+      - type: ConflictError
+        condition: "Repository already exists"
+
+  contract:
+    preconditions:
+      - "projectPath exists and is directory"
+      - "projectPath is not already a Git repository"
+      - "Git is installed and available"
+    postconditions:
+      - ".git directory exists in projectPath"
+      - "Default branch is set"
+      - ".gitignore file exists"
+      - "If initialCommit: initial commit is created"
+    invariants:
+      - "Repository is valid Git repository"
+    side_effects:
+      - type: io_operation
+        description: "Creates .git directory and files"
+        scope: "projectPath/.git/"
+      - type: io_operation
+        description: "Creates .gitignore file"
+        scope: "projectPath/.gitignore"
+
+  algorithm:
+    description: |
+      1. Validate project path
+      2. Check not already a repository
+      3. Initialize Git repository
+      4. Set default branch name
+      5. Create .gitignore file
+      6. Stage all files
+      7. Create initial commit if requested
+      8. Return result
+
+    steps:
+      - step: 1
+        action: "Validate projectPath is valid directory"
+        rationale: "Ensure valid target"
+      - step: 2
+        action: "Check if .git directory exists"
+        rationale: "Prevent re-initialization"
+      - step: 3
+        action: "Run git init"
+        rationale: "Create repository"
+      - step: 4
+        action: "Run git branch -M {defaultBranch}"
+        rationale: "Set branch name"
+      - step: 5
+        action: "Create .gitignore from template"
+        rationale: "Exclude common files"
+      - step: 6
+        action: "Run git add ."
+        rationale: "Stage initial files"
+      - step: 7
+        action: "Run git commit -m 'Initial commit'"
+        rationale: "Create first commit"
+      - step: 8
+        action: "Return InitResult"
+        rationale: "Provide result"
+
+    fol_specification: |
+      forall path in Path, opts in InitOptions:
+        ValidDirectory(path) and not IsGitRepo(path) implies
+          let result = initRepository(path, opts) in
+          result.success and
+          IsGitRepo(path) and
+          FileExists(path + '/.gitignore') and
+          (opts.initialCommit implies NonNull(result.initialCommitHash))
+
+    pseudocode: |
+      async function initRepository(projectPath, options = {}):
+          // Step 1: Validate
+          if not fs.existsSync(projectPath):
+              throw ValidationError("Project path does not exist")
+          if not fs.statSync(projectPath).isDirectory():
+              throw ValidationError("Project path is not a directory")
+          
+          // Step 2: Check existing
+          gitPath = path.join(projectPath, '.git')
+          if fs.existsSync(gitPath):
+              throw ConflictError("Repository already exists")
+          
+          // Step 3: Initialize
+          git = simpleGit(projectPath)
+          await git.init()
+          
+          // Step 4: Set branch
+          defaultBranch = options.defaultBranch || 'main'
+          await git.branch(['-M', defaultBranch])
+          
+          // Step 5: Create .gitignore
+          gitignoreContent = getGitignoreTemplate(options.gitignoreTemplate || 'node')
+          fs.writeFileSync(
+              path.join(projectPath, '.gitignore'),
+              gitignoreContent
+          )
+          
+          // Step 6-7: Initial commit
+          initialCommitHash = null
+          if options.initialCommit !== false:
+              await git.add('.')
+              result = await git.commit('Initial commit')
+              initialCommitHash = result.commit
+          
+          // Step 8: Return
+          return {
+              success: true,
+              path: projectPath,
+              branch: defaultBranch,
+              initialCommitHash: initialCommitHash
+          }
+
+  complexity:
+    time: "O(f)"
+    space: "O(1)"
+    analysis: |
+      Time:
+        - Git init: O(1)
+        - Git add: O(f) where f = number of files
+        - Git commit: O(f)
+      
+      Space:
+        - Git objects: O(s) where s = total file size
+
+  data_access:
+    reads:
+      - entity: FileSystem
+        operations: [check_exists, read_directory]
+    writes:
+      - entity: FileSystem
+        operations: [create_directory, create_file]
+    transactions: false
+
+  error_handling:
+    validation:
+      - parameter: projectPath
+        validation: "Must be valid directory"
+        error_code: "INVALID_PATH"
+    error_cases:
+      - condition: "Path doesn't exist"
+        error_type: ValidationError
+        recovery: propagate
+      - condition: "Already a repository"
+        error_type: ConflictError
+        recovery: propagate
+      - condition: "Git not installed"
+        error_type: GitError
+        recovery: propagate
+
+  testing:
+    unit_tests:
+      - name: "initializes new repository"
+        scenario: "Fresh directory"
+        inputs:
+          projectPath: "/tmp/new_project"
+        expected_output:
+          success: true
+          branch: "main"
+        expected_side_effects:
+          - ".git directory created"
+          - ".gitignore created"
+
+      - name: "creates initial commit"
+        scenario: "With initial commit"
+        inputs:
+          projectPath: "/tmp/new_project"
+          options:
+            initialCommit: true
+        expected_output:
+          initialCommitHash: "non-null"
+
+      - name: "uses custom branch"
+        scenario: "Custom default branch"
+        inputs:
+          projectPath: "/tmp/new_project"
+          options:
+            defaultBranch: "develop"
+        expected_output:
+          branch: "develop"
+
+      - name: "throws on existing repo"
+        scenario: "Already initialized"
+        inputs:
+          projectPath: "/tmp/existing_repo"
+        expected_output:
+          error: ConflictError
+
+    edge_cases:
+      - "Empty directory"
+      - "Directory with many files"
+      - "Path with spaces"
+      - "No write permission"
+
+    integration_tests:
+      - "Init and verify git status works"
+      - "Init and make subsequent commits"
+
+  llm_guidance:
+    implementation_hints: |
+      1. Use simple-git library for Git operations
+      2. Provide sensible .gitignore templates
+      3. Handle Git not installed gracefully
+      4. Set user.name and user.email if not configured
+      5. Log initialization for debugging
+
+    key_considerations:
+      - "Check for existing repository first"
+      - "Use 'main' as default branch (modern convention)"
+      - "Include comprehensive .gitignore"
+      - "Initial commit is optional but recommended"
+      - "Handle permission errors"
+
+    example_code: |
+      const simpleGit = require('simple-git');
+      const fs = require('fs');
+      const path = require('path');
+      
+      const GITIGNORE_TEMPLATES = {
+        node: `
+      # Dependencies
+      node_modules/
+      
+      # Build
+      dist/
+      build/
+      
+      # Environment
+      .env
+      .env.local
+      
+      # IDE
+      .idea/
+      .vscode/
+      *.swp
+      
+      # OS
+      .DS_Store
+      Thumbs.db
+      
+      # Logs
+      *.log
+      logs/
+      
+      # OinkerUI specific
+      .venv/
+      __pycache__/
+      *.pyc
+      `.trim(),
+        
+        python: `
+      # Virtual environment
+      .venv/
+      venv/
+      
+      # Python
+      __pycache__/
+      *.pyc
+      *.pyo
+      
+      # Environment
+      .env
+      
+      # IDE
+      .idea/
+      .vscode/
+      `.trim()
+      };
+      
+      async function initRepository(projectPath, options = {}) {
+        // Validate
+        if (!fs.existsSync(projectPath)) {
+          throw new ValidationError('Project path does not exist');
+        }
+        
+        const stats = fs.statSync(projectPath);
+        if (!stats.isDirectory()) {
+          throw new ValidationError('Project path is not a directory');
+        }
+        
+        // Check existing
+        const gitPath = path.join(projectPath, '.git');
+        if (fs.existsSync(gitPath)) {
+          throw new ConflictError('Repository already exists');
+        }
+        
+        const git = simpleGit(projectPath);
+        
+        // Initialize
+        await git.init();
+        
+        // Set branch
+        const defaultBranch = options.defaultBranch || 'main';
+        await git.branch(['-M', defaultBranch]);
+        
+        // Create .gitignore
+        const template = options.gitignoreTemplate || 'node';
+        const gitignoreContent = GITIGNORE_TEMPLATES[template] || GITIGNORE_TEMPLATES.node;
+        fs.writeFileSync(
+          path.join(projectPath, '.gitignore'),
+          gitignoreContent
+        );
+        
+        // Initial commit
+        let initialCommitHash = null;
+        if (options.initialCommit !== false) {
+          await git.add('.');
+          const result = await git.commit('Initial commit');
+          initialCommitHash = result.commit;
+        }
+        
+        return {
+          success: true,
+          path: projectPath,
+          branch: defaultBranch,
+          initialCommitHash
+        };
+      }
+
+    common_mistakes:
+      - "Not checking for existing repository"
+      - "Using 'master' instead of 'main'"
+      - "Forgetting .gitignore"
+      - "Not handling Git not installed"
+      - "Not setting default branch"
+
+  references:
+    - "spec/modules/git_integration.yaml"
+    - "https://github.com/steveukx/git-js"
