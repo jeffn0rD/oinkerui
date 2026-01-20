@@ -1,0 +1,57 @@
+{
+  "name": "oinkerui",
+  "version": "1.0.0",
+  "description": "An LLM-assisted development workbench that provides an interactive chat interface for building software projects with AI assistance",
+  "main": "backend/src/index.js",
+  "type": "commonjs",
+  "directories": {
+    "doc": "docs",
+    "man": "man",
+    "test": "tests"
+  },
+  "scripts": {
+    "dev": "nodemon backend/src/index.js",
+    "start": "node backend/src/index.js",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "lint": "eslint backend/src",
+    "lint:fix": "eslint backend/src --fix",
+    "format": "prettier --write backend/src"
+  },
+  "dependencies": {
+    "fastify": "^4.26.0",
+    "@fastify/cors": "^9.0.0",
+    "@fastify/static": "^7.0.0",
+    "simple-git": "^3.22.0",
+    "axios": "^1.6.0",
+    "uuid": "^9.0.0",
+    "date-fns": "^3.3.0",
+    "tiktoken": "^1.0.0",
+    "slugify": "^1.6.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.0",
+    "eslint": "^9.0.0",
+    "prettier": "^3.0.0",
+    "jest": "^30.0.0",
+    "supertest": "^6.3.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jeffn0rD/oinkerui.git"
+  },
+  "keywords": [
+    "llm",
+    "ai",
+    "development",
+    "workbench",
+    "chat",
+    "assistant"
+  ],
+  "author": "NinjaTech AI",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/jeffn0rD/oinkerui/issues"
+  },
+  "homepage": "https://github.com/jeffn0rD/oinkerui#readme"
+}
