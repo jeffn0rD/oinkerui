@@ -47,6 +47,36 @@ prompt_guidance: 'Always follow these guidelines and update project documentatio
   '
 current:
 - task:
+    id: 0.2.5
+    name: Specification refinement planning
+    goal: Generate a list of prompts to update and refine the specifications to full detail.    
+    files:
+    - spec/domain.yaml
+    - spec/commands.yaml
+    - spec/apis.yaml
+    - spec/ui.yaml
+    - spec/workflows.yaml
+    
+    details:
+      focus:
+      - "Domain modeling & vocabulary"
+      - "State model & invariants"
+      - "Workflows & data flows"
+      - "Interaction design (screens / APIs)"
+      - "Modules, functions, api endpoints"
+      - "Function contracts, inputs, outputs, side effects, and algorithm FOL"
+      verification:
+      - verify any references in new/modified spec files are valid; graphs for review
+      guidance: |
+        Existing spec file detail must cover the entire application specification through (at least) phase 2.  New spec files need to be generated
+        for module specifications which will encapsulate function details.  Graphs need to be generated for domain/data model, state management, workflows, interaction, modules.
+        The files must contain links and references so they can be checked for consistency by deterministic tools.  
+        Module specs must clearly outline the module role, its interaction with other parts of the system, what data entities are used and how, interaction with system state,
+        and the functions of its implementation.  Functions need to have full contracts defined, inputs, outputs, side effects.  Function algorithms must be defined in first order logic and a complexity rating should be provided to assist with development planning.  Functions and modules should additionally have 'LLM prompt guidance' defined in order to assist an LLM agent with generating the required code.  This information needs to be enough to deterministically create the module and its function prototypes, and then spawn coding agents to complete the function implementation.  
+        Output a new set of tasks (at least 6) with corresponding prompts and, for modules/functions/algorithms a schema for the new (yaml) file structures.  Specify how everything will be linked together and verification strategy.  Graphs (mermaid) need to generated for each step as well for human review.
+        New tasks should be numbered 0.2.5.n and added to master_todo.yaml
+      
+- task:
     id: 0.3
     name: Initialize Node.js Project
     goal: Initialize Node.js project with package.json and configure dependencies.
