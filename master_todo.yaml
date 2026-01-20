@@ -58,26 +58,6 @@ current:
       - npm run dev in frontend/
       - npm run build works
 - task:
-    id: 0.7
-    name: Create Build and Development Scripts
-    goal: Create build scripts, development scripts, and utility scripts.
-    prompt: ./prompts/dev/prompt_0_7_updated.md
-    files:
-    - prompts/dev/prompt_0_7_updated.md
-    - spec/workflows.yaml
-    - spec/modules/backend_node.yaml
-    - spec/modules/backend_python_tools.yaml
-    - spec/modules/frontend_svelte.yaml
-    details:
-      focus:
-      - Development scripts (dev.sh, dev.bat)
-      - Build scripts
-      - Utility scripts (setup, test, lint)
-      verification:
-      - Run npm run dev
-      - Run npm run build
-      - Test all scripts
-- task:
     id: 0.8
     name: Create Testing Infrastructure
     goal: Set up testing infrastructure for frontend (Vitest), Node.js backend (Jest), and Python backend (pytest).
