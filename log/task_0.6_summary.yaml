@@ -72,11 +72,11 @@ deliverables:
 
 dependencies_installed:
   node:
-    - dotenv: "17.2.3" (environment variable loading)
+    dotenv: "17.2.3"
   
   python:
-    - pydantic-settings: "2.12.0" (configuration management)
-    - python-dotenv: "1.2.1" (already installed)
+    pydantic_settings: "2.12.0"
+    python_dotenv: "1.2.1"
 
 environment_variables:
   server:
