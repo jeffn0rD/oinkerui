@@ -9,20 +9,7 @@
 
 The following issues were detected during task cleanup verification:
 
-1. **ERROR**: Task 0.6 not in tasks_completed.yaml
-   - File: `log/tasks_completed.yaml`
-   - Action: Add task 0.6 to tasks_completed.yaml
-
-2. **ERROR**: Completed task missing 'completed_date'
-   - File: `log/tasks_completed.yaml`
-
-3. **ERROR**: Completed task missing 'completed_date'
-   - File: `log/tasks_completed.yaml`
-
-4. **ERROR**: Completed task missing 'completed_date'
-   - File: `log/tasks_completed.yaml`
-
-5. **ERROR**: while parsing a block mapping
+1. **ERROR**: while parsing a block mapping
   in "<unicode string>", line 1, column 1:
     comment: 'Could you please add t ... 
     ^
@@ -35,7 +22,7 @@ expected <block end>, but found ','
 
 ## Required Actions
 
-- Add task 0.6 to tasks_completed.yaml
+See issues list above
 
 ## Verification Steps
 
@@ -62,7 +49,7 @@ After making the repairs:
 
 ## Context
 
-Task 0.6 cleanup found 5 issue(s) that need to be resolved.
+Task 0.6 cleanup found 1 issue(s) that need to be resolved.
 
 ## Prompt Guidance (Repair Scope)
 
@@ -86,7 +73,6 @@ After repairs:
 
 ## Files to Modify
 
-- log/tasks_completed.yaml
 - node_modules/avvio/.github/tests_checker.yml
 
 ## Reference Documentation

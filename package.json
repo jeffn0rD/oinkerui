@@ -10,13 +10,19 @@
     "test": "tests"
   },
   "scripts": {
-    "dev": "nodemon backend/src/index.js",
-    "start": "node backend/src/index.js",
-    "test": "jest",
+    "dev": "bash scripts/dev.sh",
+    "dev:frontend": "bash scripts/dev-frontend.sh",
+    "dev:backend": "bash scripts/dev-backend.sh",
+    "dev:python": "bash scripts/dev-python.sh",
+    "build": "bash scripts/build.sh",
+    "setup": "bash scripts/setup.sh",
+    "test": "bash scripts/test.sh",
     "test:watch": "jest --watch",
-    "lint": "eslint backend/src",
+    "lint": "bash scripts/lint.sh",
     "lint:fix": "eslint backend/src --fix",
-    "format": "prettier --write backend/src"
+    "format": "bash scripts/format.sh",
+    "clean": "bash scripts/clean.sh",
+    "start": "node backend/src/index.js"
   },
   "dependencies": {
     "@fastify/cors": "^9.0.0",
