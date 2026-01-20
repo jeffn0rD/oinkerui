@@ -1,39 +1,21 @@
-version: 0.1.0
-title: "Workflows Specification"
-summary: >
-  Formal model for agentic workflows as DAGs of steps (prompts, tools, file
-  operations, sub-workflows), including configuration, data flow, execution
-  semantics, and future scheduling. This spec is referenced by the main
-  application spec and is intended to guide implementation of workflow storage,
-  execution engines, and UI builders.
+# =============================================================================
+# Workflows Specification
+# =============================================================================
 
+version: "1.0.0"
+title: Workflows Specification
 description: |
-  This document defines the workflow model used by the Local LLM Project
-  Workbench. Workflows are:
-
-    - Project-scoped or global.
-    - Represented as Directed Acyclic Graphs (DAGs) of steps.
-    - Steps represent individual operations (LLM prompts, tool calls, file
-      operations, or nested workflows).
-    - Edges represent data or control dependencies between steps.
-
-  The model is designed to:
-
-    - Be fully declarative and stored as YAML/JSON files under project/global
-      directories.
-    - Be machine-readable and suitable for LLM-based generation and editing.
-    - Support a basic text-only representation in early phases and a visual
-      DAG builder in later phases.
-    - Integrate with project data entities, tools, and prompt templates.
-
-  This specification is high-level and behavioral. Low-level schemas and
-  function signatures for workflow engines and UI components should be derived
-  from this document and the global /spec/domain.yaml and /spec/apis.yaml.
+  Formal model for agentic workflows as DAGs of steps (prompts, tools, file 
+  operations, sub-workflows), including configuration, data flow, execution 
+  semantics, and future scheduling. This spec includes both the abstract model
+  and concrete workflow implementations for Phase 1-2.
 
 references:
   domain_spec: "./domain.yaml"
   config_spec: "./config.yaml"
   ui_spec: "./ui.yaml"
+  apis_spec: "./apis.yaml"
+  state_machines: "./state_machines.yaml"
 
 tags:
   - workflows
@@ -42,9 +24,9 @@ tags:
   - agentic
   - yaml
 
-###############################################################################
-# 1. CONCEPTUAL MODEL
-###############################################################################
+# =============================================================================
+# ABSTRACT WORKFLOW MODEL
+# =============================================================================
 
 model:
   overview: |
@@ -57,529 +39,1428 @@ model:
       - Optional metadata for UI layout and visualization.
 
     Steps are typed units of work. Supported step types:
-
-      - prompt: send a prompt to an LLM model, optionally using templates and
-        data entities, and store the result in a variable or entity.
-
-      - tool: invoke a tool (e.g., /execute, stream-to-file, custom data tools)
-        with parameters that may depend on prior steps' outputs.
-
-      - file_op: perform filesystem-related operations on project data
-        entities or files (copy, move, transform, etc.).
-
-      - sub_workflow: invoke another workflow as a reusable component.
+      - prompt: send a prompt to an LLM model
+      - tool: invoke a tool or function
+      - file_op: perform filesystem operations
+      - sub_workflow: invoke another workflow
+      - validation: validate inputs
+      - computation: perform calculations
+      - external: call external services
+      - event: emit events
+      - return: return results
 
   workflow_entity:
     fields:
       id:
         type: string
-        description: "Unique workflow identifier (within global or project scope)."
+        description: "Unique workflow identifier"
       name:
         type: string
-        description: "Human-readable workflow name."
+        description: "Human-readable workflow name"
       description:
         type: string
-        description: "Optional long-form description."
+        description: "Detailed workflow description"
       scope:
         type: enum
         values: [global, project]
-        description: "Where the workflow is defined and applicable."
       project_id:
         type: uuid
         nullable: true
-        description: "Required when scope=project; refers to Project.id."
       version:
         type: string
-        description: "Semantic version or simple integer for workflow evolution."
-      nodes:
+      phase:
+        type: integer
+        description: "Implementation phase (1, 2, 3, 4)"
+      trigger:
+        type: string
+        description: "What initiates this workflow"
+      steps:
         type: list
-        items: "Step"
+        items: Step
       edges:
         type: list
-        items: "Edge"
-      schedule:
+        items: Edge
+      data_flow:
+        type: list
+        items: DataFlowEdge
+      error_handling:
         type: object
-        nullable: true
-        description: "Scheduling configuration (Phase 4+)."
+      state_changes:
+        type: list
+        items: StateChange
+      rollback_strategy:
+        type: object
       metadata:
         type: object
-        description: "UI layout hints, tags, authorship, etc."
 
   step_entity:
     fields:
       id:
         type: string
-        description: "Unique step id within this workflow."
       name:
         type: string
-        description: "Human-readable step name."
       type:
         type: enum
-        values: [prompt, tool, file_op, sub_workflow]
+        values: [validation, io, data, computation, external, event, return, prompt, tool, file_op, sub_workflow]
       description:
         type: string
-      config:
-        type: object
-        description: "Type-specific configuration (see step_types)."
       inputs:
         type: list
-        items: "InputBinding"
-        description: "Logical inputs from previous steps or entities."
+        items: InputBinding
       outputs:
         type: list
-        items: "OutputBinding"
-        description: "Logical outputs to be made available to other steps."
+        items: OutputBinding
+      function:
+        type: string
+        description: "Reference to function specification"
+      config:
+        type: object
       on_error:
-        type: object
+        type: string
+        description: "Error handler reference"
+      condition:
+        type: string
         nullable: true
-        description: "Error handling strategy for the step (e.g., stop, continue, branch)."
-      metadata:
-        type: object
-        description: "Visual or organizational hints (position, grouping)."
+        description: "Conditional execution expression"
 
   edge_entity:
     fields:
       from:
         type: string
-        description: "Source step id."
       to:
         type: string
-        description: "Target step id."
       type:
         type: enum
         values: [data, control]
-        description: "Distinguish data vs pure control dependencies."
+      data:
+        type: string
+        nullable: true
       condition:
         type: string
         nullable: true
-        description: "Optional condition for control edges (Phase 4+)."
 
-  input_binding_entity:
-    fields:
-      name:
-        type: string
-        description: "Logical name used inside the step config."
-      source:
-        type: string
-        description: >
-          Expression referencing a prior step's output, a workflow input, or
-          a data entity. Example:
-            - step:step_id.output:var_name
-            - entity:data_entity_id
-            - workflow_input:input_name
+# =============================================================================
+# CONCRETE WORKFLOWS - PHASE 1
+# =============================================================================
 
-  output_binding_entity:
-    fields:
-      name:
-        type: string
-        description: "Logical name for the output."
-      target:
-        type: string
-        description: >
-          Expression referencing a workflow variable, a data entity, or a
-          transient variable used by later steps. Example:
-            - var:var_name
-            - entity:data_entity_id
-            - file:path/relative/to/project
+concrete_workflows:
+  # ---------------------------------------------------------------------------
+  # Create Project Workflow
+  # ---------------------------------------------------------------------------
+  create_project_workflow:
+    id: create_project
+    name: "Create Project Workflow"
+    description: "Complete workflow for creating a new project with Git initialization"
+    phase: 1
+    scope: global
+    trigger: "User clicks 'Create Project' and submits form"
 
-###############################################################################
-# 2. STEP TYPES AND CONFIGURATION
-###############################################################################
+    steps:
+      - id: validate_input
+        name: "Validate Input"
+        type: validation
+        description: "Validate project name and options against constraints"
+        inputs:
+          - name: project_name
+            type: string
+            source: user_input
+          - name: options
+            type: CreateProjectOptions
+            source: user_input
+        validation_rules:
+          - rule: "name matches pattern ^[a-zA-Z0-9][a-zA-Z0-9_\\- ]*$"
+            error: "INVALID_PROJECT_NAME"
+          - rule: "name length between 1 and 100"
+            error: "NAME_TOO_LONG"
+          - rule: "slug is unique among active projects"
+            error: "PROJECT_EXISTS"
+        outputs:
+          - validated_input
+          - generated_slug
+        on_error: return_validation_errors
 
-step_types:
-  prompt:
-    description: |
-      A step that sends a prompt to an LLM model. It may reference a prompt
-      template, variables from previous steps, and data entities. The result
-      can be stored in variables, data entities, or files.
+      - id: generate_ids
+        name: "Generate IDs"
+        type: computation
+        description: "Generate project ID and slug"
+        inputs:
+          - name: validated_input
+            source: validate_input.validated_input
+        function: "backend_node.generate_project_ids"
+        outputs:
+          - project_id
+          - slug
+          - project_path
 
-    config_fields:
-      model_id:
-        type: string
-        description: "Model identifier from /spec/config.yaml."
-      system_prelude:
-        type: string
-        nullable: true
-        description: "Optional system message specific to this step."
-      template_id:
-        type: string
-        nullable: true
-        description: "Reference to a global or project prompt template."
-      inline_prompt:
-        type: string
-        nullable: true
-        description: "Raw prompt text (if no template is used)."
-      variables:
-        type: object
-        description: >
-          Key: variable name used within template.
-          Value: expression referencing workflow/state (e.g., previous outputs).
-      output_format_hint:
-        type: enum
-        values: [text, markdown, json]
-        default: text
-      store_output:
-        type: list
-        items: "OutputBinding"
-        description: "Bindings specifying where the LLM result is stored."
+      - id: create_directory
+        name: "Create Directory"
+        type: io
+        description: "Create project directory structure"
+        inputs:
+          - name: project_path
+            source: generate_ids.project_path
+        function: "backend_node.create_project_directory"
+        outputs:
+          - directory_created
+          - subdirectories
+        on_error: cleanup_and_fail
 
-    llm_behavior_notes: |
-      - Steps may be configured to prefer JSON output (output_format_hint=json).
-      - Short system prompts can instruct the model to strictly adhere to
-        JSON format; however, enforcement and recovery must be done outside
-        the model (best-effort parsing, retries).
+      - id: init_git
+        name: "Initialize Git"
+        type: external
+        description: "Initialize Git repository in project directory"
+        inputs:
+          - name: project_path
+            source: generate_ids.project_path
+        function: "git_integration.init_repository"
+        config:
+          initial_commit: true
+          gitignore_template: "node"
+          default_branch: "main"
+        outputs:
+          - git_initialized
+          - initial_commit_hash
+        on_error: cleanup_directory_and_fail
 
-  tool:
-    description: |
-      A step that invokes a tool, which may be:
-        - a Python FastAPI endpoint (e.g., execute code, stream to file),
-        - a Node builtin (e.g., git operations),
-        - or a custom extension registered in the global tools registry.
+      - id: create_metadata
+        name: "Create Metadata"
+        type: data
+        description: "Create project.json metadata file"
+        inputs:
+          - name: validated_input
+            source: validate_input.validated_input
+          - name: project_id
+            source: generate_ids.project_id
+          - name: slug
+            source: generate_ids.slug
+          - name: project_path
+            source: generate_ids.project_path
+        function: "backend_node.create_project_metadata"
+        outputs:
+          - project_object
+          - metadata_file_path
+        on_error: cleanup_all_and_fail
 
-    config_fields:
-      tool_id:
-        type: string
-        description: "Identifier mapping to a tool definition."
-      args:
-        type: object
-        description: "Arguments for the tool; values may be expressions."
-      store_output:
-        type: list
-        items: "OutputBinding"
+      - id: add_to_index
+        name: "Add to Index"
+        type: data
+        description: "Add project to global project index"
+        inputs:
+          - name: project_object
+            source: create_metadata.project_object
+        function: "backend_node.add_to_project_index"
+        outputs:
+          - index_updated
+        on_error: cleanup_all_and_fail
 
-    examples:
-      - name: "Execute Python Script"
-        config_example:
-          tool_id: "python_execute"
-          args:
-            language: "python"
-            code: "{{ inputs.script_code }}"
-          store_output:
-            - name: "stdout"
-              target: "var:script_stdout"
+      - id: emit_event
+        name: "Emit Event"
+        type: event
+        description: "Emit project_created event for logging and UI"
+        inputs:
+          - name: project_object
+            source: create_metadata.project_object
+        function: "logging_and_metrics.emit_event"
+        config:
+          event_type: "project_created"
+        outputs:
+          - event_id
 
-  file_op:
-    description: |
-      A step that manipulates files or data entities: copy, move, transform,
-      serialize, deserialize, etc. It acts as a bridge between workflow
-      variables and persistent project data.
+      - id: return_result
+        name: "Return Result"
+        type: return
+        description: "Return created project to caller"
+        inputs:
+          - name: project_object
+            source: create_metadata.project_object
+        outputs:
+          - project
 
-    config_fields:
-      operation:
-        type: enum
-        values: [copy, move, delete, transform, serialize, deserialize]
-      source:
-        type: string
-        description: "Path or entity reference (may be expression-based)."
-      destination:
-        type: string
-        nullable: true
-        description: "Path or entity reference; depending on operation."
-      transform:
-        type: string
-        nullable: true
-        description: "Optional named transform (e.g., format conversion)."
-      options:
-        type: object
-        description: "Additional operation-specific options."
-      store_output:
-        type: list
-        items: "OutputBinding"
+    data_flow:
+      - from: validate_input
+        to: generate_ids
+        data: validated_input
 
-  sub_workflow:
-    description: |
-      A step that invokes another workflow as a callable unit. This supports
-      reuse of common patterns or complex sequences.
+      - from: generate_ids
+        to: create_directory
+        data: project_path
 
-    config_fields:
-      workflow_ref:
-        type: string
-        description: "Workflow id being invoked."
-      inputs:
-        type: object
-        description: "Mapping from current workflow context to sub-workflow inputs."
-      propagate_outputs:
-        type: boolean
-        default: true
-        description: "Whether to merge sub-workflow outputs back into parent."
+      - from: generate_ids
+        to: init_git
+        data: project_path
 
-###############################################################################
-# 3. EXECUTION SEMANTICS
-###############################################################################
+      - from: generate_ids
+        to: create_metadata
+        data: [project_id, slug, project_path]
 
-execution:
-  overview: |
-    Workflows are executed by interpreting the DAG in topological order
-    subject to edge constraints. Each step is attempted once its predecessors
-    on incoming edges are completed (and any edge conditions are satisfied).
+      - from: validate_input
+        to: create_metadata
+        data: validated_input
 
-  engine_model:
-    phases:
-      - parse_and_validate
-      - topological_sort
-      - execute_steps
-      - collect_results
+      - from: create_metadata
+        to: add_to_index
+        data: project_object
 
-    parse_and_validate:
-      description: |
-        Validate workflow structure and configs before execution.
-      checks:
-        - Workflow is acyclic.
-        - All step ids are unique.
-        - All edges reference existing steps.
-        - All referenced tools, templates, entities, and workflows exist.
-        - Step configs are well-formed (required fields present).
+      - from: create_metadata
+        to: emit_event
+        data: project_object
 
-      invariants:
-        - "Workflows must be DAGs."
-        - FOL: ∀w (Workflow(w) → ¬∃cycle (CycleInGraph(w.nodes, w.edges)))
+      - from: create_metadata
+        to: return_result
+        data: project_object
 
-    topological_sort:
-      description: |
-        Perform a topological sort of steps based on edges. For equal-rank
-        nodes, any deterministic ordering is acceptable.
+    error_handling:
+      return_validation_errors:
+        type: immediate_return
+        steps:
+          - action: format_validation_errors
+          - action: return_400_response
 
-    execute_steps:
-      description: |
-        Traverse steps in topological order; execute each step when all
-        incoming dependencies are satisfied.
+      cleanup_and_fail:
+        type: compensating
+        steps:
+          - action: log_error
+          - action: return_500_response
 
-      step_lifecycle:
-        - pending
-        - running
-        - success
-        - failed
-        - skipped (if downstream and on_error says skip)
+      cleanup_directory_and_fail:
+        type: compensating
+        steps:
+          - action: delete_project_directory
+            condition: "directory_created"
+          - action: log_error
+          - action: return_500_response
 
-      error_handling:
-        default: "stop_on_error"
-        options:
-          - stop_on_error
-          - continue_on_error
-          - branch_on_error  # Phase 4+ (conditional edges)
+      cleanup_all_and_fail:
+        type: compensating
+        steps:
+          - action: remove_from_index
+            condition: "index_updated"
+          - action: delete_metadata_file
+            condition: "metadata_file_path exists"
+          - action: delete_project_directory
+            condition: "directory_created"
+          - action: log_error
+          - action: return_500_response
 
-      state_updates:
-        - On success:
-          - Record step outputs (variables, entity updates, files).
-        - On failure:
-          - Record error.
-          - Apply on_error strategy (stop/continue/branch).
+    state_changes:
+      - entity: Project
+        from: null
+        to: initializing
+        at_step: create_directory
+        trigger: "directory creation started"
 
-    collect_results:
-      description: |
-        At the end of execution, the engine returns:
-          - Per-step status and outputs.
-          - Aggregated workflow outputs (if defined).
-          - Logs for causal linking (e.g., which steps touched which files).
+      - entity: Project
+        from: initializing
+        to: active
+        at_step: add_to_index
+        trigger: "project added to index"
 
-  causal_integration:
-    description: |
-      Each step that invokes LLMs or tools must be logged in a way that can
-      be integrated into the broader causal flow of the system.
+    rollback_strategy:
+      type: compensating_transactions
+      order: reverse
+      steps:
+        - condition: "add_to_index succeeded"
+          action: "remove_from_index"
+        - condition: "create_metadata succeeded"
+          action: "delete_metadata_file"
+        - condition: "init_git succeeded"
+          action: "remove_git_directory"
+        - condition: "create_directory succeeded"
+          action: "delete_project_directory"
 
-    requirements:
-      - For prompt steps:
-        - Create an LLMRequestLogEntry with:
-          - step id in metadata.
-          - messages_included (if mapped to a chat context).
-          - touched_files/entities if applicable.
-      - For tool steps:
-        - Log touched_files and touched_entities in LLMRequestLogEntry or an
-          equivalent tool log structure.
+  # ---------------------------------------------------------------------------
+  # Send Message Workflow
+  # ---------------------------------------------------------------------------
+  send_message_workflow:
+    id: send_message
+    name: "Send Message and Get LLM Response"
+    description: "Complete workflow for sending a user message and receiving LLM response"
+    phase: 1
+    scope: project
+    trigger: "User sends a message in chat"
 
-###############################################################################
-# 4. SCHEDULING (PHASE 4+)
-###############################################################################
+    steps:
+      - id: validate_message
+        name: "Validate Message"
+        type: validation
+        description: "Validate message content and chat state"
+        inputs:
+          - name: raw_text
+            type: string
+            source: user_input
+          - name: project_id
+            type: uuid
+            source: route_params
+          - name: chat_id
+            type: uuid
+            source: route_params
+          - name: options
+            type: SendMessageOptions
+            source: user_input
+        validation_rules:
+          - rule: "raw_text is not empty"
+            error: "EMPTY_MESSAGE"
+          - rule: "project exists and is active"
+            error: "PROJECT_NOT_FOUND"
+          - rule: "chat exists and is active"
+            error: "CHAT_NOT_FOUND"
+          - rule: "chat belongs to project"
+            error: "CHAT_PROJECT_MISMATCH"
+        outputs:
+          - validated_message
+          - project
+          - chat
+        on_error: return_validation_errors
 
-scheduling:
+      - id: check_slash_command
+        name: "Check Slash Command"
+        type: computation
+        description: "Check if message is a slash command"
+        inputs:
+          - name: raw_text
+            source: validate_message.validated_message.raw_text
+        function: "backend_node.is_slash_command"
+        outputs:
+          - is_command
+          - command_prefix
+        branches:
+          - condition: "is_command == true"
+            goto: parse_slash_command
+          - condition: "is_command == false"
+            goto: create_user_message
+
+      - id: parse_slash_command
+        name: "Parse Slash Command"
+        type: computation
+        description: "Parse slash command from input"
+        condition: "check_slash_command.is_command == true"
+        inputs:
+          - name: raw_text
+            source: validate_message.validated_message.raw_text
+        function: "backend_node.parse_slash_command"
+        outputs:
+          - parsed_command
+        on_error: return_unknown_command_error
+
+      - id: execute_command
+        name: "Execute Command"
+        type: external
+        description: "Execute the parsed slash command"
+        condition: "check_slash_command.is_command == true"
+        inputs:
+          - name: parsed_command
+            source: parse_slash_command.parsed_command
+          - name: context
+            source: validate_message
+        function: "backend_node.execute_command"
+        outputs:
+          - command_result
+        on_error: return_command_error
+
+      - id: return_command_result
+        name: "Return Command Result"
+        type: return
+        description: "Return command execution result"
+        condition: "check_slash_command.is_command == true"
+        inputs:
+          - name: command_result
+            source: execute_command.command_result
+        outputs:
+          - response
+
+      - id: create_user_message
+        name: "Create User Message"
+        type: data
+        description: "Create and save user message"
+        condition: "check_slash_command.is_command == false"
+        inputs:
+          - name: validated_message
+            source: validate_message.validated_message
+          - name: chat
+            source: validate_message.chat
+        function: "backend_node.create_message"
+        config:
+          role: user
+        outputs:
+          - user_message
+        on_error: return_save_error
+
+      - id: save_user_message
+        name: "Save User Message"
+        type: io
+        description: "Persist user message to chat storage"
+        inputs:
+          - name: chat_id
+            source: validate_message.chat.id
+          - name: message
+            source: create_user_message.user_message
+        function: "backend_node.save_message"
+        outputs:
+          - saved_user_message
+        on_error: return_save_error
+
+      - id: check_pure_aside
+        name: "Check Pure Aside"
+        type: computation
+        description: "Check if message is pure aside (no LLM call)"
+        inputs:
+          - name: options
+            source: validate_message.validated_message.options
+        outputs:
+          - is_pure_aside
+        branches:
+          - condition: "is_pure_aside == true"
+            goto: return_aside_result
+          - condition: "is_pure_aside == false"
+            goto: construct_context
+
+      - id: return_aside_result
+        name: "Return Aside Result"
+        type: return
+        description: "Return result for pure aside message"
+        condition: "check_pure_aside.is_pure_aside == true"
+        inputs:
+          - name: user_message
+            source: save_user_message.saved_user_message
+        outputs:
+          - response
+
+      - id: construct_context
+        name: "Construct Context"
+        type: computation
+        description: "Build LLM context from chat history"
+        condition: "check_pure_aside.is_pure_aside == false"
+        inputs:
+          - name: chat
+            source: validate_message.chat
+          - name: current_message
+            source: save_user_message.saved_user_message
+          - name: model_id
+            source: validate_message.validated_message.options.model_id
+        function: "backend_node.construct_context"
+        outputs:
+          - context_messages
+          - token_count
+        on_error: return_context_error
+
+      - id: call_llm
+        name: "Call LLM"
+        type: external
+        description: "Call OpenRouter API for LLM response"
+        inputs:
+          - name: context_messages
+            source: construct_context.context_messages
+          - name: model_id
+            source: validate_message.validated_message.options.model_id
+          - name: output_format
+            source: validate_message.validated_message.options.output_format_hint
+        function: "backend_node.call_llm"
+        config:
+          timeout: 60000
+          retry_count: 1
+        outputs:
+          - llm_response
+          - usage
+          - request_id
+        on_error: handle_llm_error
+
+      - id: create_assistant_message
+        name: "Create Assistant Message"
+        type: data
+        description: "Create assistant message from LLM response"
+        inputs:
+          - name: llm_response
+            source: call_llm.llm_response
+          - name: usage
+            source: call_llm.usage
+          - name: chat
+            source: validate_message.chat
+        function: "backend_node.create_message"
+        config:
+          role: assistant
+        outputs:
+          - assistant_message
+
+      - id: save_assistant_message
+        name: "Save Assistant Message"
+        type: io
+        description: "Persist assistant message to chat storage"
+        inputs:
+          - name: chat_id
+            source: validate_message.chat.id
+          - name: message
+            source: create_assistant_message.assistant_message
+        function: "backend_node.save_message"
+        outputs:
+          - saved_assistant_message
+
+      - id: log_request
+        name: "Log Request"
+        type: event
+        description: "Log LLM request for metrics and auditing"
+        inputs:
+          - name: project_id
+            source: validate_message.project.id
+          - name: chat_id
+            source: validate_message.chat.id
+          - name: user_message
+            source: save_user_message.saved_user_message
+          - name: assistant_message
+            source: save_assistant_message.saved_assistant_message
+          - name: usage
+            source: call_llm.usage
+          - name: request_id
+            source: call_llm.request_id
+        function: "logging_and_metrics.log_llm_request"
+        outputs:
+          - request_log
+
+      - id: update_chat_timestamp
+        name: "Update Chat Timestamp"
+        type: data
+        description: "Update chat's updated_at timestamp"
+        inputs:
+          - name: chat_id
+            source: validate_message.chat.id
+        function: "backend_node.update_chat_timestamp"
+        outputs:
+          - updated_chat
+
+      - id: check_auto_commit
+        name: "Check Auto Commit"
+        type: computation
+        description: "Check if auto-commit is enabled"
+        inputs:
+          - name: project
+            source: validate_message.project
+        outputs:
+          - should_auto_commit
+        branches:
+          - condition: "should_auto_commit == true"
+            goto: auto_commit
+          - condition: "should_auto_commit == false"
+            goto: return_result
+
+      - id: auto_commit
+        name: "Auto Commit"
+        type: external
+        description: "Auto-commit changes if policy allows"
+        condition: "check_auto_commit.should_auto_commit == true"
+        inputs:
+          - name: project_path
+            source: validate_message.project.paths.root
+        function: "git_integration.auto_commit"
+        config:
+          message_template: "Auto-commit: Chat message"
+        outputs:
+          - commit_result
+
+      - id: return_result
+        name: "Return Result"
+        type: return
+        description: "Return complete response"
+        inputs:
+          - name: user_message
+            source: save_user_message.saved_user_message
+          - name: assistant_message
+            source: save_assistant_message.saved_assistant_message
+          - name: request_log
+            source: log_request.request_log
+        outputs:
+          - response
+
+    data_flow:
+      - from: validate_message
+        to: check_slash_command
+        data: raw_text
+
+      - from: check_slash_command
+        to: parse_slash_command
+        data: raw_text
+        condition: "is_command"
+
+      - from: parse_slash_command
+        to: execute_command
+        data: parsed_command
+
+      - from: validate_message
+        to: create_user_message
+        data: [validated_message, chat]
+
+      - from: create_user_message
+        to: save_user_message
+        data: user_message
+
+      - from: save_user_message
+        to: construct_context
+        data: saved_user_message
+
+      - from: construct_context
+        to: call_llm
+        data: context_messages
+
+      - from: call_llm
+        to: create_assistant_message
+        data: [llm_response, usage]
+
+      - from: create_assistant_message
+        to: save_assistant_message
+        data: assistant_message
+
+      - from: save_assistant_message
+        to: log_request
+        data: saved_assistant_message
+
+      - from: log_request
+        to: return_result
+        data: request_log
+
+    error_handling:
+      return_validation_errors:
+        type: immediate_return
+        http_status: 400
+        steps:
+          - action: format_validation_errors
+          - action: return_error_response
+
+      return_unknown_command_error:
+        type: immediate_return
+        http_status: 400
+        steps:
+          - action: format_error
+            message: "Unknown command"
+          - action: return_error_response
+
+      return_command_error:
+        type: immediate_return
+        http_status: 400
+        steps:
+          - action: format_command_error
+          - action: return_error_response
+
+      return_save_error:
+        type: immediate_return
+        http_status: 500
+        steps:
+          - action: log_error
+          - action: return_error_response
+
+      return_context_error:
+        type: immediate_return
+        http_status: 500
+        steps:
+          - action: log_error
+          - action: return_error_response
+
+      handle_llm_error:
+        type: graceful_degradation
+        steps:
+          - action: log_llm_error
+          - action: create_error_message
+          - action: save_error_message
+          - action: return_error_response
+            http_status: 502
+
+    state_changes:
+      - entity: Message
+        from: null
+        to: pending
+        at_step: create_user_message
+        trigger: "user message created"
+
+      - entity: Message
+        from: pending
+        to: complete
+        at_step: save_user_message
+        trigger: "user message saved"
+
+      - entity: Message
+        from: null
+        to: pending
+        at_step: create_assistant_message
+        trigger: "assistant message created"
+
+      - entity: Message
+        from: pending
+        to: complete
+        at_step: save_assistant_message
+        trigger: "assistant message saved"
+
+      - entity: LLMRequestLogEntry
+        from: null
+        to: pending
+        at_step: call_llm
+        trigger: "LLM request started"
+
+      - entity: LLMRequestLogEntry
+        from: pending
+        to: success
+        at_step: log_request
+        trigger: "LLM request completed"
+
+  # ---------------------------------------------------------------------------
+  # Execute Slash Command Workflow
+  # ---------------------------------------------------------------------------
+  execute_slash_command_workflow:
+    id: execute_slash_command
+    name: "Execute Slash Command"
+    description: "Workflow for parsing and executing slash commands"
+    phase: 1
+    scope: project
+    trigger: "User enters a message starting with /"
+
+    steps:
+      - id: parse_command
+        name: "Parse Command"
+        type: computation
+        description: "Parse slash command from input"
+        inputs:
+          - name: input
+            type: string
+            source: user_input
+        function: "backend_node.parse_slash_command"
+        outputs:
+          - command
+          - args
+          - options
+          - raw_args
+        on_error: return_parse_error
+
+      - id: validate_command
+        name: "Validate Command"
+        type: validation
+        description: "Validate command exists and arguments are valid"
+        inputs:
+          - name: command
+            source: parse_command.command
+          - name: args
+            source: parse_command.args
+        validation_rules:
+          - rule: "command is registered"
+            error: "UNKNOWN_COMMAND"
+          - rule: "required args are present"
+            error: "MISSING_ARGUMENTS"
+          - rule: "arg types are valid"
+            error: "INVALID_ARGUMENTS"
+        outputs:
+          - validated_command
+        on_error: return_validation_error
+
+      - id: check_permissions
+        name: "Check Permissions"
+        type: validation
+        description: "Check user has permission to execute command"
+        inputs:
+          - name: command
+            source: validate_command.validated_command
+          - name: context
+            source: execution_context
+        validation_rules:
+          - rule: "user has required permissions"
+            error: "PERMISSION_DENIED"
+        outputs:
+          - authorized
+        on_error: return_permission_error
+
+      - id: dispatch_command
+        name: "Dispatch Command"
+        type: computation
+        description: "Route to appropriate command handler"
+        inputs:
+          - name: command
+            source: validate_command.validated_command
+        function: "backend_node.get_command_handler"
+        outputs:
+          - handler
+          - handler_type
+
+      - id: execute_handler
+        name: "Execute Handler"
+        type: external
+        description: "Execute the command handler"
+        inputs:
+          - name: handler
+            source: dispatch_command.handler
+          - name: args
+            source: parse_command.args
+          - name: options
+            source: parse_command.options
+          - name: context
+            source: execution_context
+        function: "backend_node.execute_handler"
+        outputs:
+          - result
+          - side_effects
+        on_error: handle_execution_error
+
+      - id: process_side_effects
+        name: "Process Side Effects"
+        type: computation
+        description: "Process any side effects from command"
+        inputs:
+          - name: side_effects
+            source: execute_handler.side_effects
+        function: "backend_node.process_side_effects"
+        outputs:
+          - processed_effects
+
+      - id: format_result
+        name: "Format Result"
+        type: computation
+        description: "Format command result for display"
+        inputs:
+          - name: result
+            source: execute_handler.result
+          - name: command
+            source: validate_command.validated_command
+        function: "backend_node.format_command_result"
+        outputs:
+          - formatted_result
+
+      - id: return_result
+        name: "Return Result"
+        type: return
+        description: "Return command result"
+        inputs:
+          - name: formatted_result
+            source: format_result.formatted_result
+          - name: side_effects
+            source: process_side_effects.processed_effects
+        outputs:
+          - response
+
+    error_handling:
+      return_parse_error:
+        type: immediate_return
+        http_status: 400
+        message: "Failed to parse command"
+
+      return_validation_error:
+        type: immediate_return
+        http_status: 400
+        message: "Invalid command or arguments"
+
+      return_permission_error:
+        type: immediate_return
+        http_status: 403
+        message: "Permission denied"
+
+      handle_execution_error:
+        type: graceful_degradation
+        steps:
+          - action: log_error
+          - action: format_error_result
+          - action: return_error_response
+
+  # ---------------------------------------------------------------------------
+  # Fork Chat Workflow
+  # ---------------------------------------------------------------------------
+  fork_chat_workflow:
+    id: fork_chat
+    name: "Fork Chat Workflow"
+    description: "Create a new chat by forking from an existing chat"
+    phase: 1
+    scope: project
+    trigger: "User clicks 'Fork Chat'"
+
+    steps:
+      - id: validate_fork_request
+        name: "Validate Fork Request"
+        type: validation
+        description: "Validate fork parameters"
+        inputs:
+          - name: project_id
+            source: route_params
+          - name: chat_id
+            source: route_params
+          - name: from_message_id
+            source: user_input
+          - name: prune_excluded
+            source: user_input
+        validation_rules:
+          - rule: "source chat exists"
+            error: "CHAT_NOT_FOUND"
+          - rule: "from_message_id exists in chat (if provided)"
+            error: "MESSAGE_NOT_FOUND"
+        outputs:
+          - source_chat
+          - fork_point_message
+        on_error: return_validation_error
+
+      - id: load_messages
+        name: "Load Messages"
+        type: io
+        description: "Load messages from source chat"
+        inputs:
+          - name: chat_id
+            source: validate_fork_request.source_chat.id
+          - name: up_to_message_id
+            source: validate_fork_request.fork_point_message.id
+        function: "backend_node.load_messages"
+        outputs:
+          - messages
+
+      - id: filter_messages
+        name: "Filter Messages"
+        type: computation
+        description: "Filter messages based on prune_excluded option"
+        inputs:
+          - name: messages
+            source: load_messages.messages
+          - name: prune_excluded
+            source: user_input.prune_excluded
+        function: "backend_node.filter_fork_messages"
+        outputs:
+          - filtered_messages
+
+      - id: create_new_chat
+        name: "Create New Chat"
+        type: data
+        description: "Create new chat entity"
+        inputs:
+          - name: project_id
+            source: route_params.project_id
+          - name: source_chat
+            source: validate_fork_request.source_chat
+          - name: fork_point_message
+            source: validate_fork_request.fork_point_message
+        function: "backend_node.create_chat"
+        config:
+          name_template: "Fork of {source_chat.name}"
+        outputs:
+          - new_chat
+
+      - id: copy_messages
+        name: "Copy Messages"
+        type: io
+        description: "Copy filtered messages to new chat"
+        inputs:
+          - name: new_chat_id
+            source: create_new_chat.new_chat.id
+          - name: messages
+            source: filter_messages.filtered_messages
+        function: "backend_node.copy_messages"
+        outputs:
+          - copied_count
+
+      - id: emit_event
+        name: "Emit Event"
+        type: event
+        description: "Emit chat_forked event"
+        inputs:
+          - name: source_chat
+            source: validate_fork_request.source_chat
+          - name: new_chat
+            source: create_new_chat.new_chat
+        function: "logging_and_metrics.emit_event"
+        config:
+          event_type: "chat_forked"
+
+      - id: return_result
+        name: "Return Result"
+        type: return
+        inputs:
+          - name: new_chat
+            source: create_new_chat.new_chat
+        outputs:
+          - chat
+
+    state_changes:
+      - entity: Chat
+        from: null
+        to: active
+        at_step: create_new_chat
+        trigger: "forked chat created"
+
+  # ---------------------------------------------------------------------------
+  # Git Commit Workflow
+  # ---------------------------------------------------------------------------
+  git_commit_workflow:
+    id: git_commit
+    name: "Git Commit Workflow"
+    description: "Commit changes to project Git repository"
+    phase: 1
+    scope: project
+    trigger: "User clicks 'Commit' or auto-commit triggered"
+
+    steps:
+      - id: validate_request
+        name: "Validate Request"
+        type: validation
+        description: "Validate commit request"
+        inputs:
+          - name: project_id
+            source: route_params
+          - name: message
+            source: user_input
+          - name: files
+            source: user_input
+        validation_rules:
+          - rule: "project exists and is active"
+            error: "PROJECT_NOT_FOUND"
+          - rule: "message is not empty"
+            error: "EMPTY_COMMIT_MESSAGE"
+        outputs:
+          - project
+          - commit_message
+          - files_to_commit
+
+      - id: get_status
+        name: "Get Status"
+        type: external
+        description: "Get current Git status"
+        inputs:
+          - name: project_path
+            source: validate_request.project.paths.root
+        function: "git_integration.get_status"
+        outputs:
+          - status
+          - has_changes
+
+      - id: check_changes
+        name: "Check Changes"
+        type: computation
+        description: "Check if there are changes to commit"
+        inputs:
+          - name: has_changes
+            source: get_status.has_changes
+          - name: files_to_commit
+            source: validate_request.files_to_commit
+        outputs:
+          - should_commit
+        branches:
+          - condition: "should_commit == false"
+            goto: return_no_changes
+          - condition: "should_commit == true"
+            goto: stage_files
+
+      - id: return_no_changes
+        name: "Return No Changes"
+        type: return
+        condition: "check_changes.should_commit == false"
+        outputs:
+          - name: response
+            value:
+              committed: false
+              reason: "no_changes"
+
+      - id: stage_files
+        name: "Stage Files"
+        type: external
+        description: "Stage files for commit"
+        condition: "check_changes.should_commit == true"
+        inputs:
+          - name: project_path
+            source: validate_request.project.paths.root
+          - name: files
+            source: validate_request.files_to_commit
+        function: "git_integration.stage_files"
+        outputs:
+          - staged_files
+
+      - id: create_commit
+        name: "Create Commit"
+        type: external
+        description: "Create Git commit"
+        inputs:
+          - name: project_path
+            source: validate_request.project.paths.root
+          - name: message
+            source: validate_request.commit_message
+        function: "git_integration.commit"
+        outputs:
+          - commit_hash
+          - commit_message
+
+      - id: log_commit
+        name: "Log Commit"
+        type: event
+        description: "Log commit event"
+        inputs:
+          - name: project_id
+            source: validate_request.project.id
+          - name: commit_hash
+            source: create_commit.commit_hash
+          - name: files
+            source: stage_files.staged_files
+        function: "logging_and_metrics.emit_event"
+        config:
+          event_type: "git_commit"
+
+      - id: return_result
+        name: "Return Result"
+        type: return
+        inputs:
+          - name: commit_hash
+            source: create_commit.commit_hash
+          - name: message
+            source: create_commit.commit_message
+          - name: files
+            source: stage_files.staged_files
+        outputs:
+          - response
+
+  # ---------------------------------------------------------------------------
+  # Template Render Workflow
+  # ---------------------------------------------------------------------------
+  template_render_workflow:
+    id: template_render
+    name: "Template Render Workflow"
+    description: "Render a Jinja2 template with variables"
+    phase: 1
+    scope: global
+    trigger: "User selects template and provides variables"
+
+    steps:
+      - id: validate_request
+        name: "Validate Request"
+        type: validation
+        description: "Validate template and variables"
+        inputs:
+          - name: template_id
+            source: route_params
+          - name: variables
+            source: user_input
+        validation_rules:
+          - rule: "template exists"
+            error: "TEMPLATE_NOT_FOUND"
+        outputs:
+          - template
+          - variables
+
+      - id: load_template
+        name: "Load Template"
+        type: io
+        description: "Load template content"
+        inputs:
+          - name: template_id
+            source: validate_request.template.id
+        function: "backend_node.load_template"
+        outputs:
+          - template_content
+          - required_variables
+
+      - id: validate_variables
+        name: "Validate Variables"
+        type: validation
+        description: "Validate all required variables are provided"
+        inputs:
+          - name: required_variables
+            source: load_template.required_variables
+          - name: provided_variables
+            source: validate_request.variables
+        validation_rules:
+          - rule: "all required variables provided"
+            error: "MISSING_VARIABLE"
+        outputs:
+          - validated_variables
+
+      - id: render_template
+        name: "Render Template"
+        type: external
+        description: "Render template with Jinja2"
+        inputs:
+          - name: template_content
+            source: load_template.template_content
+          - name: variables
+            source: validate_variables.validated_variables
+        function: "backend_python_tools.render_template"
+        outputs:
+          - rendered_content
+          - variables_used
+          - warnings
+        on_error: handle_render_error
+
+      - id: return_result
+        name: "Return Result"
+        type: return
+        inputs:
+          - name: content
+            source: render_template.rendered_content
+          - name: variables_used
+            source: render_template.variables_used
+          - name: warnings
+            source: render_template.warnings
+        outputs:
+          - response
+
+    error_handling:
+      handle_render_error:
+        type: immediate_return
+        http_status: 400
+        steps:
+          - action: format_template_error
+          - action: return_error_response
+
+# =============================================================================
+# PHASE 2 WORKFLOWS
+# =============================================================================
+
+  # ---------------------------------------------------------------------------
+  # Create Data Entity Workflow
+  # ---------------------------------------------------------------------------
+  create_data_entity_workflow:
+    id: create_data_entity
+    name: "Create Data Entity Workflow"
+    description: "Create and track a new data entity in the project"
+    phase: 2
+    scope: project
+    trigger: "File created or user registers entity"
+
+    steps:
+      - id: validate_entity
+        name: "Validate Entity"
+        type: validation
+        description: "Validate entity data"
+        inputs:
+          - name: project_id
+            source: route_params
+          - name: entity_data
+            source: user_input
+        validation_rules:
+          - rule: "project exists"
+            error: "PROJECT_NOT_FOUND"
+          - rule: "path is within project"
+            error: "INVALID_PATH"
+          - rule: "entity type is valid"
+            error: "INVALID_ENTITY_TYPE"
+        outputs:
+          - project
+          - validated_entity
+
+      - id: check_exists
+        name: "Check Exists"
+        type: io
+        description: "Check if resource exists at path"
+        inputs:
+          - name: project_path
+            source: validate_entity.project.paths.root
+          - name: entity_path
+            source: validate_entity.validated_entity.path
+        function: "backend_node.check_path_exists"
+        outputs:
+          - exists
+          - resource_type
+
+      - id: create_entity_record
+        name: "Create Entity Record"
+        type: data
+        description: "Create data entity record"
+        inputs:
+          - name: project_id
+            source: validate_entity.project.id
+          - name: entity_data
+            source: validate_entity.validated_entity
+          - name: resource_type
+            source: check_exists.resource_type
+        function: "backend_node.create_data_entity"
+        outputs:
+          - entity
+
+      - id: compute_hash
+        name: "Compute Hash"
+        type: computation
+        description: "Compute content hash for tracking"
+        inputs:
+          - name: entity
+            source: create_entity_record.entity
+        function: "backend_node.compute_entity_hash"
+        outputs:
+          - content_hash
+
+      - id: update_entity_hash
+        name: "Update Entity Hash"
+        type: data
+        description: "Update entity with content hash"
+        inputs:
+          - name: entity_id
+            source: create_entity_record.entity.id
+          - name: content_hash
+            source: compute_hash.content_hash
+        function: "backend_node.update_entity"
+        outputs:
+          - updated_entity
+
+      - id: add_to_index
+        name: "Add to Index"
+        type: data
+        description: "Add entity to project index"
+        inputs:
+          - name: entity
+            source: update_entity_hash.updated_entity
+        function: "backend_node.add_entity_to_index"
+        outputs:
+          - indexed
+
+      - id: emit_event
+        name: "Emit Event"
+        type: event
+        description: "Emit entity_created event"
+        inputs:
+          - name: entity
+            source: update_entity_hash.updated_entity
+        function: "logging_and_metrics.emit_event"
+        config:
+          event_type: "entity_created"
+
+      - id: return_result
+        name: "Return Result"
+        type: return
+        inputs:
+          - name: entity
+            source: update_entity_hash.updated_entity
+        outputs:
+          - entity
+
+    state_changes:
+      - entity: DataEntity
+        from: null
+        to: active
+        at_step: create_entity_record
+        trigger: "entity created"
+
+# =============================================================================
+# WORKFLOW EXECUTION ENGINE
+# =============================================================================
+
+execution_engine:
   description: |
-    Workflows may be scheduled to run automatically at specified times or
-    intervals. Scheduling is introduced in Phase 4+ and should be designed
-    to be compatible with both local and server deployments.
+    The workflow execution engine is responsible for:
+    - Loading workflow definitions
+    - Validating workflow structure (DAG, no cycles)
+    - Executing steps in topological order
+    - Managing data flow between steps
+    - Handling errors and rollbacks
+    - Emitting execution events
 
-  schedule_entity:
-    fields:
-      enabled:
-        type: boolean
-        default: false
-      type:
-        type: enum
-        values: [cron, interval, once]
-      cron:
-        type: string
-        nullable: true
-        description: "Standard cron expression if type=cron."
-      interval_seconds:
-        type: integer
-        nullable: true
-        description: "Interval in seconds if type=interval."
-      run_at:
-        type: datetime
-        nullable: true
-        description: "Specific run timestamp if type=once."
-      timezone:
-        type: string
-        default: "UTC"
-      notification:
-        type: object
-        nullable: true
-        description: "Notification configuration (e.g., email)."
+  execution_modes:
+    - mode: synchronous
+      description: "Execute workflow and wait for completion"
+      use_case: "API requests, user actions"
 
-  engine_requirements:
-    - Maintain a registry of workflows with schedules.
-    - Trigger workflow executions accordingly.
-    - Log scheduled executions distinct from user-triggered runs.
+    - mode: asynchronous
+      description: "Queue workflow for background execution"
+      use_case: "Long-running operations, scheduled tasks"
+      phase: 4
 
-###############################################################################
-# 5. STORAGE AND FILE LAYOUT
-###############################################################################
+  step_execution:
+    timeout_default: 30000
+    retry_policy:
+      max_retries: 3
+      backoff: exponential
+      initial_delay: 1000
 
-storage:
-  description: |
-    Workflows are stored as files under the workspace root. There are global
-    workflows and per-project workflows.
+  data_passing:
+    method: "in-memory object references"
+    serialization: "JSON for persistence"
 
-  layout:
-    global:
-      path: "global/workflows/"
-      pattern: "<workflow_id>.yaml"
-    project:
-      path: "projects/<project_id>/data/workflows/"
-      pattern: "<workflow_id>.yaml"
-
-  file_structure:
-    example_workflow_file:
-      description: "A minimal example of a workflow file."
-      example: |
-        id: build_and_test_project
-        name: "Build and Test Project"
-        description: "Run build and tests for the current project."
-        scope: project
-        project_id: <uuid>
-        version: "1.0.0"
-        nodes:
-          - id: step1
-            name: "Install Dependencies"
-            type: tool
-            config:
-              tool_id: "python_execute"
-              args:
-                language: "bash"
-                code: "pip install -r requirements.txt"
-              store_output:
-                - name: stdout
-                  target: "var:pip_output"
-          - id: step2
-            name: "Run Tests"
-            type: tool
-            config:
-              tool_id: "python_execute"
-              args:
-                language: "bash"
-                code: "pytest"
-              store_output:
-                - name: stdout
-                  target: "var:test_output"
-        edges:
-          - from: step1
-            to: step2
-            type: control
-
-###############################################################################
-# 6. UI AND INTERACTION NOTES
-###############################################################################
-
-ui_integration:
-  description: |
-    The UI, as specified in /spec/ui.yaml, must support both a text-based
-    view and a visual DAG builder (Phase 4+).
-
-  phase_3_ui:
-    features:
-      - List workflows per project/global.
-      - Show basic structured view of nodes and edges (textual).
-      - Allow manual editing of workflow YAML files from the UI, with a
-        "Validate" action invoking workflow parse_and_validate.
-
-  phase_4_ui:
-    features:
-      - Visual DAG builder:
-        - Drag-and-drop creation and reordering of steps.
-        - Connect steps with edges.
-        - Edit step configs in side panels.
-      - Synchronization with YAML:
-        - Any change in the visual builder should update the YAML file.
-        - Any change to YAML should refresh the graph representation.
-
-  llm_guidance_for_ui_generation: |
-    - When generating UI code for workflow editors:
-      - Use a declarative representation derived from this workflows.yaml.
-      - Ensure editor prevents creation of cycles (e.g., disallow edges that
-        would create cycles).
-      - Provide clear feedback on validation errors (missing tool_id, invalid
-        references, etc.).
-
-###############################################################################
-# 7. LOGICAL INVARIANTS (FIRST-ORDER LOGIC)
-###############################################################################
-
-invariants:
-  description: |
-    These FOL annotations formalize critical properties that must hold for
-    all valid workflows.
-
-  list:
-    - name: WorkflowIsAcyclic
-      formula: |
-        ∀w (Workflow(w) → ¬∃cycle (CycleInGraph(w.nodes, w.edges)))
-      comment: "No workflow may contain a cycle in its step dependency graph."
-
-    - name: AllEdgesReferenceExistingSteps
-      formula: |
-        ∀w,e (Workflow(w) ∧ Edge(e) ∧ e ∈ w.edges →
-          ∃s1,s2 (Step(s1) ∧ Step(s2) ∧ s1 ∈ w.nodes ∧ s2 ∈ w.nodes ∧
-                  e.from = s1.id ∧ e.to = s2.id))
-      comment: "Every edge in a workflow must reference existing steps."
-
-    - name: StepIdsUniqueWithinWorkflow
-      formula: |
-        ∀w,s1,s2 (Workflow(w) ∧ Step(s1) ∧ Step(s2) ∧
-                  s1 ∈ w.nodes ∧ s2 ∈ w.nodes ∧ s1.id = s2.id → s1 = s2)
-      comment: "Each step id within a workflow must be unique."
-
-    - name: NoDanglingSubWorkflowRefs
-      formula: |
-        ∀w,s (Workflow(w) ∧ Step(s) ∧ s ∈ w.nodes ∧ s.type = sub_workflow →
-          ∃w' (Workflow(w') ∧ w'.id = s.config.workflow_ref))
-      comment: "Every sub_workflow step must reference an existing workflow."
-
-###############################################################################
-# 8. LLM-SPECIFIC GUIDANCE
-###############################################################################
-
-llm_guidance:
-  description: |
-    Guidance for LLM-based agents that generate or modify workflows based
-    on this specification.
-
-  rules:
-    - "When generating workflows, always ensure the DAG remains acyclic."
-    - "Use only step types defined in this spec (prompt, tool, file_op, sub_workflow)."
-    - "Validate references to tools, templates, and data entities against the
-       relevant specs (/spec/commands.yaml, /spec/domain.yaml, /spec/config.yaml)."
-    - "Prefer expressing conditional logic as future extension via conditions
-       on edges, but do not rely on them until Phase 4+."
-
-  patterns:
-    - For simple linear workflows, generate steps with edges in sequence,
-      avoiding unnecessary complexity.
-    - When referencing prompt templates, store template_id and variable mapping
-      explicitly in the step config.
-    - When referencing tools, use tool_id corresponding to registered tools
-      (potentially from a tools registry spec).
-
-  testing:
-    - Generate tests that:
-      - Construct example workflows and verify all invariants.
-      - Perform topological sort and ensure no back-edges.
-      - Execute mock workflows to ensure step execution ordering respects edges.
+  error_recovery:
+    strategies:
+      - name: immediate_return
+        description: "Return error immediately, no cleanup"
+      - name: compensating
+        description: "Execute compensating transactions in reverse order"
+      - name: graceful_degradation
+        description: "Continue with partial results"
+      - name: retry
+        description: "Retry failed step with backoff"

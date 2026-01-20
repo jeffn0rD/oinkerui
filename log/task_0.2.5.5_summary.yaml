@@ -1,0 +1,155 @@
+task_id: "0.2.5.5"
+task_name: "Workflow Implementation Specs"
+status: completed
+completed_at: "2024-01-15"
+
+goal: |
+  Expand workflows.yaml with concrete workflow implementations for Phase 1-2.
+
+deliverables:
+  - file: spec/workflows.yaml
+    description: "Complete workflow specifications with abstract model and concrete implementations"
+    line_count: 1200
+    contents:
+      - Abstract workflow model (entities, steps, edges, data flow)
+      - 7 concrete workflow implementations
+      - Error handling strategies
+      - State change tracking
+      - Rollback strategies
+
+    workflows_defined:
+      phase_1:
+        - id: create_project_workflow
+          name: "Create Project Workflow"
+          steps: 7
+          description: "Complete workflow for creating a new project"
+
+        - id: send_message_workflow
+          name: "Send Message Workflow"
+          steps: 12
+          description: "Process user message with LLM integration"
+
+        - id: execute_slash_command_workflow
+          name: "Execute Slash Command Workflow"
+          steps: 6
+          description: "Parse and execute slash commands"
+
+        - id: fork_chat_workflow
+          name: "Fork Chat Workflow"
+          steps: 8
+          description: "Fork a chat at a specific message"
+
+        - id: git_commit_workflow
+          name: "Git Commit Workflow"
+          steps: 8
+          description: "Auto-commit changes with batching"
+
+        - id: template_render_workflow
+          name: "Template Render Workflow"
+          steps: 6
+          description: "Render Jinja2 template with variables"
+
+      phase_2:
+        - id: create_data_entity_workflow
+          name: "Create Data Entity Workflow"
+          steps: 7
+          description: "Create and index a data entity"
+
+  - file: docs/diagrams/workflow_create_project.mmd
+    description: "Flowchart for create project workflow"
+    elements:
+      - 11 process nodes
+      - 5 error paths
+      - State change annotations
+
+  - file: docs/diagrams/workflow_send_message.mmd
+    description: "Flowchart for send message workflow"
+    elements:
+      - 18 process nodes
+      - Decision points for slash commands and asides
+      - LLM integration path
+      - State change annotations
+
+  - file: docs/diagrams/workflow_fork_chat.mmd
+    description: "Flowchart for fork chat workflow"
+    elements:
+      - 12 process nodes
+      - Fork point handling
+      - Data flow annotations
+
+workflow_components:
+  step_types_used:
+    - validation: "Input validation steps"
+    - io: "File system operations"
+    - data: "Data manipulation"
+    - computation: "Calculations and transformations"
+    - external: "External service calls (Git, LLM)"
+    - event: "Event emission"
+    - return: "Result return"
+
+  error_handling_patterns:
+    - cleanup_and_fail: "Clean up partial work and return error"
+    - rollback_strategy: "Ordered rollback of completed steps"
+    - retry_with_backoff: "Retry transient failures"
+    - return_partial: "Return partial results on non-critical failure"
+
+  state_changes_tracked:
+    - Project: "null → initializing → active"
+    - Chat: "null → active"
+    - Message: "null → pending → complete/error"
+    - LLMRequest: "null → pending → success/error/timeout"
+    - DataEntity: "null → active"
+
+steps_completed:
+  - step: 1
+    action: "Gathered context from existing workflows.yaml"
+    justification: "Understand abstract model before adding concrete implementations"
+
+  - step: 2
+    action: "Expanded workflows.yaml with 7 concrete workflow implementations"
+    justification: "Cover all major Phase 1-2 operations"
+    workflows:
+      - create_project_workflow
+      - send_message_workflow
+      - execute_slash_command_workflow
+      - fork_chat_workflow
+      - git_commit_workflow
+      - template_render_workflow
+      - create_data_entity_workflow
+
+  - step: 3
+    action: "Created workflow diagrams in Mermaid format"
+    justification: "Visual documentation for understanding workflow structure"
+    diagrams:
+      - workflow_create_project.mmd
+      - workflow_send_message.mmd
+      - workflow_fork_chat.mmd
+
+  - step: 4
+    action: "Fixed YAML validation error"
+    justification: "Ensure all files are valid YAML"
+    fix: "Corrected output binding format in git_commit_workflow"
+
+  - step: 5
+    action: "Validated all YAML files"
+    justification: "Ensure specification integrity"
+    result: "52 files valid, 0 invalid"
+
+verification:
+  yaml_validation:
+    files_checked: 52
+    valid: 52
+    invalid: 0
+  
+  workflow_completeness:
+    - All Phase 1 workflows defined
+    - All workflows have steps, data flow, error handling
+    - All workflows reference function specifications
+    - State changes documented for each workflow
+
+notes:
+  - Workflows follow DAG structure per abstract model
+  - Each step references function specifications where applicable
+  - Error handling includes rollback strategies
+  - State changes align with state_machines.yaml definitions
+  - Diagrams use consistent styling with other project diagrams

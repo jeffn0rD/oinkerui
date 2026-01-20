@@ -1,0 +1,74 @@
+%%{init: {'theme': 'dark', 'themeVariables': { 'primaryColor': '#1e3a5f'}}}%%
+
+flowchart TD
+    Start([User Sends Message]) --> Validate[Validate Message]
+    
+    Validate -->|Valid| CheckCmd{Is Slash<br/>Command?}
+    Validate -->|Invalid| Error1[Return Error]
+    
+    CheckCmd -->|Yes| ParseCmd[Parse Command]
+    CheckCmd -->|No| CreateUser[Create User Message]
+    
+    ParseCmd --> ExecCmd[Execute Command]
+    ExecCmd --> ReturnCmd[Return Command Result]
+    ReturnCmd --> End([Complete])
+    
+    CreateUser --> SaveUser[Save User Message]
+    
+    SaveUser --> CheckAside{Is Pure<br/>Aside?}
+    
+    CheckAside -->|Yes| ReturnAside[Return Aside Result]
+    ReturnAside --> End
+    
+    CheckAside -->|No| Context[Construct Context]
+    
+    Context --> CallLLM[Call OpenRouter]
+    
+    CallLLM -->|Success| CreateAssist[Create Assistant Message]
+    CallLLM -->|Error| HandleError[Handle LLM Error]
+    HandleError --> End
+    
+    CreateAssist --> SaveAssist[Save Assistant Message]
+    
+    SaveAssist --> LogReq[Log Request]
+    
+    LogReq --> UpdateChat[Update Chat Timestamp]
+    
+    UpdateChat --> CheckCommit{Auto-commit<br/>Enabled?}
+    
+    CheckCommit -->|Yes| AutoCommit[Auto Commit]
+    CheckCommit -->|No| Return[Return Result]
+    
+    AutoCommit --> Return
+    Return --> End
+    
+    Error1 --> EndError([Error])
+
+    subgraph "State Changes"
+        SC1[Message: null → pending]
+        SC2[Message: pending → complete]
+        SC3[LLMRequest: null → pending]
+        SC4[LLMRequest: pending → success]
+    end
+
+    CreateUser -.-> SC1
+    SaveUser -.-> SC2
+    CallLLM -.-> SC3
+    LogReq -.-> SC4
+
+    style Start fill:#10b981
+    style End fill:#10b981
+    style EndError fill:#ef4444
+    style Validate fill:#3b82f6
+    style CheckCmd fill:#f59e0b
+    style ParseCmd fill:#8b5cf6
+    style ExecCmd fill:#8b5cf6
+    style CreateUser fill:#8b5cf6
+    style SaveUser fill:#f59e0b
+    style Context fill:#8b5cf6
+    style CallLLM fill:#ef4444
+    style CreateAssist fill:#8b5cf6
+    style SaveAssist fill:#f59e0b
+    style LogReq fill:#6366f1
+    style AutoCommit fill:#f59e0b
+    style Return fill:#10b981

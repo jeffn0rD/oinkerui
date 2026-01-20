@@ -1,0 +1,53 @@
+%%{init: {'theme': 'dark', 'themeVariables': { 'primaryColor': '#1e3a5f'}}}%%
+
+flowchart TD
+    Start([User Creates Project]) --> Validate[Validate Input]
+    
+    Validate -->|Valid| GenIDs[Generate IDs]
+    Validate -->|Invalid| Error1[Return Validation Error]
+    
+    GenIDs --> CreateDir[Create Directory]
+    
+    CreateDir -->|Success| InitGit[Initialize Git]
+    CreateDir -->|Fail| Error2[Return Error]
+    
+    InitGit -->|Success| CreateMeta[Create Metadata]
+    InitGit -->|Fail| Cleanup1[Delete Directory]
+    Cleanup1 --> Error3[Return Error]
+    
+    CreateMeta -->|Success| AddIndex[Add to Index]
+    CreateMeta -->|Fail| Cleanup2[Delete Directory]
+    Cleanup2 --> Error4[Return Error]
+    
+    AddIndex -->|Success| EmitEvent[Emit Event]
+    AddIndex -->|Fail| Cleanup3[Full Cleanup]
+    Cleanup3 --> Error5[Return Error]
+    
+    EmitEvent --> Return[Return Project]
+    Return --> End([Complete])
+    
+    Error1 --> EndError([Error])
+    Error2 --> EndError
+    Error3 --> EndError
+    Error4 --> EndError
+    Error5 --> EndError
+
+    subgraph "State Changes"
+        SC1[Project: null → initializing]
+        SC2[Project: initializing → active]
+    end
+
+    CreateDir -.-> SC1
+    AddIndex -.-> SC2
+
+    style Start fill:#10b981
+    style End fill:#10b981
+    style EndError fill:#ef4444
+    style Validate fill:#3b82f6
+    style GenIDs fill:#8b5cf6
+    style CreateDir fill:#f59e0b
+    style InitGit fill:#f59e0b
+    style CreateMeta fill:#8b5cf6
+    style AddIndex fill:#8b5cf6
+    style EmitEvent fill:#6366f1
+    style Return fill:#10b981

@@ -1,0 +1,63 @@
+%%{init: {'theme': 'dark', 'themeVariables': { 'primaryColor': '#1e3a5f'}}}%%
+
+flowchart TD
+    Start([User Forks Chat]) --> Validate[Validate Input]
+    
+    Validate -->|Valid| LoadSource[Load Source Chat]
+    Validate -->|Invalid| Error1[Return Error]
+    
+    LoadSource -->|Found| LoadMsgs[Load Messages]
+    LoadSource -->|Not Found| Error2[Return Error]
+    
+    LoadMsgs --> FindFork{Fork Point<br/>Specified?}
+    
+    FindFork -->|Yes| FilterMsgs[Filter Messages<br/>Up to Fork Point]
+    FindFork -->|No| CopyAll[Copy All Messages]
+    
+    FilterMsgs --> CreateChat[Create New Chat]
+    CopyAll --> CreateChat
+    
+    CreateChat --> CopyMsgs[Copy Messages to New Chat]
+    
+    CopyMsgs --> SetRefs[Set Fork References]
+    
+    SetRefs --> SaveChat[Save Chat Metadata]
+    
+    SaveChat --> EmitEvent[Emit Fork Event]
+    
+    EmitEvent --> Return[Return New Chat]
+    
+    Return --> End([Complete])
+    
+    Error1 --> EndError([Error])
+    Error2 --> EndError
+
+    subgraph "Data Flow"
+        DF1[source_chat_id → source_chat]
+        DF2[source_chat → messages]
+        DF3[messages → filtered_messages]
+        DF4[filtered_messages → new_chat]
+    end
+
+    subgraph "State Changes"
+        SC1[Chat: null → active]
+        SC2[Messages: copied with new IDs]
+    end
+
+    CreateChat -.-> SC1
+    CopyMsgs -.-> SC2
+
+    style Start fill:#10b981
+    style End fill:#10b981
+    style EndError fill:#ef4444
+    style Validate fill:#3b82f6
+    style LoadSource fill:#f59e0b
+    style LoadMsgs fill:#f59e0b
+    style FilterMsgs fill:#8b5cf6
+    style CopyAll fill:#8b5cf6
+    style CreateChat fill:#8b5cf6
+    style CopyMsgs fill:#f59e0b
+    style SetRefs fill:#8b5cf6
+    style SaveChat fill:#f59e0b
+    style EmitEvent fill:#6366f1
+    style Return fill:#10b981

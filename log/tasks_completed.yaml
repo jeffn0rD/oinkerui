@@ -411,3 +411,63 @@ tasks:
       method: YAML validation
       result: success
       notes: All 51 YAML files valid.
+- task:
+    id: 0.2.5.5
+    name: Workflow Implementation Specs
+    goal: Expand workflows.yaml with concrete workflow implementations for Phase 1-2.
+    completed_date: '2026-01-20'
+    files_created:
+    - docs/diagrams/workflow_create_project.mmd
+    - docs/diagrams/workflow_send_message.mmd
+    - docs/diagrams/workflow_fork_chat.mmd
+    - log/task_0.2.5.5_summary.yaml
+    files_modified:
+    - spec/workflows.yaml
+    summary: 'Expanded workflows.yaml with 7 concrete workflow implementations:
+
+
+      Phase 1 Workflows:
+
+      1. create_project_workflow - Complete project creation with Git init
+
+      2. send_message_workflow - Message processing with LLM integration
+
+      3. execute_slash_command_workflow - Slash command parsing and execution
+
+      4. fork_chat_workflow - Chat forking at specific message
+
+      5. git_commit_workflow - Auto-commit with batching
+
+      6. template_render_workflow - Jinja2 template rendering
+
+
+      Phase 2 Workflows:
+
+      7. create_data_entity_workflow - Data entity creation and indexing
+
+
+      Each workflow includes:
+
+      - Detailed steps with types (validation, io, data, external, event, return)
+
+      - Data flow between steps
+
+      - Error handling with rollback strategies
+
+      - State change tracking
+
+
+      Created 3 workflow diagrams:
+
+      - workflow_create_project.mmd
+
+      - workflow_send_message.mmd
+
+      - workflow_fork_chat.mmd
+
+
+      All 52 YAML files validated successfully.'
+    verification:
+      method: YAML validation
+      result: success
+      notes: All 52 YAML files valid.
