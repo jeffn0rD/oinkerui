@@ -40,33 +40,6 @@ prompt_guidance: 'Always follow these guidelines and update project documentatio
   '
 current:
 - task:
-    id: 0.2.5.6
-    name: Verification & Linking System
-    goal: Create comprehensive verification tools to validate specification completeness, consistency, and correctness.
-    prompt: ./prompts/dev/prompt_0_2_5_6.md
-    files:
-    - verify/check_spec_completeness.py
-    - verify/check_spec_references.py
-    - verify/check_spec_consistency.py
-    - verify/generate_traceability_matrix.py
-    - verify/generate_dependency_graphs.py
-    - verify/verify_all_specs.py
-    - docs/traceability/*.md
-    - docs/diagrams/generated/*.mmd
-    details:
-      focus:
-      - Completeness checking
-      - Reference validation
-      - Consistency checking
-      - Traceability matrices
-      - Dependency graphs
-      verification:
-      - All verification scripts execute
-      - No broken references
-      - All specs are complete
-      - Traceability matrices generated
-      - Dependency graphs generated
-- task:
     id: 0.3
     name: Initialize Node.js Project
     goal: Initialize Node.js project with package.json and configure dependencies.

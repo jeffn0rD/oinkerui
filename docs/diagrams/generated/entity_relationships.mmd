@@ -1,0 +1,42 @@
+%%{init: {'theme': 'dark'}}%%
+
+graph TD
+    %% Entity Relationship Graph
+    %% Generated: 2026-01-20T16:16:08.179345
+
+    %% Entities
+    Project[Project]
+    Chat[Chat]
+    Message[Message]
+    DataEntity[DataEntity]
+    LLMRequestLogEntry[LLMRequestLogEntry]
+    User[User]
+
+    %% Relationships
+    Project -->|one_to_many (1:N)| Chat
+    Project -->|one_to_many (1:N)| DataEntity
+    Project -->|one_to_many (1:N)| LLMRequestLogEntry
+    Project -->|many_to_one (N:1)| User
+    Chat -->|many_to_one (N:1)| Project
+    Chat -->|one_to_many (1:N)| Message
+    Chat -->|many_to_one (N:1)| Chat
+    Message -->|many_to_one (N:1)| Chat
+    Message -->|many_to_one (N:1)| Project
+    Message -->|many_to_many (N:M)| DataEntity
+    Message -->|many_to_one (N:1)| LLMRequestLogEntry
+    Message -->|many_to_one (N:1)| Message
+    DataEntity -->|many_to_one (N:1)| Project
+    DataEntity -->|many_to_many (N:M)| Message
+    LLMRequestLogEntry -->|many_to_one (N:1)| Project
+    LLMRequestLogEntry -->|many_to_one (N:1)| Chat
+    LLMRequestLogEntry -->|one_to_many (1:N)| Message
+    User -->|one_to_many (1:N)| Project
+
+    %% Styling
+    classDef entity fill:#2c5282,stroke:#3182ce
+    class Project entity
+    class Chat entity
+    class Message entity
+    class DataEntity entity
+    class LLMRequestLogEntry entity
+    class User entity

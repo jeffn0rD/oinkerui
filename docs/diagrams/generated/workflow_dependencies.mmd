@@ -1,0 +1,82 @@
+%%{init: {'theme': 'dark'}}%%
+
+graph TD
+    %% Workflow Dependencies
+    %% Generated: 2026-01-20T16:16:08.242089
+
+    subgraph create_project[Create Project Workflow]
+        create_project_validate_input[Validate Input]
+        create_project_generate_ids[Generate IDs]
+        create_project_validate_input --> create_project_generate_ids
+        create_project_create_directory[Create Directory]
+        create_project_generate_ids --> create_project_create_directory
+        create_project_init_git[Initialize Git]
+        create_project_create_directory --> create_project_init_git
+        create_project_create_metadata[Create Metadata]
+        create_project_init_git --> create_project_create_metadata
+        create_project_add_to_index[Add to Index]
+        create_project_create_metadata --> create_project_add_to_index
+        create_project_emit_event[Emit Event]
+        create_project_add_to_index --> create_project_emit_event
+        create_project_return_result[Return Result]
+        create_project_emit_event --> create_project_return_result
+    end
+
+    subgraph send_message[Send Message and Get LLM Response]
+        send_message_validate_message[Validate Message]
+        send_message_check_slash_command[Check Slash Command]
+        send_message_validate_message --> send_message_check_slash_command
+        send_message_parse_slash_command[Parse Slash Command]
+        send_message_check_slash_command --> send_message_parse_slash_command
+        send_message_execute_command[Execute Command]
+        send_message_parse_slash_command --> send_message_execute_command
+        send_message_return_command_result[Return Command Result]
+        send_message_execute_command --> send_message_return_command_result
+        send_message_create_user_message[Create User Message]
+        send_message_return_command_result --> send_message_create_user_message
+        send_message_save_user_message[Save User Message]
+        send_message_create_user_message --> send_message_save_user_message
+        send_message_check_pure_aside[Check Pure Aside]
+        send_message_save_user_message --> send_message_check_pure_aside
+        send_message_return_aside_result[Return Aside Result]
+        send_message_check_pure_aside --> send_message_return_aside_result
+        send_message_construct_context[Construct Context]
+        send_message_return_aside_result --> send_message_construct_context
+        send_message_call_llm[Call LLM]
+        send_message_construct_context --> send_message_call_llm
+        send_message_create_assistant_message[Create Assistant Message]
+        send_message_call_llm --> send_message_create_assistant_message
+        send_message_save_assistant_message[Save Assistant Message]
+        send_message_create_assistant_message --> send_message_save_assistant_message
+        send_message_log_request[Log Request]
+        send_message_save_assistant_message --> send_message_log_request
+        send_message_update_chat_timestamp[Update Chat Timestamp]
+        send_message_log_request --> send_message_update_chat_timestamp
+        send_message_check_auto_commit[Check Auto Commit]
+        send_message_update_chat_timestamp --> send_message_check_auto_commit
+        send_message_auto_commit[Auto Commit]
+        send_message_check_auto_commit --> send_message_auto_commit
+        send_message_return_result[Return Result]
+        send_message_auto_commit --> send_message_return_result
+    end
+
+    subgraph execute_slash_command[Execute Slash Command]
+        execute_slash_command_parse_command[Parse Command]
+        execute_slash_command_validate_command[Validate Command]
+        execute_slash_command_parse_command --> execute_slash_command_validate_command
+        execute_slash_command_check_permissions[Check Permissions]
+        execute_slash_command_validate_command --> execute_slash_command_check_permissions
+        execute_slash_command_dispatch_command[Dispatch Command]
+        execute_slash_command_check_permissions --> execute_slash_command_dispatch_command
+        execute_slash_command_execute_handler[Execute Handler]
+        execute_slash_command_dispatch_command --> execute_slash_command_execute_handler
+        execute_slash_command_process_side_effects[Process Side Effects]
+        execute_slash_command_execute_handler --> execute_slash_command_process_side_effects
+        execute_slash_command_format_result[Format Result]
+        execute_slash_command_process_side_effects --> execute_slash_command_format_result
+        execute_slash_command_return_result[Return Result]
+        execute_slash_command_format_result --> execute_slash_command_return_result
+    end
+
+    %% Styling
+    classDef step fill:#744210,stroke:#d69e2e

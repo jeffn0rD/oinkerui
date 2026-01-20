@@ -1,0 +1,71 @@
+%%{init: {'theme': 'dark'}}%%
+
+graph TD
+    %% Module Dependency Graph
+    %% Generated: 2026-01-20T16:16:08.131587
+
+    %% Modules
+    frontend_svelte[Svelte Frontend Application]
+    logging_and_metrics[Logging and Metrics Module]
+    git_integration[Git Integration Module]
+    backend_node[Node.js Backend Server]
+    backend_python_tools[Python Tools Backend Server]
+
+    %% External Dependencies
+    ext_axios((axios))
+    ext_date_fns((date-fns))
+    ext_diff((diff))
+    ext_dompurify((dompurify))
+    ext_fastapi((fastapi))
+    ext_fastify((fastify))
+    ext_fastify_cors((@fastify/cors))
+    ext_fastify_static((@fastify/static))
+    ext_highlight.js((highlight.js))
+    ext_jinja2((jinja2))
+    ext_marked((marked))
+    ext_pino((pino))
+    ext_pino_pretty((pino-pretty))
+    ext_pydantic((pydantic))
+    ext_python_multipart((python-multipart))
+    ext_rotating_file_stream((rotating-file-stream))
+    ext_simple_git((simple-git))
+    ext_slugify((slugify))
+    ext_svelte((svelte))
+    ext_tailwindcss((tailwindcss))
+    ext_tiktoken((tiktoken))
+    ext_uuid((uuid))
+    ext_uvicorn((uvicorn))
+    ext_vite((vite))
+
+    %% Module Dependencies
+    frontend_svelte --> backend_node
+    git_integration --> logging_and_metrics
+    backend_node --> backend_python_tools
+    backend_node --> git_integration
+    backend_node --> logging_and_metrics
+    backend_python_tools --> logging_and_metrics
+
+    %% External Dependencies
+    frontend_svelte -.-> ext_svelte
+    frontend_svelte -.-> ext_vite
+    frontend_svelte -.-> ext_tailwindcss
+    logging_and_metrics -.-> ext_pino
+    logging_and_metrics -.-> ext_pino_pretty
+    logging_and_metrics -.-> ext_rotating_file_stream
+    git_integration -.-> ext_simple_git
+    git_integration -.-> ext_diff
+    backend_node -.-> ext_fastify
+    backend_node -.-> ext_fastify_cors
+    backend_node -.-> ext_fastify_static
+    backend_python_tools -.-> ext_fastapi
+    backend_python_tools -.-> ext_uvicorn
+    backend_python_tools -.-> ext_jinja2
+
+    %% Styling
+    classDef module fill:#2d3748,stroke:#4a5568
+    classDef external fill:#553c9a,stroke:#6b46c1
+    class frontend_svelte module
+    class logging_and_metrics module
+    class git_integration module
+    class backend_node module
+    class backend_python_tools module
