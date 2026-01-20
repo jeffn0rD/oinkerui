@@ -1,0 +1,388 @@
+# =============================================================================
+# Module Specification: Frontend Svelte
+# =============================================================================
+
+module:
+  id: frontend_svelte
+  name: Svelte Frontend Application
+  version: "1.0.0"
+  description: |
+    The Svelte frontend provides the user interface for OinkerUI, implementing
+    a dark-themed, responsive workbench for LLM-assisted development. Built with
+    Svelte 4, Vite, and Tailwind CSS, it communicates with the Node.js backend
+    via REST API and handles all user interactions, state management, and
+    real-time updates.
+
+  responsibilities:
+    - Render the main application layout (left sidebar, main area, right sidebar)
+    - Display and manage project/chat navigation tree
+    - Render chat messages with markdown and syntax highlighting
+    - Handle user input and prompt composition
+    - Manage UI state (active project, active chat, expanded/collapsed elements)
+    - Display context information (token counts, model info)
+    - Handle message flags (aside, pinned, discarded) via UI controls
+    - Render data entity references and diffs
+    - Provide template selection and variable input UI
+    - Display LLM request statistics and metrics
+
+  boundaries:
+    in_scope:
+      - All UI rendering and user interaction handling
+      - Client-side state management (Svelte stores)
+      - REST API communication with backend
+      - Markdown rendering with syntax highlighting
+      - Dark theme implementation via Tailwind
+      - Responsive layout management
+      - Form validation and user feedback
+      - Local storage for UI preferences
+    out_of_scope:
+      - Business logic (handled by backend)
+      - LLM API calls (proxied through backend)
+      - Git operations (handled by backend)
+      - File system access (handled by backend)
+      - Code execution (handled by Python tools backend)
+      - Authentication (Phase 4+)
+
+  dependencies:
+    modules:
+      - module_id: backend_node
+        relationship: uses
+        description: "All data operations via REST API"
+    external:
+      - name: svelte
+        version: "^4.0.0"
+        purpose: "Component framework"
+      - name: vite
+        version: "^5.0.0"
+        purpose: "Build tool and dev server"
+      - name: tailwindcss
+        version: "^3.4.0"
+        purpose: "Utility-first CSS framework"
+      - name: marked
+        version: "^12.0.0"
+        purpose: "Markdown parsing"
+      - name: highlight.js
+        version: "^11.9.0"
+        purpose: "Syntax highlighting for code blocks"
+      - name: dompurify
+        version: "^3.0.0"
+        purpose: "HTML sanitization for markdown output"
+
+  data_entities:
+    primary:
+      - entity: Project
+        operations: [read, list]
+        notes: "Display in sidebar, selection handling"
+      - entity: Chat
+        operations: [read, list]
+        notes: "Display in sidebar under projects"
+      - entity: Message
+        operations: [read, list]
+        notes: "Display in chat view with formatting"
+    secondary:
+      - entity: DataEntity
+        usage: "Display references in messages, show in entity panel"
+      - entity: LLMRequestLogEntry
+        usage: "Display statistics in right sidebar"
+      - entity: User
+        usage: "Display user info (Phase 4+)"
+
+  state_management:
+    manages_state: true
+    approach: "Svelte stores with reactive subscriptions"
+    state_entities:
+      - name: appState
+        scope: global
+        persistence: memory
+        description: "Global application state"
+        properties:
+          - activeProjectId
+          - activeChatId
+          - sidebarCollapsed
+          - theme
+      - name: projectsStore
+        scope: global
+        persistence: memory
+        description: "Cached project list"
+        properties:
+          - projects (array)
+          - loading (boolean)
+          - error (string|null)
+      - name: chatsStore
+        scope: project
+        persistence: memory
+        description: "Chats for active project"
+        properties:
+          - chats (array)
+          - loading (boolean)
+      - name: messagesStore
+        scope: chat
+        persistence: memory
+        description: "Messages for active chat"
+        properties:
+          - messages (array)
+          - loading (boolean)
+          - pendingMessage (object|null)
+      - name: contextStore
+        scope: chat
+        persistence: memory
+        description: "Context calculation state"
+        properties:
+          - estimatedTokens (number)
+          - contextLimit (number)
+          - includedMessageIds (array)
+      - name: uiPreferences
+        scope: global
+        persistence: file
+        description: "User UI preferences"
+        storage: localStorage
+        properties:
+          - collapsedSections (array)
+          - messageDisplayMode (compact|expanded)
+          - fontSize (number)
+
+  interfaces:
+    public_api:
+      - type: event
+        name: project-selected
+        description: "Emitted when user selects a project"
+        payload: "{ projectId: string }"
+      - type: event
+        name: chat-selected
+        description: "Emitted when user selects a chat"
+        payload: "{ chatId: string }"
+      - type: event
+        name: message-sent
+        description: "Emitted when user sends a message"
+        payload: "{ content: string, options: object }"
+    internal_api:
+      - name: apiClient
+        visibility: module_private
+        description: "HTTP client for backend communication"
+      - name: storeHelpers
+        visibility: module_private
+        description: "Utility functions for store management"
+
+  functions:
+    # Layout Components
+    - id: app_layout
+      name: AppLayout
+      purpose: "Root layout component with three-pane structure"
+      visibility: public
+      component_type: layout
+      reference: "spec/functions/frontend_svelte/app_layout.yaml"
+    
+    - id: left_sidebar
+      name: LeftSidebar
+      purpose: "Project and chat navigation tree"
+      visibility: public
+      component_type: layout
+      reference: "spec/functions/frontend_svelte/left_sidebar.yaml"
+    
+    - id: main_area
+      name: MainArea
+      purpose: "Primary content area with chat view"
+      visibility: public
+      component_type: layout
+      reference: "spec/functions/frontend_svelte/main_area.yaml"
+    
+    - id: right_sidebar
+      name: RightSidebar
+      purpose: "Statistics and info panels"
+      visibility: public
+      component_type: layout
+      reference: "spec/functions/frontend_svelte/right_sidebar.yaml"
+
+    # Chat Components
+    - id: message_list
+      name: MessageList
+      purpose: "Scrollable list of chat messages"
+      visibility: public
+      component_type: feature
+      reference: "spec/functions/frontend_svelte/message_list.yaml"
+    
+    - id: message_item
+      name: MessageItem
+      purpose: "Individual message display with controls"
+      visibility: public
+      component_type: feature
+      reference: "spec/functions/frontend_svelte/message_item.yaml"
+    
+    - id: prompt_input
+      name: PromptInput
+      purpose: "Message composition with model/format selection"
+      visibility: public
+      component_type: feature
+      reference: "spec/functions/frontend_svelte/prompt_input.yaml"
+    
+    - id: context_info_bar
+      name: ContextInfoBar
+      purpose: "Live context size and model info display"
+      visibility: public
+      component_type: feature
+      reference: "spec/functions/frontend_svelte/context_info_bar.yaml"
+
+    # Utility Components
+    - id: markdown_renderer
+      name: MarkdownRenderer
+      purpose: "Render markdown with syntax highlighting"
+      visibility: public
+      component_type: utility
+      reference: "spec/functions/frontend_svelte/markdown_renderer.yaml"
+    
+    - id: code_block
+      name: CodeBlock
+      purpose: "Syntax-highlighted code display"
+      visibility: public
+      component_type: utility
+      reference: "spec/functions/frontend_svelte/code_block.yaml"
+    
+    - id: model_selector
+      name: ModelSelector
+      purpose: "Dropdown for LLM model selection"
+      visibility: public
+      component_type: utility
+      reference: "spec/functions/frontend_svelte/model_selector.yaml"
+    
+    - id: template_picker
+      name: TemplatePicker
+      purpose: "Template selection and variable input"
+      visibility: public
+      component_type: utility
+      reference: "spec/functions/frontend_svelte/template_picker.yaml"
+
+    # Store Functions
+    - id: fetch_projects
+      name: fetchProjects
+      purpose: "Load projects from backend API"
+      visibility: private
+      function_type: store_action
+      reference: "spec/functions/frontend_svelte/fetch_projects.yaml"
+    
+    - id: fetch_chats
+      name: fetchChats
+      purpose: "Load chats for a project"
+      visibility: private
+      function_type: store_action
+      reference: "spec/functions/frontend_svelte/fetch_chats.yaml"
+    
+    - id: fetch_messages
+      name: fetchMessages
+      purpose: "Load messages for a chat"
+      visibility: private
+      function_type: store_action
+      reference: "spec/functions/frontend_svelte/fetch_messages.yaml"
+    
+    - id: send_message
+      name: sendMessage
+      purpose: "Send user message to backend"
+      visibility: private
+      function_type: store_action
+      reference: "spec/functions/frontend_svelte/send_message.yaml"
+
+    # API Client Functions
+    - id: api_get
+      name: apiGet
+      purpose: "HTTP GET request wrapper"
+      visibility: private
+      function_type: utility
+      reference: "spec/functions/frontend_svelte/api_client.yaml"
+    
+    - id: api_post
+      name: apiPost
+      purpose: "HTTP POST request wrapper"
+      visibility: private
+      function_type: utility
+      reference: "spec/functions/frontend_svelte/api_client.yaml"
+
+  error_handling:
+    strategy: "Graceful degradation with user feedback"
+    error_types:
+      - code: NETWORK_ERROR
+        description: "Backend unreachable or request failed"
+        recovery: "Show error toast, allow retry"
+      - code: VALIDATION_ERROR
+        description: "Invalid user input"
+        recovery: "Highlight invalid fields, show message"
+      - code: API_ERROR
+        description: "Backend returned error response"
+        recovery: "Display error message from backend"
+      - code: RENDER_ERROR
+        description: "Component rendering failed"
+        recovery: "Show fallback UI, log error"
+
+  testing:
+    unit_tests: "frontend/tests/unit/"
+    integration_tests: "frontend/tests/integration/"
+    test_coverage_target: 80
+    testing_framework: "vitest"
+    component_testing: "@testing-library/svelte"
+
+  llm_guidance:
+    implementation_approach: |
+      Implement the frontend as a Svelte 4 application with the following structure:
+      
+      1. Use Svelte stores for state management - create separate stores for
+         projects, chats, messages, and UI state.
+      
+      2. Implement components in a hierarchical structure:
+         - App.svelte (root)
+           - LeftSidebar.svelte
+           - MainArea.svelte
+             - MessageList.svelte
+               - MessageItem.svelte
+             - PromptInput.svelte
+             - ContextInfoBar.svelte
+           - RightSidebar.svelte
+      
+      3. Use Tailwind CSS for all styling with the dark theme tokens defined
+         in ui.yaml. Prefer utility classes over custom CSS.
+      
+      4. Implement the API client as a simple fetch wrapper with error handling.
+         All API calls should update the appropriate stores.
+      
+      5. Use marked + highlight.js for markdown rendering. Sanitize HTML output
+         with DOMPurify to prevent XSS.
+
+    key_patterns:
+      - "Reactive stores with $: syntax for derived state"
+      - "Component composition over inheritance"
+      - "Event dispatching for parent-child communication"
+      - "Async/await for API calls with loading states"
+      - "Tailwind utility classes for responsive design"
+      - "Slot-based component customization"
+
+    common_pitfalls:
+      - "Forgetting to unsubscribe from stores in onDestroy"
+      - "Not handling loading and error states in UI"
+      - "XSS vulnerabilities from unsanitized markdown"
+      - "Memory leaks from event listeners"
+      - "Blocking UI during API calls"
+      - "Not debouncing rapid user input"
+
+    testing_strategy: |
+      1. Unit test store logic independently
+      2. Use @testing-library/svelte for component tests
+      3. Mock API calls in component tests
+      4. Test accessibility with axe-core
+      5. Visual regression testing for key components
+
+  references:
+    - type: spec
+      id: ui_spec
+      file: "spec/ui.yaml"
+    - type: spec
+      id: api_spec
+      file: "spec/apis.yaml"
+    - type: entity
+      id: project
+      file: "spec/domain.yaml#Project"
+    - type: entity
+      id: chat
+      file: "spec/domain.yaml#Chat"
+    - type: entity
+      id: message
+      file: "spec/domain.yaml#Message"
+    - type: module
+      id: backend_node
+      file: "spec/modules/backend_node.yaml"

@@ -1,0 +1,362 @@
+# =============================================================================
+# Module Specification: Git Integration
+# =============================================================================
+
+module:
+  id: git_integration
+  name: Git Integration Module
+  version: "1.0.0"
+  description: |
+    The Git integration module provides all Git operations for OinkerUI projects.
+    Each project is backed by a Git repository, enabling version control, change
+    tracking, and collaboration features. This module wraps simple-git and provides
+    a consistent interface for Git operations with proper error handling.
+
+  responsibilities:
+    - Initialize Git repositories for new projects
+    - Track file changes and provide status information
+    - Commit changes with auto-batching support
+    - Push changes to remote repositories
+    - Pull changes from remote repositories
+    - Generate diffs for file changes
+    - Manage .gitignore configuration
+    - Handle merge conflicts (basic)
+    - Provide commit history and log access
+
+  boundaries:
+    in_scope:
+      - Git repository initialization
+      - Status, add, commit, push, pull operations
+      - Diff generation for files
+      - Branch management (basic)
+      - Remote configuration
+      - Commit history retrieval
+      - .gitignore management
+      - Stash operations (basic)
+    out_of_scope:
+      - Complex merge conflict resolution (manual)
+      - Git hooks management
+      - Submodule management
+      - Git LFS operations
+      - Advanced rebasing
+      - Cherry-picking
+
+  dependencies:
+    modules:
+      - module_id: logging_and_metrics
+        relationship: uses
+        description: "Log Git operations and errors"
+    external:
+      - name: simple-git
+        version: "^3.22.0"
+        purpose: "Git operations wrapper"
+      - name: diff
+        version: "^5.2.0"
+        purpose: "Text diff generation (fallback)"
+
+  data_entities:
+    primary: []
+    secondary:
+      - entity: Project
+        usage: "Each project has associated Git repository"
+      - entity: LLMRequestLogEntry
+        usage: "Track files touched by Git operations"
+
+  state_management:
+    manages_state: false
+    approach: "Stateless - Git repository is the source of truth"
+    state_entities:
+      - name: gitInstanceCache
+        scope: global
+        persistence: memory
+        description: "Cache of simple-git instances per project"
+        properties:
+          - projectPath
+          - gitInstance
+          - lastUsed
+
+  interfaces:
+    public_api:
+      - type: function
+        name: initRepository
+        description: "Initialize Git repository in project directory"
+        reference: "spec/functions/git_integration/init_repository.yaml"
+      - type: function
+        name: getStatus
+        description: "Get repository status"
+        reference: "spec/functions/git_integration/get_status.yaml"
+      - type: function
+        name: commitChanges
+        description: "Stage and commit changes"
+        reference: "spec/functions/git_integration/commit_changes.yaml"
+      - type: function
+        name: pushChanges
+        description: "Push to remote"
+        reference: "spec/functions/git_integration/push_changes.yaml"
+      - type: function
+        name: getDiff
+        description: "Get diff for file or commit"
+        reference: "spec/functions/git_integration/get_diff.yaml"
+    internal_api:
+      - name: getGitInstance
+        visibility: module_private
+        description: "Get or create simple-git instance for project"
+      - name: validateGitRepo
+        visibility: module_private
+        description: "Validate directory is a Git repository"
+
+  functions:
+    # Repository Management
+    - id: init_repository
+      name: initRepository
+      purpose: "Initialize new Git repository with default configuration"
+      visibility: public
+      reference: "spec/functions/git_integration/init_repository.yaml"
+    
+    - id: clone_repository
+      name: cloneRepository
+      purpose: "Clone existing repository to project directory"
+      visibility: public
+      reference: "spec/functions/git_integration/clone_repository.yaml"
+    
+    - id: is_git_repo
+      name: isGitRepo
+      purpose: "Check if directory is a Git repository"
+      visibility: public
+      reference: "spec/functions/git_integration/is_git_repo.yaml"
+
+    # Status and Information
+    - id: get_status
+      name: getStatus
+      purpose: "Get current repository status"
+      visibility: public
+      reference: "spec/functions/git_integration/get_status.yaml"
+    
+    - id: get_log
+      name: getLog
+      purpose: "Get commit history"
+      visibility: public
+      reference: "spec/functions/git_integration/get_log.yaml"
+    
+    - id: get_diff
+      name: getDiff
+      purpose: "Get diff for file, staged changes, or between commits"
+      visibility: public
+      reference: "spec/functions/git_integration/get_diff.yaml"
+    
+    - id: get_file_history
+      name: getFileHistory
+      purpose: "Get commit history for specific file"
+      visibility: public
+      reference: "spec/functions/git_integration/get_file_history.yaml"
+
+    # Staging and Committing
+    - id: stage_files
+      name: stageFiles
+      purpose: "Stage files for commit"
+      visibility: public
+      reference: "spec/functions/git_integration/stage_files.yaml"
+    
+    - id: unstage_files
+      name: unstageFiles
+      purpose: "Unstage files"
+      visibility: public
+      reference: "spec/functions/git_integration/unstage_files.yaml"
+    
+    - id: commit_changes
+      name: commitChanges
+      purpose: "Commit staged changes with message"
+      visibility: public
+      reference: "spec/functions/git_integration/commit_changes.yaml"
+    
+    - id: auto_commit
+      name: autoCommit
+      purpose: "Auto-commit with generated message based on changes"
+      visibility: public
+      reference: "spec/functions/git_integration/auto_commit.yaml"
+
+    # Remote Operations
+    - id: push_changes
+      name: pushChanges
+      purpose: "Push commits to remote"
+      visibility: public
+      reference: "spec/functions/git_integration/push_changes.yaml"
+    
+    - id: pull_changes
+      name: pullChanges
+      purpose: "Pull changes from remote"
+      visibility: public
+      reference: "spec/functions/git_integration/pull_changes.yaml"
+    
+    - id: configure_remote
+      name: configureRemote
+      purpose: "Add or update remote configuration"
+      visibility: public
+      reference: "spec/functions/git_integration/configure_remote.yaml"
+    
+    - id: get_remotes
+      name: getRemotes
+      purpose: "List configured remotes"
+      visibility: public
+      reference: "spec/functions/git_integration/get_remotes.yaml"
+
+    # Branch Operations
+    - id: get_current_branch
+      name: getCurrentBranch
+      purpose: "Get current branch name"
+      visibility: public
+      reference: "spec/functions/git_integration/get_current_branch.yaml"
+    
+    - id: list_branches
+      name: listBranches
+      purpose: "List local and remote branches"
+      visibility: public
+      reference: "spec/functions/git_integration/list_branches.yaml"
+    
+    - id: create_branch
+      name: createBranch
+      purpose: "Create new branch"
+      visibility: public
+      reference: "spec/functions/git_integration/create_branch.yaml"
+    
+    - id: switch_branch
+      name: switchBranch
+      purpose: "Switch to different branch"
+      visibility: public
+      reference: "spec/functions/git_integration/switch_branch.yaml"
+
+    # File Operations
+    - id: discard_changes
+      name: discardChanges
+      purpose: "Discard uncommitted changes to file"
+      visibility: public
+      reference: "spec/functions/git_integration/discard_changes.yaml"
+    
+    - id: get_file_content_at_commit
+      name: getFileContentAtCommit
+      purpose: "Get file content at specific commit"
+      visibility: public
+      reference: "spec/functions/git_integration/get_file_content_at_commit.yaml"
+
+    # Utility Functions
+    - id: create_gitignore
+      name: createGitignore
+      purpose: "Create or update .gitignore with defaults"
+      visibility: public
+      reference: "spec/functions/git_integration/create_gitignore.yaml"
+    
+    - id: get_git_instance
+      name: getGitInstance
+      purpose: "Get cached simple-git instance for project"
+      visibility: private
+      reference: "spec/functions/git_integration/get_git_instance.yaml"
+
+  error_handling:
+    strategy: "Wrap Git errors with context and recovery suggestions"
+    error_types:
+      - code: NOT_A_GIT_REPO
+        description: "Directory is not a Git repository"
+        recovery: "Initialize repository or check path"
+      - code: UNCOMMITTED_CHANGES
+        description: "Operation blocked by uncommitted changes"
+        recovery: "Commit or stash changes first"
+      - code: MERGE_CONFLICT
+        description: "Merge conflict detected"
+        recovery: "Manual conflict resolution required"
+      - code: PUSH_REJECTED
+        description: "Push rejected by remote"
+        recovery: "Pull changes first, resolve conflicts"
+      - code: REMOTE_NOT_CONFIGURED
+        description: "No remote configured"
+        recovery: "Configure remote before push/pull"
+      - code: AUTHENTICATION_FAILED
+        description: "Git authentication failed"
+        recovery: "Check credentials or SSH key"
+      - code: NETWORK_ERROR
+        description: "Network operation failed"
+        recovery: "Check network connection"
+
+  testing:
+    unit_tests: "backend/tests/unit/git/"
+    integration_tests: "backend/tests/integration/git/"
+    test_coverage_target: 85
+    testing_framework: "jest"
+    test_utilities: "Create temporary Git repos for testing"
+
+  llm_guidance:
+    implementation_approach: |
+      Implement Git integration as a service module in the Node.js backend:
+      
+      1. File structure:
+         - src/services/gitService.js - Main service with all Git operations
+         - src/services/git/operations.js - Individual operation implementations
+         - src/services/git/utils.js - Utility functions
+      
+      2. Use simple-git library for all Git operations:
+         ```javascript
+         const simpleGit = require('simple-git');
+         
+         function getGitInstance(projectPath) {
+           return simpleGit(projectPath, { binary: 'git' });
+         }
+         ```
+      
+      3. Cache Git instances per project to avoid repeated initialization.
+      
+      4. All operations should be async and handle errors gracefully.
+      
+      5. Implement auto-commit batching:
+         - Collect changes over a short period (e.g., 5 seconds)
+         - Batch into single commit with descriptive message
+         - Configurable via project settings
+
+    key_patterns:
+      - "Singleton Git instance per project path"
+      - "Async/await for all Git operations"
+      - "Error wrapping with context"
+      - "Debounced auto-commit for batching"
+      - "Status caching with short TTL"
+
+    common_pitfalls:
+      - "Not handling detached HEAD state"
+      - "Assuming remote is always 'origin'"
+      - "Not escaping special characters in commit messages"
+      - "Blocking on large repository operations"
+      - "Not handling binary files in diff"
+      - "Race conditions in concurrent commits"
+
+    testing_strategy: |
+      1. Create temporary Git repos for each test
+      2. Test all error conditions
+      3. Test concurrent operations
+      4. Test with various Git configurations
+      5. Mock network operations for remote tests
+
+    auto_commit_algorithm: |
+      The auto-commit feature batches changes:
+      
+      1. When a file change is detected, start a timer (default 5s)
+      2. Collect all changes during the timer period
+      3. When timer expires:
+         a. Get list of changed files
+         b. Generate commit message based on changes
+         c. Stage all changed files
+         d. Commit with generated message
+      4. Reset timer on new changes during batch period
+      
+      Message generation:
+      - Single file: "Update {filename}"
+      - Multiple files same type: "Update {count} {type} files"
+      - Mixed changes: "Update {count} files"
+      - Include LLM context if available: "AI: {summary}"
+
+  references:
+    - type: spec
+      id: domain_spec
+      file: "spec/domain.yaml"
+    - type: module
+      id: backend_node
+      file: "spec/modules/backend_node.yaml"
+    - type: module
+      id: logging
+      file: "spec/modules/logging_and_metrics.yaml"

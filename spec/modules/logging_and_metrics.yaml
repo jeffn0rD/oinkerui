@@ -1,0 +1,407 @@
+# =============================================================================
+# Module Specification: Logging and Metrics
+# =============================================================================
+
+module:
+  id: logging_and_metrics
+  name: Logging and Metrics Module
+  version: "1.0.0"
+  description: |
+    The logging and metrics module provides structured logging, metrics collection,
+    and observability features for OinkerUI. It captures LLM request logs, system
+    events, error tracking, and usage statistics. All logs are stored in JSONL
+    format for easy parsing and analysis.
+
+  responsibilities:
+    - Capture and store LLM request/response logs
+    - Log system events (project creation, chat operations, etc.)
+    - Track error events with stack traces and context
+    - Collect usage metrics (token counts, request counts, latencies)
+    - Provide log retrieval and search capabilities
+    - Generate usage reports and statistics
+    - Support log rotation and cleanup
+    - Enable causal tracking (touched files/entities)
+
+  boundaries:
+    in_scope:
+      - Structured logging to JSONL files
+      - LLM request logging with full context
+      - System event logging
+      - Error logging with context
+      - Metrics aggregation
+      - Log retrieval APIs
+      - Log rotation
+      - Usage statistics calculation
+    out_of_scope:
+      - External log shipping (Phase 4+)
+      - Real-time alerting (Phase 4+)
+      - Distributed tracing
+      - APM integration
+      - Log visualization (use external tools)
+
+  dependencies:
+    modules: []
+    external:
+      - name: pino
+        version: "^8.19.0"
+        purpose: "Fast JSON logger for Node.js"
+      - name: pino-pretty
+        version: "^10.3.0"
+        purpose: "Pretty print logs in development"
+      - name: rotating-file-stream
+        version: "^3.2.0"
+        purpose: "Log file rotation"
+
+  data_entities:
+    primary:
+      - entity: LLMRequestLogEntry
+        operations: [create, read, list, search]
+        storage: "project_root/logs/llm_requests.jsonl"
+    secondary:
+      - entity: Project
+        usage: "Log entries are scoped to projects"
+      - entity: Chat
+        usage: "Log entries reference chats"
+      - entity: Message
+        usage: "Log entries reference messages"
+      - entity: DataEntity
+        usage: "Track touched entities in logs"
+
+  state_management:
+    manages_state: true
+    approach: "Append-only JSONL files with in-memory aggregation"
+    state_entities:
+      - name: logBuffer
+        scope: global
+        persistence: memory
+        description: "Buffer for batched log writes"
+        properties:
+          - entries (array)
+          - flushInterval (number)
+      - name: metricsCache
+        scope: global
+        persistence: memory
+        description: "Cached metrics aggregations"
+        properties:
+          - projectMetrics (map)
+          - globalMetrics (object)
+          - lastUpdated (datetime)
+      - name: loggerInstances
+        scope: global
+        persistence: memory
+        description: "Cached logger instances"
+        properties:
+          - systemLogger
+          - projectLoggers (map)
+
+  interfaces:
+    public_api:
+      # Logging functions
+      - type: function
+        name: logLLMRequest
+        description: "Log an LLM request with full context"
+        reference: "spec/functions/logging_and_metrics/log_llm_request.yaml"
+      - type: function
+        name: logSystemEvent
+        description: "Log a system event"
+        reference: "spec/functions/logging_and_metrics/log_system_event.yaml"
+      - type: function
+        name: logError
+        description: "Log an error with context"
+        reference: "spec/functions/logging_and_metrics/log_error.yaml"
+      
+      # Retrieval functions
+      - type: function
+        name: getLLMRequestLogs
+        description: "Retrieve LLM request logs"
+        reference: "spec/functions/logging_and_metrics/get_llm_request_logs.yaml"
+      - type: function
+        name: getSystemLogs
+        description: "Retrieve system logs"
+        reference: "spec/functions/logging_and_metrics/get_system_logs.yaml"
+      
+      # Metrics functions
+      - type: function
+        name: getProjectMetrics
+        description: "Get metrics for a project"
+        reference: "spec/functions/logging_and_metrics/get_project_metrics.yaml"
+      - type: function
+        name: getChatMetrics
+        description: "Get metrics for a chat"
+        reference: "spec/functions/logging_and_metrics/get_chat_metrics.yaml"
+
+    internal_api:
+      - name: writeLogEntry
+        visibility: module_private
+        description: "Write entry to log file"
+      - name: rotateLogFile
+        visibility: module_private
+        description: "Rotate log file when size limit reached"
+      - name: aggregateMetrics
+        visibility: module_private
+        description: "Aggregate metrics from log entries"
+
+  functions:
+    # LLM Request Logging
+    - id: log_llm_request
+      name: logLLMRequest
+      purpose: "Log complete LLM request with context, response, and metrics"
+      visibility: public
+      reference: "spec/functions/logging_and_metrics/log_llm_request.yaml"
+    
+    - id: log_llm_request_start
+      name: logLLMRequestStart
+      purpose: "Log start of LLM request (for streaming)"
+      visibility: public
+      reference: "spec/functions/logging_and_metrics/log_llm_request_start.yaml"
+    
+    - id: log_llm_request_complete
+      name: logLLMRequestComplete
+      purpose: "Log completion of LLM request"
+      visibility: public
+      reference: "spec/functions/logging_and_metrics/log_llm_request_complete.yaml"
+    
+    - id: log_llm_request_error
+      name: logLLMRequestError
+      purpose: "Log LLM request error"
+      visibility: public
+      reference: "spec/functions/logging_and_metrics/log_llm_request_error.yaml"
+
+    # System Event Logging
+    - id: log_system_event
+      name: logSystemEvent
+      purpose: "Log system-level event"
+      visibility: public
+      reference: "spec/functions/logging_and_metrics/log_system_event.yaml"
+    
+    - id: log_project_event
+      name: logProjectEvent
+      purpose: "Log project-level event"
+      visibility: public
+      reference: "spec/functions/logging_and_metrics/log_project_event.yaml"
+    
+    - id: log_chat_event
+      name: logChatEvent
+      purpose: "Log chat-level event"
+      visibility: public
+      reference: "spec/functions/logging_and_metrics/log_chat_event.yaml"
+
+    # Error Logging
+    - id: log_error
+      name: logError
+      purpose: "Log error with stack trace and context"
+      visibility: public
+      reference: "spec/functions/logging_and_metrics/log_error.yaml"
+    
+    - id: log_warning
+      name: logWarning
+      purpose: "Log warning message"
+      visibility: public
+      reference: "spec/functions/logging_and_metrics/log_warning.yaml"
+
+    # Log Retrieval
+    - id: get_llm_request_logs
+      name: getLLMRequestLogs
+      purpose: "Retrieve LLM request logs with filtering"
+      visibility: public
+      reference: "spec/functions/logging_and_metrics/get_llm_request_logs.yaml"
+    
+    - id: get_system_logs
+      name: getSystemLogs
+      purpose: "Retrieve system logs with filtering"
+      visibility: public
+      reference: "spec/functions/logging_and_metrics/get_system_logs.yaml"
+    
+    - id: search_logs
+      name: searchLogs
+      purpose: "Search logs by content or metadata"
+      visibility: public
+      reference: "spec/functions/logging_and_metrics/search_logs.yaml"
+
+    # Metrics
+    - id: get_project_metrics
+      name: getProjectMetrics
+      purpose: "Calculate and return project metrics"
+      visibility: public
+      reference: "spec/functions/logging_and_metrics/get_project_metrics.yaml"
+    
+    - id: get_chat_metrics
+      name: getChatMetrics
+      purpose: "Calculate and return chat metrics"
+      visibility: public
+      reference: "spec/functions/logging_and_metrics/get_chat_metrics.yaml"
+    
+    - id: get_global_metrics
+      name: getGlobalMetrics
+      purpose: "Calculate and return global metrics"
+      visibility: public
+      reference: "spec/functions/logging_and_metrics/get_global_metrics.yaml"
+    
+    - id: aggregate_usage
+      name: aggregateUsage
+      purpose: "Aggregate token usage statistics"
+      visibility: private
+      reference: "spec/functions/logging_and_metrics/aggregate_usage.yaml"
+
+    # Log Management
+    - id: rotate_logs
+      name: rotateLogs
+      purpose: "Rotate log files based on size/age"
+      visibility: private
+      reference: "spec/functions/logging_and_metrics/rotate_logs.yaml"
+    
+    - id: cleanup_old_logs
+      name: cleanupOldLogs
+      purpose: "Remove logs older than retention period"
+      visibility: private
+      reference: "spec/functions/logging_and_metrics/cleanup_old_logs.yaml"
+    
+    - id: get_logger
+      name: getLogger
+      purpose: "Get or create logger instance"
+      visibility: private
+      reference: "spec/functions/logging_and_metrics/get_logger.yaml"
+
+  error_handling:
+    strategy: "Fail silently for logging errors to avoid cascading failures"
+    error_types:
+      - code: LOG_WRITE_ERROR
+        description: "Failed to write to log file"
+        recovery: "Buffer entry, retry, fallback to console"
+      - code: LOG_READ_ERROR
+        description: "Failed to read log file"
+        recovery: "Return empty results with error flag"
+      - code: LOG_PARSE_ERROR
+        description: "Failed to parse log entry"
+        recovery: "Skip malformed entry, continue"
+      - code: METRICS_CALCULATION_ERROR
+        description: "Failed to calculate metrics"
+        recovery: "Return partial metrics with error flag"
+
+  testing:
+    unit_tests: "backend/tests/unit/logging/"
+    integration_tests: "backend/tests/integration/logging/"
+    test_coverage_target: 80
+    testing_framework: "jest"
+    test_utilities: "Temporary log directories for testing"
+
+  llm_guidance:
+    implementation_approach: |
+      Implement logging as a service module in the Node.js backend:
+      
+      1. File structure:
+         - src/services/loggingService.js - Main logging service
+         - src/services/logging/llmLogger.js - LLM request logging
+         - src/services/logging/systemLogger.js - System event logging
+         - src/services/logging/metricsService.js - Metrics calculation
+      
+      2. Use pino for structured JSON logging:
+         ```javascript
+         const pino = require('pino');
+         
+         const logger = pino({
+           level: process.env.LOG_LEVEL || 'info',
+           formatters: {
+             level: (label) => ({ level: label })
+           }
+         });
+         ```
+      
+      3. Log file organization:
+         - workspace_root/logs/system.jsonl - Global system logs
+         - project_root/logs/llm_requests.jsonl - LLM request logs
+         - project_root/logs/events.jsonl - Project events
+      
+      4. Each log entry should include:
+         - timestamp (ISO 8601)
+         - level (info, warn, error)
+         - event_type
+         - context (project_id, chat_id, etc.)
+         - data (event-specific payload)
+      
+      5. Implement buffered writes for performance.
+
+    key_patterns:
+      - "Structured JSON logging with pino"
+      - "Append-only JSONL files"
+      - "Buffered writes with periodic flush"
+      - "Log rotation by size and age"
+      - "Lazy metrics aggregation with caching"
+      - "Request ID correlation across logs"
+
+    common_pitfalls:
+      - "Logging sensitive data (API keys, passwords)"
+      - "Synchronous file writes blocking event loop"
+      - "Not handling log file corruption"
+      - "Memory leaks from unbounded buffers"
+      - "Not rotating logs leading to disk full"
+      - "Circular references in logged objects"
+
+    testing_strategy: |
+      1. Test log entry format and structure
+      2. Test log rotation triggers
+      3. Test metrics aggregation accuracy
+      4. Test error handling (disk full, permissions)
+      5. Test concurrent write handling
+
+    log_entry_schemas:
+      llm_request: |
+        {
+          "timestamp": "2024-01-15T10:30:00.000Z",
+          "level": "info",
+          "event_type": "llm_request",
+          "request_id": "uuid",
+          "project_id": "uuid",
+          "chat_id": "uuid",
+          "model": "gpt-4",
+          "request_type": "chat",
+          "messages_count": 5,
+          "prompt_tokens": 1500,
+          "completion_tokens": 500,
+          "total_tokens": 2000,
+          "latency_ms": 2500,
+          "status": "success",
+          "touched_files": ["src/main.js"],
+          "touched_entities": ["uuid1", "uuid2"]
+        }
+      
+      system_event: |
+        {
+          "timestamp": "2024-01-15T10:30:00.000Z",
+          "level": "info",
+          "event_type": "project_created",
+          "project_id": "uuid",
+          "data": {
+            "name": "My Project",
+            "slug": "my-project"
+          }
+        }
+      
+      error: |
+        {
+          "timestamp": "2024-01-15T10:30:00.000Z",
+          "level": "error",
+          "event_type": "error",
+          "error_code": "LLM_ERROR",
+          "message": "OpenRouter API error",
+          "stack": "Error: ...",
+          "context": {
+            "project_id": "uuid",
+            "chat_id": "uuid",
+            "request_id": "uuid"
+          }
+        }
+
+  references:
+    - type: entity
+      id: llm_request_log_entry
+      file: "spec/domain.yaml#LLMRequestLogEntry"
+    - type: module
+      id: backend_node
+      file: "spec/modules/backend_node.yaml"
+    - type: module
+      id: python_tools
+      file: "spec/modules/backend_python_tools.yaml"
+    - type: module
+      id: git_integration
+      file: "spec/modules/git_integration.yaml"

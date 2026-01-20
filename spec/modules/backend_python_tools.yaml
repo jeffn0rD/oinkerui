@@ -1,0 +1,344 @@
+# =============================================================================
+# Module Specification: Backend Python Tools
+# =============================================================================
+
+module:
+  id: backend_python_tools
+  name: Python Tools Backend Server
+  version: "1.0.0"
+  description: |
+    The Python tools backend is a FastAPI server that provides specialized
+    capabilities not easily implemented in Node.js: Jinja2 template rendering,
+    code/shell execution in sandboxed environments, and advanced text processing.
+    It runs as a separate service and is called by the Node.js backend.
+
+  responsibilities:
+    - Render Jinja2 templates with safe filters
+    - Execute Python code in project-scoped virtual environments
+    - Execute shell commands in sandboxed project directories
+    - Provide streaming file output for LLM responses
+    - Validate and sanitize code before execution
+    - Manage project-specific Python virtual environments
+    - Provide text processing utilities (diff, tokenization)
+
+  boundaries:
+    in_scope:
+      - Jinja2 template rendering with custom filters
+      - Python code execution in isolated environments
+      - Shell command execution with path restrictions
+      - File streaming for LLM output
+      - Virtual environment management
+      - Text diff generation
+      - Token counting utilities
+    out_of_scope:
+      - Direct client communication (proxied through Node.js)
+      - Project/chat management (handled by Node.js)
+      - LLM API calls (handled by Node.js)
+      - Git operations (handled by Node.js)
+      - User authentication (Phase 4+)
+
+  dependencies:
+    modules:
+      - module_id: logging_and_metrics
+        relationship: uses
+        description: "Structured logging for tool execution"
+    external:
+      - name: fastapi
+        version: "^0.109.0"
+        purpose: "Web framework"
+      - name: uvicorn
+        version: "^0.27.0"
+        purpose: "ASGI server"
+      - name: jinja2
+        version: "^3.1.0"
+        purpose: "Template rendering"
+      - name: pydantic
+        version: "^2.6.0"
+        purpose: "Data validation"
+      - name: tiktoken
+        version: "^0.6.0"
+        purpose: "Token counting"
+      - name: python-multipart
+        version: "^0.0.9"
+        purpose: "File upload handling"
+
+  data_entities:
+    primary: []
+    secondary:
+      - entity: DataEntity
+        usage: "Track files created/modified by tool execution"
+      - entity: LLMRequestLogEntry
+        usage: "Log tool execution as part of LLM request"
+
+  state_management:
+    manages_state: false
+    approach: "Stateless service - all state managed by Node.js backend"
+    state_entities:
+      - name: venvCache
+        scope: global
+        persistence: memory
+        description: "Cache of initialized virtual environments"
+        properties:
+          - projectId
+          - venvPath
+          - lastUsed
+      - name: executionLimits
+        scope: global
+        persistence: memory
+        description: "Rate limiting for code execution"
+        properties:
+          - maxConcurrent
+          - currentCount
+
+  interfaces:
+    public_api:
+      # Template endpoints
+      - type: rest
+        name: POST /tools/render-template
+        description: "Render Jinja2 template with variables"
+        reference: "spec/apis.yaml#render_template"
+      - type: rest
+        name: POST /tools/validate-template
+        description: "Validate Jinja2 template syntax"
+        reference: "spec/apis.yaml#validate_template"
+      - type: rest
+        name: GET /tools/template-filters
+        description: "List available Jinja2 filters"
+        reference: "spec/apis.yaml#list_template_filters"
+      
+      # Execution endpoints
+      - type: rest
+        name: POST /tools/execute
+        description: "Execute code or shell command"
+        reference: "spec/apis.yaml#execute_code"
+      - type: rest
+        name: POST /tools/stream-to-file
+        description: "Stream content to file"
+        reference: "spec/apis.yaml#stream_to_file"
+      
+      # Utility endpoints
+      - type: rest
+        name: POST /tools/diff
+        description: "Generate text diff"
+        reference: "spec/apis.yaml#generate_diff"
+      - type: rest
+        name: POST /tools/count-tokens
+        description: "Count tokens for text"
+        reference: "spec/apis.yaml#count_tokens"
+      
+      # Health endpoint
+      - type: rest
+        name: GET /health
+        description: "Health check endpoint"
+        reference: "spec/apis.yaml#tools_health"
+
+    internal_api:
+      - name: sandboxExecutor
+        visibility: module_private
+        description: "Sandboxed code execution engine"
+      - name: venvManager
+        visibility: module_private
+        description: "Virtual environment management"
+      - name: templateEngine
+        visibility: module_private
+        description: "Jinja2 environment with custom filters"
+
+  functions:
+    # Template Functions
+    - id: render_template
+      name: render_template
+      purpose: "Render Jinja2 template with provided variables"
+      visibility: public
+      reference: "spec/functions/backend_python_tools/render_template.yaml"
+    
+    - id: validate_template
+      name: validate_template
+      purpose: "Validate Jinja2 template syntax without rendering"
+      visibility: public
+      reference: "spec/functions/backend_python_tools/validate_template.yaml"
+    
+    - id: get_template_filters
+      name: get_template_filters
+      purpose: "Return list of available safe Jinja2 filters"
+      visibility: public
+      reference: "spec/functions/backend_python_tools/get_template_filters.yaml"
+    
+    - id: create_jinja_env
+      name: create_jinja_env
+      purpose: "Create sandboxed Jinja2 environment"
+      visibility: private
+      reference: "spec/functions/backend_python_tools/create_jinja_env.yaml"
+
+    # Execution Functions
+    - id: execute_code
+      name: execute_code
+      purpose: "Execute Python code in sandboxed environment"
+      visibility: public
+      reference: "spec/functions/backend_python_tools/execute_code.yaml"
+    
+    - id: execute_shell
+      name: execute_shell
+      purpose: "Execute shell command in project directory"
+      visibility: public
+      reference: "spec/functions/backend_python_tools/execute_shell.yaml"
+    
+    - id: validate_path
+      name: validate_path
+      purpose: "Validate path is within project directory"
+      visibility: private
+      reference: "spec/functions/backend_python_tools/validate_path.yaml"
+    
+    - id: create_sandbox
+      name: create_sandbox
+      purpose: "Create execution sandbox for project"
+      visibility: private
+      reference: "spec/functions/backend_python_tools/create_sandbox.yaml"
+
+    # Virtual Environment Functions
+    - id: get_or_create_venv
+      name: get_or_create_venv
+      purpose: "Get or create project virtual environment"
+      visibility: private
+      reference: "spec/functions/backend_python_tools/get_or_create_venv.yaml"
+    
+    - id: install_requirements
+      name: install_requirements
+      purpose: "Install requirements in project venv"
+      visibility: public
+      reference: "spec/functions/backend_python_tools/install_requirements.yaml"
+
+    # File Streaming Functions
+    - id: stream_to_file
+      name: stream_to_file
+      purpose: "Stream content to file in project"
+      visibility: public
+      reference: "spec/functions/backend_python_tools/stream_to_file.yaml"
+    
+    - id: append_to_file
+      name: append_to_file
+      purpose: "Append content to existing file"
+      visibility: public
+      reference: "spec/functions/backend_python_tools/append_to_file.yaml"
+
+    # Utility Functions
+    - id: generate_diff
+      name: generate_diff
+      purpose: "Generate unified diff between two texts"
+      visibility: public
+      reference: "spec/functions/backend_python_tools/generate_diff.yaml"
+    
+    - id: count_tokens
+      name: count_tokens
+      purpose: "Count tokens using tiktoken"
+      visibility: public
+      reference: "spec/functions/backend_python_tools/count_tokens.yaml"
+
+  error_handling:
+    strategy: "Structured error responses with execution details"
+    error_types:
+      - code: TEMPLATE_SYNTAX_ERROR
+        description: "Invalid Jinja2 template syntax"
+        http_status: 400
+        recovery: "Return syntax error details"
+      - code: TEMPLATE_RENDER_ERROR
+        description: "Error during template rendering"
+        http_status: 400
+        recovery: "Return render error with context"
+      - code: EXECUTION_ERROR
+        description: "Code execution failed"
+        http_status: 400
+        recovery: "Return stdout, stderr, exit code"
+      - code: EXECUTION_TIMEOUT
+        description: "Code execution timed out"
+        http_status: 408
+        recovery: "Kill process, return timeout error"
+      - code: PATH_VIOLATION
+        description: "Path outside project directory"
+        http_status: 403
+        recovery: "Return security error"
+      - code: VENV_ERROR
+        description: "Virtual environment error"
+        http_status: 500
+        recovery: "Log error, return details"
+
+  testing:
+    unit_tests: "backend/python/tests/unit/"
+    integration_tests: "backend/python/tests/integration/"
+    test_coverage_target: 80
+    testing_framework: "pytest"
+    fixtures: "pytest fixtures for sandbox setup"
+
+  llm_guidance:
+    implementation_approach: |
+      Implement the Python tools backend as a FastAPI application:
+      
+      1. Entry point: main.py - Initialize FastAPI app, configure CORS, mount routers
+      
+      2. Router organization:
+         - routers/templates.py - Template rendering endpoints
+         - routers/execution.py - Code execution endpoints
+         - routers/utilities.py - Diff, token counting endpoints
+      
+      3. Core modules:
+         - core/jinja_env.py - Sandboxed Jinja2 environment
+         - core/sandbox.py - Code execution sandbox
+         - core/venv_manager.py - Virtual environment management
+         - core/path_validator.py - Path security validation
+      
+      4. Security considerations:
+         - NEVER execute code outside project directory
+         - Use subprocess with timeout for all execution
+         - Validate all paths before file operations
+         - Limit available Jinja2 filters to safe subset
+         - Rate limit execution requests
+      
+      5. Use Pydantic models for all request/response validation.
+
+    key_patterns:
+      - "FastAPI dependency injection for shared resources"
+      - "Pydantic models for request validation"
+      - "Context managers for sandbox lifecycle"
+      - "Subprocess with timeout for execution"
+      - "Path validation before any file operation"
+      - "Structured logging with execution context"
+
+    common_pitfalls:
+      - "Path traversal vulnerabilities (../../)"
+      - "Command injection in shell execution"
+      - "Infinite loops in executed code"
+      - "Memory exhaustion from large outputs"
+      - "Not cleaning up temporary files"
+      - "Leaving zombie processes"
+      - "Exposing sensitive environment variables"
+
+    testing_strategy: |
+      1. Unit test path validation thoroughly
+      2. Test template rendering with malicious input
+      3. Test execution timeout handling
+      4. Test sandbox isolation
+      5. Integration test with Node.js backend
+
+    security_notes: |
+      This module handles code execution and must be implemented with
+      extreme care for security:
+      
+      1. All paths must be validated to be within project directory
+      2. Shell commands must be sanitized or use allowlist
+      3. Execution must have strict timeouts
+      4. Memory limits should be enforced
+      5. Network access from executed code should be restricted
+      6. File system access should be limited to project directory
+
+  references:
+    - type: spec
+      id: api_spec
+      file: "spec/apis.yaml"
+    - type: spec
+      id: commands_spec
+      file: "spec/commands.yaml"
+    - type: module
+      id: backend_node
+      file: "spec/modules/backend_node.yaml"
+    - type: module
+      id: logging
+      file: "spec/modules/logging_and_metrics.yaml"

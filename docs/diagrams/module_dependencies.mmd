@@ -1,0 +1,57 @@
+%%{init: {'theme': 'dark', 'themeVariables': { 'primaryColor': '#1e3a5f', 'primaryTextColor': '#fff', 'lineColor': '#F8B229'}}}%%
+
+graph TD
+    subgraph "Client Layer"
+        FE[Frontend Svelte<br/>UI Components & State]
+    end
+
+    subgraph "API Layer"
+        BN[Backend Node.js<br/>REST API & Business Logic]
+    end
+
+    subgraph "Service Layer"
+        BP[Backend Python Tools<br/>Jinja2 & Code Execution]
+        GI[Git Integration<br/>Version Control]
+        LM[Logging & Metrics<br/>Observability]
+    end
+
+    subgraph "External Services"
+        OR[OpenRouter API<br/>LLM Provider]
+        GIT[Git CLI<br/>Version Control]
+        FS[File System<br/>Data Storage]
+    end
+
+    %% Client to API
+    FE -->|REST API| BN
+
+    %% API to Services
+    BN -->|Tool Calls| BP
+    BN -->|Git Operations| GI
+    BN -->|Log Events| LM
+
+    %% Services to Logging
+    BP -->|Log Events| LM
+    GI -->|Log Events| LM
+
+    %% External Integrations
+    BN -->|LLM Requests| OR
+    GI -->|Git Commands| GIT
+    BN -->|File I/O| FS
+    BP -->|File I/O| FS
+    LM -->|Log Files| FS
+
+    %% Styling
+    style FE fill:#4a5568,stroke:#718096,stroke-width:2px
+    style BN fill:#2d3748,stroke:#4a5568,stroke-width:2px
+    style BP fill:#553c9a,stroke:#6b46c1,stroke-width:2px
+    style GI fill:#2c5282,stroke:#3182ce,stroke-width:2px
+    style LM fill:#2b6cb0,stroke:#4299e1,stroke-width:2px
+    style OR fill:#c53030,stroke:#e53e3e,stroke-width:2px
+    style GIT fill:#2f855a,stroke:#48bb78,stroke-width:2px
+    style FS fill:#744210,stroke:#d69e2e,stroke-width:2px
+
+    %% Link styling
+    linkStyle 0 stroke:#F8B229,stroke-width:2px
+    linkStyle 1 stroke:#9F7AEA,stroke-width:2px
+    linkStyle 2 stroke:#4299E1,stroke-width:2px
+    linkStyle 3 stroke:#48BB78,stroke-width:2px

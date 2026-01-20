@@ -1,0 +1,458 @@
+# =============================================================================
+# Module Specification: Backend Node.js
+# =============================================================================
+
+module:
+  id: backend_node
+  name: Node.js Backend Server
+  version: "1.0.0"
+  description: |
+    The Node.js backend is the primary API server for OinkerUI, built with Fastify.
+    It implements all business logic, manages project/chat/message data, integrates
+    with OpenRouter for LLM calls, coordinates with the Python tools backend, and
+    handles Git operations. All client requests flow through this server.
+
+  responsibilities:
+    - Expose REST API endpoints for all CRUD operations
+    - Implement project lifecycle management (create, archive, delete)
+    - Manage chat and message persistence (JSONL files)
+    - Construct LLM context per spec/context.yaml algorithm
+    - Integrate with OpenRouter API for LLM requests
+    - Parse and dispatch slash commands
+    - Coordinate with Python tools backend for code execution
+    - Manage Git operations (init, commit, status, push)
+    - Handle prompt template resolution
+    - Log all LLM requests and system events
+    - Serve static frontend assets in production
+
+  boundaries:
+    in_scope:
+      - REST API implementation
+      - Business logic and validation
+      - Data persistence (file-based)
+      - OpenRouter integration
+      - Slash command parsing
+      - Git operations via simple-git
+      - Context construction algorithm
+      - Template variable substitution
+      - Request/response logging
+    out_of_scope:
+      - UI rendering (handled by frontend)
+      - Code/shell execution (handled by Python tools)
+      - Jinja2 template rendering (handled by Python tools)
+      - Database operations (Phase 4+ with Supabase)
+      - User authentication (Phase 4+)
+
+  dependencies:
+    modules:
+      - module_id: backend_python_tools
+        relationship: uses
+        description: "Code execution and Jinja2 rendering"
+      - module_id: git_integration
+        relationship: depends_on
+        description: "Git operations for projects"
+      - module_id: logging_and_metrics
+        relationship: uses
+        description: "Structured logging"
+    external:
+      - name: fastify
+        version: "^4.26.0"
+        purpose: "Web framework"
+      - name: "@fastify/cors"
+        version: "^9.0.0"
+        purpose: "CORS handling"
+      - name: "@fastify/static"
+        version: "^7.0.0"
+        purpose: "Static file serving"
+      - name: simple-git
+        version: "^3.22.0"
+        purpose: "Git operations"
+      - name: axios
+        version: "^1.6.0"
+        purpose: "HTTP client for OpenRouter"
+      - name: uuid
+        version: "^9.0.0"
+        purpose: "UUID generation"
+      - name: date-fns
+        version: "^3.3.0"
+        purpose: "Date manipulation"
+      - name: tiktoken
+        version: "^1.0.0"
+        purpose: "Token counting for context"
+      - name: slugify
+        version: "^1.6.0"
+        purpose: "URL-safe slug generation"
+
+  data_entities:
+    primary:
+      - entity: Project
+        operations: [create, read, update, delete, list]
+        storage: "workspace_root/projects/{slug}/project.json"
+      - entity: Chat
+        operations: [create, read, update, delete, list]
+        storage: "project_root/chats/{chat_id}.jsonl"
+      - entity: Message
+        operations: [create, read, list]
+        storage: "Appended to chat JSONL file"
+      - entity: LLMRequestLogEntry
+        operations: [create, read, list]
+        storage: "project_root/logs/llm_requests.jsonl"
+    secondary:
+      - entity: DataEntity
+        usage: "Create/update when files change, link to messages"
+      - entity: User
+        usage: "Phase 4+ for multi-user support"
+
+  state_management:
+    manages_state: true
+    approach: "File-based persistence with in-memory caching"
+    state_entities:
+      - name: projectIndex
+        scope: global
+        persistence: file
+        description: "Index of all projects"
+        storage: "workspace_root/projects/index.json"
+      - name: projectCache
+        scope: global
+        persistence: memory
+        description: "In-memory cache of loaded projects"
+        ttl: "5 minutes"
+      - name: chatCache
+        scope: project
+        persistence: memory
+        description: "In-memory cache of loaded chats"
+        ttl: "10 minutes"
+      - name: configCache
+        scope: global
+        persistence: memory
+        description: "Cached configuration"
+        ttl: "until restart"
+
+  interfaces:
+    public_api:
+      # Project endpoints
+      - type: rest
+        name: GET /api/projects
+        description: "List all projects"
+        reference: "spec/apis.yaml#list_projects"
+      - type: rest
+        name: POST /api/projects
+        description: "Create new project"
+        reference: "spec/apis.yaml#create_project"
+      - type: rest
+        name: GET /api/projects/:id
+        description: "Get project details"
+        reference: "spec/apis.yaml#get_project"
+      - type: rest
+        name: PUT /api/projects/:id
+        description: "Update project"
+        reference: "spec/apis.yaml#update_project"
+      - type: rest
+        name: DELETE /api/projects/:id
+        description: "Delete project"
+        reference: "spec/apis.yaml#delete_project"
+      
+      # Chat endpoints
+      - type: rest
+        name: GET /api/projects/:id/chats
+        description: "List chats in project"
+        reference: "spec/apis.yaml#list_chats"
+      - type: rest
+        name: POST /api/projects/:id/chats
+        description: "Create new chat"
+        reference: "spec/apis.yaml#create_chat"
+      - type: rest
+        name: POST /api/projects/:id/chats/:chatId/messages
+        description: "Send message (with LLM call)"
+        reference: "spec/apis.yaml#send_message"
+      - type: rest
+        name: POST /api/projects/:id/chats/:chatId/fork
+        description: "Fork chat"
+        reference: "spec/apis.yaml#fork_chat"
+      - type: rest
+        name: POST /api/projects/:id/chats/:chatId/context-preview
+        description: "Preview context without LLM call"
+        reference: "spec/apis.yaml#get_context_preview"
+      
+      # Message flag endpoints
+      - type: rest
+        name: PATCH /api/messages/:id/flags
+        description: "Update message flags"
+        reference: "spec/apis.yaml#update_message_flags"
+      
+      # Git endpoints
+      - type: rest
+        name: GET /api/projects/:id/git/status
+        description: "Get Git status"
+        reference: "spec/apis.yaml#git_status"
+      - type: rest
+        name: POST /api/projects/:id/git/commit
+        description: "Commit changes"
+        reference: "spec/apis.yaml#git_commit"
+      - type: rest
+        name: POST /api/projects/:id/git/push
+        description: "Push to remote"
+        reference: "spec/apis.yaml#git_push"
+
+    internal_api:
+      - name: contextBuilder
+        visibility: module_private
+        description: "Context construction per spec/context.yaml"
+      - name: openRouterClient
+        visibility: module_private
+        description: "OpenRouter API client"
+      - name: slashCommandParser
+        visibility: module_private
+        description: "Parse and dispatch slash commands"
+      - name: templateResolver
+        visibility: module_private
+        description: "Resolve prompt templates"
+
+  functions:
+    # Project Management
+    - id: create_project
+      name: createProject
+      purpose: "Create new project with Git initialization"
+      visibility: public
+      reference: "spec/functions/backend_node/create_project.yaml"
+    
+    - id: get_project
+      name: getProject
+      purpose: "Retrieve project by ID or slug"
+      visibility: public
+      reference: "spec/functions/backend_node/get_project.yaml"
+    
+    - id: list_projects
+      name: listProjects
+      purpose: "List all projects with optional filtering"
+      visibility: public
+      reference: "spec/functions/backend_node/list_projects.yaml"
+    
+    - id: update_project
+      name: updateProject
+      purpose: "Update project metadata"
+      visibility: public
+      reference: "spec/functions/backend_node/update_project.yaml"
+    
+    - id: delete_project
+      name: deleteProject
+      purpose: "Delete project (with confirmation)"
+      visibility: public
+      reference: "spec/functions/backend_node/delete_project.yaml"
+    
+    - id: archive_project
+      name: archiveProject
+      purpose: "Archive project"
+      visibility: public
+      reference: "spec/functions/backend_node/archive_project.yaml"
+
+    # Chat Management
+    - id: create_chat
+      name: createChat
+      purpose: "Create new chat in project"
+      visibility: public
+      reference: "spec/functions/backend_node/create_chat.yaml"
+    
+    - id: get_chat
+      name: getChat
+      purpose: "Retrieve chat with messages"
+      visibility: public
+      reference: "spec/functions/backend_node/get_chat.yaml"
+    
+    - id: list_chats
+      name: listChats
+      purpose: "List chats in project"
+      visibility: public
+      reference: "spec/functions/backend_node/list_chats.yaml"
+    
+    - id: fork_chat
+      name: forkChat
+      purpose: "Fork chat with optional pruning"
+      visibility: public
+      reference: "spec/functions/backend_node/fork_chat.yaml"
+
+    # Message Handling
+    - id: send_message
+      name: sendMessage
+      purpose: "Process user message, call LLM, return response"
+      visibility: public
+      reference: "spec/functions/backend_node/send_message.yaml"
+    
+    - id: update_message_flags
+      name: updateMessageFlags
+      purpose: "Update message context flags"
+      visibility: public
+      reference: "spec/functions/backend_node/update_message_flags.yaml"
+
+    # Context Management
+    - id: build_context
+      name: buildContext
+      purpose: "Construct LLM context per algorithm"
+      visibility: private
+      reference: "spec/functions/backend_node/build_context.yaml"
+    
+    - id: estimate_tokens
+      name: estimateTokens
+      purpose: "Estimate token count for messages"
+      visibility: private
+      reference: "spec/functions/backend_node/estimate_tokens.yaml"
+    
+    - id: get_context_preview
+      name: getContextPreview
+      purpose: "Preview context without LLM call"
+      visibility: public
+      reference: "spec/functions/backend_node/get_context_preview.yaml"
+
+    # OpenRouter Integration
+    - id: call_llm
+      name: callLLM
+      purpose: "Make OpenRouter API request"
+      visibility: private
+      reference: "spec/functions/backend_node/call_llm.yaml"
+    
+    - id: stream_llm_response
+      name: streamLLMResponse
+      purpose: "Stream LLM response to client"
+      visibility: private
+      reference: "spec/functions/backend_node/stream_llm_response.yaml"
+
+    # Slash Commands
+    - id: parse_slash_command
+      name: parseSlashCommand
+      purpose: "Parse slash command from message"
+      visibility: private
+      reference: "spec/functions/backend_node/parse_slash_command.yaml"
+    
+    - id: execute_slash_command
+      name: executeSlashCommand
+      purpose: "Execute parsed slash command"
+      visibility: private
+      reference: "spec/functions/backend_node/execute_slash_command.yaml"
+
+    # Template Resolution
+    - id: resolve_template
+      name: resolveTemplate
+      purpose: "Resolve template with variables"
+      visibility: private
+      reference: "spec/functions/backend_node/resolve_template.yaml"
+    
+    - id: list_templates
+      name: listTemplates
+      purpose: "List available templates"
+      visibility: public
+      reference: "spec/functions/backend_node/list_templates.yaml"
+
+  error_handling:
+    strategy: "Structured error responses with codes"
+    error_types:
+      - code: PROJECT_NOT_FOUND
+        description: "Project does not exist"
+        http_status: 404
+        recovery: "Return error response"
+      - code: CHAT_NOT_FOUND
+        description: "Chat does not exist"
+        http_status: 404
+        recovery: "Return error response"
+      - code: VALIDATION_ERROR
+        description: "Invalid request data"
+        http_status: 400
+        recovery: "Return validation errors"
+      - code: LLM_ERROR
+        description: "OpenRouter API error"
+        http_status: 502
+        recovery: "Log error, return message"
+      - code: GIT_ERROR
+        description: "Git operation failed"
+        http_status: 500
+        recovery: "Log error, return details"
+      - code: INTERNAL_ERROR
+        description: "Unexpected server error"
+        http_status: 500
+        recovery: "Log stack trace, return generic message"
+
+  testing:
+    unit_tests: "backend/tests/unit/"
+    integration_tests: "backend/tests/integration/"
+    test_coverage_target: 85
+    testing_framework: "jest"
+    mocking: "jest mocks for external services"
+
+  llm_guidance:
+    implementation_approach: |
+      Implement the backend as a Fastify application with the following structure:
+      
+      1. Entry point: src/index.js - Initialize Fastify, register plugins, start server
+      
+      2. Route organization:
+         - src/routes/projects.js - Project CRUD endpoints
+         - src/routes/chats.js - Chat endpoints
+         - src/routes/messages.js - Message endpoints
+         - src/routes/git.js - Git operation endpoints
+         - src/routes/templates.js - Template endpoints
+      
+      3. Service layer:
+         - src/services/projectService.js - Project business logic
+         - src/services/chatService.js - Chat business logic
+         - src/services/contextService.js - Context construction
+         - src/services/llmService.js - OpenRouter integration
+         - src/services/gitService.js - Git operations wrapper
+      
+      4. Data access:
+         - src/data/projectStore.js - Project file operations
+         - src/data/chatStore.js - Chat JSONL operations
+         - src/data/configStore.js - Configuration loading
+      
+      5. Use async/await throughout. All file operations should be async.
+      
+      6. Implement proper request validation using Fastify schemas.
+
+    key_patterns:
+      - "Fastify plugin architecture for modularity"
+      - "Service layer pattern for business logic"
+      - "Repository pattern for data access"
+      - "Async/await for all I/O operations"
+      - "Structured logging with request IDs"
+      - "Error handling middleware"
+      - "Request validation with JSON schemas"
+
+    common_pitfalls:
+      - "Not handling async errors properly"
+      - "Blocking the event loop with sync operations"
+      - "Not validating request input"
+      - "Leaking sensitive data in error responses"
+      - "Not implementing proper CORS"
+      - "Race conditions in file operations"
+      - "Not handling Git conflicts"
+
+    testing_strategy: |
+      1. Unit test services with mocked dependencies
+      2. Integration test routes with supertest
+      3. Mock OpenRouter API in tests
+      4. Test error handling paths
+      5. Test concurrent request handling
+
+  references:
+    - type: spec
+      id: api_spec
+      file: "spec/apis.yaml"
+    - type: spec
+      id: context_spec
+      file: "spec/context.yaml"
+    - type: spec
+      id: commands_spec
+      file: "spec/commands.yaml"
+    - type: entity
+      id: project
+      file: "spec/domain.yaml#Project"
+    - type: entity
+      id: chat
+      file: "spec/domain.yaml#Chat"
+    - type: entity
+      id: message
+      file: "spec/domain.yaml#Message"
+    - type: module
+      id: python_tools
+      file: "spec/modules/backend_python_tools.yaml"
+    - type: module
+      id: git_integration
+      file: "spec/modules/git_integration.yaml"

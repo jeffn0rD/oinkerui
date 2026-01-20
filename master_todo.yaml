@@ -40,29 +40,6 @@ prompt_guidance: 'Always follow these guidelines and update project documentatio
   '
 current:
 - task:
-    id: 0.2.5.2
-    name: Module Specification Creation
-    goal: Create detailed module specifications for all 5 core modules following the module_spec_schema.yaml.
-    prompt: ./prompts/dev/prompt_0_2_5_2.md
-    files:
-    - spec/modules/frontend_svelte.yaml
-    - spec/modules/backend_node.yaml
-    - spec/modules/backend_python_tools.yaml
-    - spec/modules/git_integration.yaml
-    - spec/modules/logging_and_metrics.yaml
-    - docs/diagrams/module_dependencies.mmd
-    details:
-      focus:
-      - Module responsibilities and boundaries
-      - Dependencies and interfaces
-      - Function listings
-      - LLM implementation guidance
-      verification:
-      - All modules follow schema
-      - All dependencies are valid
-      - All functions are listed
-      - Module dependency diagram is complete
-- task:
     id: 0.2.5.3
     name: Function Specification Framework
     goal: Create detailed function specifications for 20+ critical functions with contracts, FOL algorithms, and complexity
