@@ -40,24 +40,6 @@ prompt_guidance: 'Always follow these guidelines and update project documentatio
   '
 current:
 - task:
-    id: 0.4
-    name: Initialize Python Project
-    goal: Initialize Python project with requirements.txt and configure FastAPI dependencies.
-    prompt: ./prompts/dev/prompt_0_4_updated.md
-    files:
-    - prompts/dev/prompt_0_4_updated.md
-    - spec/modules/backend_python_tools.yaml
-    - spec/apis.yaml
-    - spec/commands.yaml
-    details:
-      focus:
-      - requirements.txt creation
-      - FastAPI and dependencies
-      - Python development tools
-      verification:
-      - pip list in virtual environment
-      - Verify all tools configured
-- task:
     id: 0.5
     name: Initialize Svelte Frontend
     goal: Set up Svelte frontend with Vite and Tailwind CSS.
