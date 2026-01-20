@@ -533,9 +533,9 @@ tasks:
       notes: All checks passed with expected warnings
 
 - task:
-    id: "0.3.0"
+    id: 0.3.0
     name: Review and Update Phase 0 Tasks
-    date_completed: 2024-01-20
+    completed_date: 2024-01-20
     commit: 6b0db8c
     summary: |
         Reviewed all Phase 0 tasks (0.3.5 - 0.9) against the expanded specifications
@@ -559,9 +559,9 @@ tasks:
         notes: 178/179 files valid (1 error in node_modules ignored)
 
 - task:
-    id: "0.3.5"
+    id: 0.3.5
     name: Initialize Node.js Project
-    date_completed: 2024-01-20
+    completed_date: 2024-01-20
     commit: bd431e2
     summary: |
         Successfully initialized the Node.js project with package.json, configured all
@@ -579,9 +579,9 @@ tasks:
         notes: All dependencies installed, server running on port 3000, all tools working
 
 - task:
-    id: "0.6"
+    id: 0.6
     name: Create Development Environment Configuration
-    date_completed: 2024-01-20
+    completed_date: 2024-01-20
     commit: 1693f3b
     summary: |
       Successfully created development environment configuration files including .env.example,
