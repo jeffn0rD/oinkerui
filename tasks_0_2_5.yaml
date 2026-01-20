@@ -1,0 +1,144 @@
+# Tasks for Specification Refinement (0.2.5.1 - 0.2.5.6)
+
+tasks:
+  - task:
+      id: 0.2.5.1
+      name: "Domain Model & State Refinement"
+      goal: "Refine domain.yaml with complete state transitions, invariants, relationships, and validation rules. Create state machine specifications and diagrams."
+      prompt: "./prompts/dev/prompt_0_2_5_1.md"
+      files:
+        - "spec/domain.yaml"
+        - "spec/state_machines.yaml"
+        - "docs/diagrams/domain_model.mmd"
+        - "docs/diagrams/state_machine.mmd"
+      details:
+        focus:
+          - "Entity state transitions"
+          - "Invariants and validation rules"
+          - "Relationship cardinalities"
+          - "State machine diagrams"
+        verification:
+          - "All entities have complete state definitions"
+          - "All state transitions have guards"
+          - "All invariants are checkable"
+          - "Diagrams render correctly"
+  
+  - task:
+      id: 0.2.5.2
+      name: "Module Specification Creation"
+      goal: "Create detailed module specifications for all 5 core modules following the module_spec_schema.yaml."
+      prompt: "./prompts/dev/prompt_0_2_5_2.md"
+      files:
+        - "spec/modules/frontend_svelte.yaml"
+        - "spec/modules/backend_node.yaml"
+        - "spec/modules/backend_python_tools.yaml"
+        - "spec/modules/git_integration.yaml"
+        - "spec/modules/logging_and_metrics.yaml"
+        - "docs/diagrams/module_dependencies.mmd"
+      details:
+        focus:
+          - "Module responsibilities and boundaries"
+          - "Dependencies and interfaces"
+          - "Function listings"
+          - "LLM implementation guidance"
+        verification:
+          - "All modules follow schema"
+          - "All dependencies are valid"
+          - "All functions are listed"
+          - "Module dependency diagram is complete"
+  
+  - task:
+      id: 0.2.5.3
+      name: "Function Specification Framework"
+      goal: "Create detailed function specifications for 20+ critical functions with contracts, FOL algorithms, and complexity analysis."
+      prompt: "./prompts/dev/prompt_0_2_5_3.md"
+      files:
+        - "spec/functions/backend_node/*.yaml"
+        - "spec/functions/frontend_svelte/*.yaml"
+        - "spec/functions/backend_python_tools/*.yaml"
+        - "spec/functions/git_integration/*.yaml"
+        - "spec/functions/logging_and_metrics/*.yaml"
+      details:
+        focus:
+          - "Function contracts (pre/post conditions)"
+          - "Algorithms in First Order Logic"
+          - "Complexity analysis"
+          - "LLM implementation guidance"
+        verification:
+          - "All functions follow schema"
+          - "FOL specifications are valid"
+          - "Complexity analysis is accurate"
+          - "All error cases documented"
+  
+  - task:
+      id: 0.2.5.4
+      name: "API & Interaction Detail"
+      goal: "Expand apis.yaml and ui.yaml with complete endpoint specifications and interaction flows."
+      prompt: "./prompts/dev/prompt_0_2_5_4.md"
+      files:
+        - "spec/apis.yaml"
+        - "spec/ui.yaml"
+        - "docs/diagrams/interaction_flow.mmd"
+        - "docs/diagrams/api_flow.mmd"
+      details:
+        focus:
+          - "Complete API endpoint specifications"
+          - "Request/response schemas"
+          - "UI interaction flows"
+          - "State changes per interaction"
+        verification:
+          - "All endpoints have complete specs"
+          - "All UI interactions documented"
+          - "All state changes specified"
+          - "Interaction diagrams complete"
+  
+  - task:
+      id: 0.2.5.5
+      name: "Workflow Implementation Specs"
+      goal: "Expand workflows.yaml with concrete workflow implementations for Phase 1-2."
+      prompt: "./prompts/dev/prompt_0_2_5_5.md"
+      files:
+        - "spec/workflows.yaml"
+        - "docs/diagrams/workflow_create_project.mmd"
+        - "docs/diagrams/workflow_send_message.mmd"
+        - "docs/diagrams/workflow_execute_command.mmd"
+        - "docs/diagrams/data_flow.mmd"
+      details:
+        focus:
+          - "Concrete workflow implementations"
+          - "Step-by-step specifications"
+          - "Error handling and rollback"
+          - "Workflow diagrams"
+        verification:
+          - "All workflows have complete steps"
+          - "All steps reference valid functions"
+          - "Error handling is comprehensive"
+          - "Workflow diagrams render correctly"
+  
+  - task:
+      id: 0.2.5.6
+      name: "Verification & Linking System"
+      goal: "Create comprehensive verification tools to validate specification completeness, consistency, and correctness."
+      prompt: "./prompts/dev/prompt_0_2_5_6.md"
+      files:
+        - "verify/check_spec_completeness.py"
+        - "verify/check_spec_references.py"
+        - "verify/check_spec_consistency.py"
+        - "verify/generate_traceability_matrix.py"
+        - "verify/generate_dependency_graphs.py"
+        - "verify/verify_all_specs.py"
+        - "docs/traceability/*.md"
+        - "docs/diagrams/generated/*.mmd"
+      details:
+        focus:
+          - "Completeness checking"
+          - "Reference validation"
+          - "Consistency checking"
+          - "Traceability matrices"
+          - "Dependency graphs"
+        verification:
+          - "All verification scripts execute"
+          - "No broken references"
+          - "All specs are complete"
+          - "Traceability matrices generated"
+          - "Dependency graphs generated"

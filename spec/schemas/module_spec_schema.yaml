@@ -1,0 +1,314 @@
+version: 1.0.0
+title: Module Specification Schema
+description: |
+  Schema for detailed module specifications. Each module should have its own
+  YAML file following this structure.
+
+schema:
+  module:
+    type: object
+    required:
+      - id
+      - name
+      - version
+      - description
+      - responsibilities
+      - dependencies
+      - data_entities
+      - state_management
+      - functions
+      - llm_guidance
+    properties:
+      id:
+        type: string
+        description: Unique module identifier (e.g., "backend_node")
+      
+      name:
+        type: string
+        description: Human-readable module name
+      
+      version:
+        type: string
+        description: Module specification version
+      
+      description:
+        type: string
+        description: Detailed module description
+      
+      responsibilities:
+        type: array
+        items:
+          type: string
+        description: List of module responsibilities
+      
+      boundaries:
+        type: object
+        properties:
+          in_scope:
+            type: array
+            items:
+              type: string
+          out_of_scope:
+            type: array
+            items:
+              type: string
+      
+      dependencies:
+        type: object
+        properties:
+          modules:
+            type: array
+            items:
+              type: object
+              properties:
+                module_id:
+                  type: string
+                relationship:
+                  type: string
+                  enum: [uses, provides_to, depends_on, optional]
+          
+          external:
+            type: array
+            items:
+              type: object
+              properties:
+                name:
+                  type: string
+                version:
+                  type: string
+                purpose:
+                  type: string
+      
+      data_entities:
+        type: object
+        properties:
+          primary:
+            type: array
+            items:
+              type: object
+              properties:
+                entity:
+                  type: string
+                  description: Reference to entity in domain.yaml
+                operations:
+                  type: array
+                  items:
+                    type: string
+                    enum: [create, read, update, delete, list, search]
+          
+          secondary:
+            type: array
+            items:
+              type: object
+              properties:
+                entity:
+                  type: string
+                usage:
+                  type: string
+      
+      state_management:
+        type: object
+        properties:
+          manages_state:
+            type: boolean
+          
+          state_entities:
+            type: array
+            items:
+              type: object
+              properties:
+                name:
+                  type: string
+                scope:
+                  type: string
+                  enum: [global, project, chat, session]
+                persistence:
+                  type: string
+                  enum: [memory, file, database]
+          
+          state_transitions:
+            type: array
+            items:
+              type: object
+              properties:
+                from:
+                  type: string
+                to:
+                  type: string
+                trigger:
+                  type: string
+                guards:
+                  type: array
+                  items:
+                    type: string
+      
+      interfaces:
+        type: object
+        properties:
+          public_api:
+            type: array
+            items:
+              type: object
+              properties:
+                type:
+                  type: string
+                  enum: [rest, function, event]
+                name:
+                  type: string
+                description:
+                  type: string
+                reference:
+                  type: string
+                  description: Link to detailed spec
+          
+          internal_api:
+            type: array
+            items:
+              type: object
+              properties:
+                name:
+                  type: string
+                visibility:
+                  type: string
+                  enum: [module_private, package_private]
+      
+      functions:
+        type: array
+        items:
+          type: object
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+            purpose:
+              type: string
+            visibility:
+              type: string
+              enum: [public, private, protected]
+            reference:
+              type: string
+              description: Link to detailed function spec file
+      
+      error_handling:
+        type: object
+        properties:
+          strategy:
+            type: string
+          error_types:
+            type: array
+            items:
+              type: object
+              properties:
+                code:
+                  type: string
+                description:
+                  type: string
+                recovery:
+                  type: string
+      
+      testing:
+        type: object
+        properties:
+          unit_tests:
+            type: string
+            description: Location of unit tests
+          integration_tests:
+            type: string
+          test_coverage_target:
+            type: number
+            minimum: 0
+            maximum: 100
+      
+      llm_guidance:
+        type: object
+        properties:
+          implementation_approach:
+            type: string
+            description: High-level guidance for LLM implementing this module
+          
+          key_patterns:
+            type: array
+            items:
+              type: string
+          
+          common_pitfalls:
+            type: array
+            items:
+              type: string
+          
+          testing_strategy:
+            type: string
+      
+      references:
+        type: array
+        items:
+          type: object
+          properties:
+            type:
+              type: string
+              enum: [spec, module, function, entity, api]
+            id:
+              type: string
+            file:
+              type: string
+
+example:
+  module:
+    id: backend_node
+    name: Node.js Backend Server
+    version: 1.0.0
+    description: |
+      Fastify-based API server implementing the primary business logic
+      and bridging to external services (OpenRouter, Git, Supabase later).
+    
+    responsibilities:
+      - Project, chat, message CRUD operations
+      - Context construction per spec/context.yaml
+      - Integration with OpenRouter for LLM calls
+      - Slash command parsing and dispatch
+      - Git operations (init, status, commit, push)
+    
+    boundaries:
+      in_scope:
+        - REST API endpoints
+        - Business logic
+        - External service integration
+      out_of_scope:
+        - UI rendering (handled by frontend)
+        - Code execution (handled by Python tools backend)
+    
+    dependencies:
+      modules:
+        - module_id: backend_python_tools
+          relationship: uses
+        - module_id: git_integration
+          relationship: depends_on
+      
+      external:
+        - name: fastify
+          version: "^4.0.0"
+          purpose: Web framework
+        - name: simple-git
+          version: "^3.0.0"
+          purpose: Git operations
+    
+    data_entities:
+      primary:
+        - entity: Project
+          operations: [create, read, update, delete, list]
+        - entity: Chat
+          operations: [create, read, update, delete, list]
+        - entity: Message
+          operations: [create, read, list]
+      
+      secondary:
+        - entity: DataEntity
+          usage: Reference and link to messages
+    
+    functions:
+      - id: create_project
+        name: createProject
+        purpose: Create a new project with Git initialization
+        visibility: public
+        reference: spec/functions/backend_node/create_project.yaml

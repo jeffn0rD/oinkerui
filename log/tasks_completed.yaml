@@ -8,8 +8,7 @@ tasks:
 - task:
     id: 0.0
     name: Add phase 0
-    goal: Add a phase 0 to the main specification document (./spec/spec.yaml); it
-      needs to outline any steps to prepare for phase 1 development.
+    goal: Add a phase 0 to the main specification document (./spec/spec.yaml); it needs to outline any steps to prepare for phase 1 development.
     completed_date: 2024-01-19
     files_modified:
     - spec/spec.yaml
@@ -105,21 +104,18 @@ tasks:
 
       Added tasks 0.2-0.9 to master_todo.yaml for systematic Phase 0 implementation.
 
-      Each task corresponds to a prompt file and has clear goals and verification
-      steps.
+      Each task corresponds to a prompt file and has clear goals and verification steps.
 
       '
     verification:
       test_results: All 6 tests passed
       tool_functionality: Verified across all query modes
-      prompt_completeness: All 8 prompts complete with context gathering, requirements,
-        steps, and verification
+      prompt_completeness: All 8 prompts complete with context gathering, requirements, steps, and verification
       tasks_added: Tasks 0.2-0.9 successfully added to master_todo.yaml
 - task:
     id: 0.2
     name: Create Root Project Structure
-    goal: Create the root project folder structure for frontend, backend, tests, docs,
-      and scripts.
+    goal: Create the root project folder structure for frontend, backend, tests, docs, and scripts.
     completed_date: '2026-01-20'
     files_created:
     - frontend/src/
@@ -149,12 +145,32 @@ tasks:
     - .github/workflows/
     - .github/workflows/.gitkeep
     - log/task_0.2_summary.yaml
-    summary: Successfully created the root project folder structure for the oinkerui
-      application. All directories, .gitkeep files, and README.md files have been
-      created as specified. The structure supports both local development (Phase 1-3)
-      and server deployment (Phase 4+).
+    summary: Successfully created the root project folder structure for the oinkerui application. All directories, .gitkeep files, and README.md files have been created as specified. The structure supports both local development (Phase 1-3) and server deployment (Phase 4+).
     verification:
       method: tree command
       result: success
-      notes: All directories and files created successfully. Structure verified with
-        tree command.
+      notes: All directories and files created successfully. Structure verified with tree command.
+- task:
+    id: 0.2.5
+    name: Specification refinement planning
+    goal: Generate a list of prompts to update and refine the specifications to full detail.
+    completed_date: '2026-01-20'
+    files_created:
+    - docs/SPEC_ANALYSIS.md
+    - spec/schemas/module_spec_schema.yaml
+    - spec/schemas/function_spec_schema.yaml
+    - prompts/dev/prompt_0_2_5_1.md
+    - prompts/dev/prompt_0_2_5_2.md
+    - prompts/dev/prompt_0_2_5_3.md
+    - prompts/dev/prompt_0_2_5_4.md
+    - prompts/dev/prompt_0_2_5_5.md
+    - prompts/dev/prompt_0_2_5_6.md
+    - tasks_0_2_5.yaml
+    - log/task_0.2.5_summary.yaml
+    files_modified:
+    - 'master_todo.yaml (added 6 new tasks: 0.2.5.1 - 0.2.5.6)'
+    summary: Successfully created comprehensive specification refinement plan with 6 focused subtasks, detailed prompts, schema definitions, and verification strategies. Created 100+ pages of documentation covering domain modeling, modules, functions, APIs, workflows, and verification.
+    verification:
+      method: Manual review
+      result: success
+      notes: 'All deliverables created: 1 analysis doc, 2 schemas, 6 prompts, 6 tasks'

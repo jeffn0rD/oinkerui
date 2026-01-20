@@ -4,79 +4,170 @@ description: 'This is a master development todo list for human and machine inter
   '
 prompt_guidance: 'Always follow these guidelines and update project documentation:
 
-  **** When possible and practical use deterministic methods (python code) to accomplish
-  tasks.  ****
+  **** When possible and practical use deterministic methods (python code) to accomplish tasks.  ****
 
-  * When processing tasks always creae a brief summary of steps and actions in log/task_<id>_summary.yaml
-  .
+  * When processing tasks always creae a brief summary of steps and actions in log/task_<id>_summary.yaml .
 
-  * when processing a task review the last task notes (log/task_<id>_notes.yaml).  There
-  may be information needed or remaining work that needs to be completed first.
+  * when processing a task review the last task notes (log/task_<id>_notes.yaml).  There may be information needed or remaining work that needs to be completed first.
 
-  * In the task_<id>_summary.yaml file always provide ''justification:'' for each
-  step/action.  It is important to track the decisions made and reasoning behind them.
+  * In the task_<id>_summary.yaml file always provide ''justification:'' for each step/action.  It is important to track the decisions made and reasoning behind them.
 
-  * If there are errors, inconsistencies, or inadequate information to accomplish
-  all goals of a task append questions to ./open_questions.yaml
+  * If there are errors, inconsistencies, or inadequate information to accomplish all goals of a task append questions to ./open_questions.yaml
 
-  * If the task is complete mark it complete by removing the task from the list in
-  this document and appending it to ./log/tasks_completed.yaml
+  * If the task is complete mark it complete by removing the task from the list in this document and appending it to ./log/tasks_completed.yaml
 
-  * Tasks should be verified before considered complete, when possible use a small
-  python script (save to ./verify/task_<id>_<descriptor>.py). The script should be
-  well commented as to what it does and why.
+  * Tasks should be verified before considered complete, when possible use a small python script (save to ./verify/task_<id>_<descriptor>.py). The script should be well commented as to what it does and why.
 
-  * Always make sure system documentation is up to date with work just done! manuals
-  go in ./man/*.yaml
+  * Always make sure system documentation is up to date with work just done! manuals go in ./man/*.yaml
 
-  * NOTE: All spec files need to have consistent references to each other.  This needs
-  to be verified whenever spec files are changed.
+  * NOTE: All spec files need to have consistent references to each other.  This needs to be verified whenever spec files are changed.
 
-  **** You can create temporary files to assist with task completion but they should
-  be removed when task is complete.  Use the files outlined here for project tracking.
-  ****
+  **** You can create temporary files to assist with task completion but they should be removed when task is complete.  Use the files outlined here for project tracking. ****
 
   **** It is important to keep the repository clean of uneccessary files. ****
 
-  **** Follow the task instructions closely and carefully.  Constrain work and scope
-  to the task.  Return with questions if needed and confirm any extra work if it is
-  outside the scope. ****
+  **** Follow the task instructions closely and carefully.  Constrain work and scope to the task.  Return with questions if needed and confirm any extra work if it is outside the scope. ****
 
   **** ALWAYS COMMIT AND PUSH the repository after a task. ****
 
   '
 current:
 - task:
-    id: 0.2.5
-    name: Specification refinement planning
-    goal: Generate a list of prompts to update and refine the specifications to full detail.    
+    id: 0.2.5.1
+    name: Domain Model & State Refinement
+    goal: Refine domain.yaml with complete state transitions, invariants, relationships, and validation rules. Create state machine specifications and diagrams.
+    prompt: ./prompts/dev/prompt_0_2_5_1.md
     files:
     - spec/domain.yaml
-    - spec/commands.yaml
-    - spec/apis.yaml
-    - spec/ui.yaml
-    - spec/workflows.yaml
-    - spec/spec.yaml
+    - spec/state_machines.yaml
+    - docs/diagrams/domain_model.mmd
+    - docs/diagrams/state_machine.mmd
     details:
       focus:
-      - "Domain modeling & vocabulary"
-      - "State model & invariants"
-      - "Workflows & data flows"
-      - "Interaction design (screens / APIs)"
-      - "Modules, functions, api endpoints"
-      - "Function contracts, inputs, outputs, side effects, and algorithm FOL"
+      - Entity state transitions
+      - Invariants and validation rules
+      - Relationship cardinalities
+      - State machine diagrams
       verification:
-      - verify any references in new/modified spec files are valid; graphs for review
-      guidance: |
-        Existing spec file detail must cover the entire application specification through (at least) phase 2.  New spec files need to be generated
-        for module specifications which will encapsulate function details.  Graphs need to be generated for domain/data model, state management, workflows, interaction, modules.
-        The files must contain links and references so they can be checked for consistency by deterministic tools.  
-        Module specs must clearly outline the module role, its interaction with other parts of the system, what data entities are used and how, interaction with system state,
-        and the functions of its implementation.  Functions need to have full contracts defined, inputs, outputs, side effects.  Function algorithms must be defined in first order logic and a complexity rating should be provided to assist with development planning.  Functions and modules should additionally have 'LLM prompt guidance' defined in order to assist an LLM agent with generating the required code.  This information needs to be enough to deterministically create the module and its function prototypes, and then spawn coding agents to complete the function implementation.  
-        Output a new set of tasks (at least 6) with corresponding prompts and, for modules/functions/algorithms a schema for the new (yaml) file structures.  Specify how everything will be linked together and verification strategy.  Graphs (mermaid) need to generated for each step as well for human review.
-        New tasks should be numbered 0.2.5.n and added to master_todo.yaml
-        Split the tasks up so that each step is focused with narrow scope and clear goals / outputs.
-        
+      - All entities have complete state definitions
+      - All state transitions have guards
+      - All invariants are checkable
+      - Diagrams render correctly
+- task:
+    id: 0.2.5.2
+    name: Module Specification Creation
+    goal: Create detailed module specifications for all 5 core modules following the module_spec_schema.yaml.
+    prompt: ./prompts/dev/prompt_0_2_5_2.md
+    files:
+    - spec/modules/frontend_svelte.yaml
+    - spec/modules/backend_node.yaml
+    - spec/modules/backend_python_tools.yaml
+    - spec/modules/git_integration.yaml
+    - spec/modules/logging_and_metrics.yaml
+    - docs/diagrams/module_dependencies.mmd
+    details:
+      focus:
+      - Module responsibilities and boundaries
+      - Dependencies and interfaces
+      - Function listings
+      - LLM implementation guidance
+      verification:
+      - All modules follow schema
+      - All dependencies are valid
+      - All functions are listed
+      - Module dependency diagram is complete
+- task:
+    id: 0.2.5.3
+    name: Function Specification Framework
+    goal: Create detailed function specifications for 20+ critical functions with contracts, FOL algorithms, and complexity analysis.
+    prompt: ./prompts/dev/prompt_0_2_5_3.md
+    files:
+    - spec/functions/backend_node/*.yaml
+    - spec/functions/frontend_svelte/*.yaml
+    - spec/functions/backend_python_tools/*.yaml
+    - spec/functions/git_integration/*.yaml
+    - spec/functions/logging_and_metrics/*.yaml
+    details:
+      focus:
+      - Function contracts (pre/post conditions)
+      - Algorithms in First Order Logic
+      - Complexity analysis
+      - LLM implementation guidance
+      verification:
+      - All functions follow schema
+      - FOL specifications are valid
+      - Complexity analysis is accurate
+      - All error cases documented
+- task:
+    id: 0.2.5.4
+    name: API & Interaction Detail
+    goal: Expand apis.yaml and ui.yaml with complete endpoint specifications and interaction flows.
+    prompt: ./prompts/dev/prompt_0_2_5_4.md
+    files:
+    - spec/apis.yaml
+    - spec/ui.yaml
+    - docs/diagrams/interaction_flow.mmd
+    - docs/diagrams/api_flow.mmd
+    details:
+      focus:
+      - Complete API endpoint specifications
+      - Request/response schemas
+      - UI interaction flows
+      - State changes per interaction
+      verification:
+      - All endpoints have complete specs
+      - All UI interactions documented
+      - All state changes specified
+      - Interaction diagrams complete
+- task:
+    id: 0.2.5.5
+    name: Workflow Implementation Specs
+    goal: Expand workflows.yaml with concrete workflow implementations for Phase 1-2.
+    prompt: ./prompts/dev/prompt_0_2_5_5.md
+    files:
+    - spec/workflows.yaml
+    - docs/diagrams/workflow_create_project.mmd
+    - docs/diagrams/workflow_send_message.mmd
+    - docs/diagrams/workflow_execute_command.mmd
+    - docs/diagrams/data_flow.mmd
+    details:
+      focus:
+      - Concrete workflow implementations
+      - Step-by-step specifications
+      - Error handling and rollback
+      - Workflow diagrams
+      verification:
+      - All workflows have complete steps
+      - All steps reference valid functions
+      - Error handling is comprehensive
+      - Workflow diagrams render correctly
+- task:
+    id: 0.2.5.6
+    name: Verification & Linking System
+    goal: Create comprehensive verification tools to validate specification completeness, consistency, and correctness.
+    prompt: ./prompts/dev/prompt_0_2_5_6.md
+    files:
+    - verify/check_spec_completeness.py
+    - verify/check_spec_references.py
+    - verify/check_spec_consistency.py
+    - verify/generate_traceability_matrix.py
+    - verify/generate_dependency_graphs.py
+    - verify/verify_all_specs.py
+    - docs/traceability/*.md
+    - docs/diagrams/generated/*.mmd
+    details:
+      focus:
+      - Completeness checking
+      - Reference validation
+      - Consistency checking
+      - Traceability matrices
+      - Dependency graphs
+      verification:
+      - All verification scripts execute
+      - No broken references
+      - All specs are complete
+      - Traceability matrices generated
+      - Dependency graphs generated
 - task:
     id: 0.3
     name: Initialize Node.js Project
@@ -199,20 +290,15 @@ current:
       notes:
       - develop mapping to data_models/types.
       steps:
-      - Review spec documents and determine details that need to be added for a complete
-        domain model.
+      - Review spec documents and determine details that need to be added for a complete domain model.
       - If more information is needed update ./open_questions.yaml
-      - New spec files can be created if appropriate.  Use verification script to
-        verify new files are referenced correctly.
+      - New spec files can be created if appropriate.  Use verification script to verify new files are referenced correctly.
       verification:
       - Run verify/verify_phase_0.py
       - All documentation complete
       - Git repository initialized
 future:
-- add context re-ordering feature; prompt/responses in chat history can be re-ordered
-  in the left side list, drag and drop and/or buttons move up/down.  Need a reset
-  button as well.
-- (LLM) crawl the spec files and look for inconsistencies and areas that need elaboration,
-  create document of questions to be addressed.
+- add context re-ordering feature; prompt/responses in chat history can be re-ordered in the left side list, drag and drop and/or buttons move up/down.  Need a reset button as well.
+- (LLM) crawl the spec files and look for inconsistencies and areas that need elaboration, create document of questions to be addressed.
 - repository bootstrapping with node/fastapi
 open_questions: []

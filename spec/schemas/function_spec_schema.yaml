@@ -1,0 +1,623 @@
+version: 1.0.0
+title: Function Specification Schema
+description: |
+  Schema for detailed function specifications. Each significant function
+  should have its own YAML file following this structure.
+
+schema:
+  function:
+    type: object
+    required:
+      - id
+      - name
+      - module
+      - purpose
+      - signature
+      - contract
+      - algorithm
+      - complexity
+      - llm_guidance
+    properties:
+      id:
+        type: string
+        description: Unique function identifier (e.g., "backend_node.create_project")
+      
+      name:
+        type: string
+        description: Function name in code
+      
+      module:
+        type: string
+        description: Parent module ID
+      
+      purpose:
+        type: string
+        description: What this function does and why it exists
+      
+      signature:
+        type: object
+        properties:
+          parameters:
+            type: array
+            items:
+              type: object
+              properties:
+                name:
+                  type: string
+                type:
+                  type: string
+                required:
+                  type: boolean
+                default:
+                  type: any
+                description:
+                  type: string
+                constraints:
+                  type: array
+                  items:
+                    type: string
+          
+          returns:
+            type: object
+            properties:
+              type:
+                type: string
+              description:
+                type: string
+              schema:
+                type: object
+          
+          throws:
+            type: array
+            items:
+              type: object
+              properties:
+                type:
+                  type: string
+                condition:
+                  type: string
+                description:
+                  type: string
+      
+      contract:
+        type: object
+        properties:
+          preconditions:
+            type: array
+            items:
+              type: string
+              description: Conditions that must be true before function executes
+          
+          postconditions:
+            type: array
+            items:
+              type: string
+              description: Conditions guaranteed to be true after function executes
+          
+          invariants:
+            type: array
+            items:
+              type: string
+              description: Conditions that remain true throughout execution
+          
+          side_effects:
+            type: array
+            items:
+              type: object
+              properties:
+                type:
+                  type: string
+                  enum: [state_mutation, io_operation, external_call, event_emission]
+                description:
+                  type: string
+                scope:
+                  type: string
+      
+      algorithm:
+        type: object
+        properties:
+          description:
+            type: string
+            description: High-level algorithm description
+          
+          steps:
+            type: array
+            items:
+              type: object
+              properties:
+                step:
+                  type: integer
+                action:
+                  type: string
+                rationale:
+                  type: string
+          
+          fol_specification:
+            type: string
+            description: |
+              Algorithm specified in First Order Logic.
+              Format: ∀x, ∃y, P(x) → Q(y) ∧ R(x,y)
+          
+          pseudocode:
+            type: string
+            description: Detailed pseudocode if FOL is insufficient
+      
+      complexity:
+        type: object
+        properties:
+          time:
+            type: string
+            description: Time complexity in Big-O notation
+          
+          space:
+            type: string
+            description: Space complexity in Big-O notation
+          
+          analysis:
+            type: string
+            description: Explanation of complexity analysis
+      
+      data_access:
+        type: object
+        properties:
+          reads:
+            type: array
+            items:
+              type: object
+              properties:
+                entity:
+                  type: string
+                operations:
+                  type: array
+                  items:
+                    type: string
+          
+          writes:
+            type: array
+            items:
+              type: object
+              properties:
+                entity:
+                  type: string
+                operations:
+                  type: array
+                  items:
+                    type: string
+          
+          transactions:
+            type: boolean
+            description: Whether function requires transactional semantics
+      
+      error_handling:
+        type: object
+        properties:
+          validation:
+            type: array
+            items:
+              type: object
+              properties:
+                parameter:
+                  type: string
+                validation:
+                  type: string
+                error_code:
+                  type: string
+          
+          error_cases:
+            type: array
+            items:
+              type: object
+              properties:
+                condition:
+                  type: string
+                error_type:
+                  type: string
+                recovery:
+                  type: string
+                  enum: [retry, fallback, propagate, log_and_continue]
+      
+      testing:
+        type: object
+        properties:
+          unit_tests:
+            type: array
+            items:
+              type: object
+              properties:
+                name:
+                  type: string
+                scenario:
+                  type: string
+                inputs:
+                  type: object
+                expected_output:
+                  type: any
+                expected_side_effects:
+                  type: array
+          
+          edge_cases:
+            type: array
+            items:
+              type: string
+          
+          integration_tests:
+            type: array
+            items:
+              type: string
+      
+      llm_guidance:
+        type: object
+        properties:
+          implementation_hints:
+            type: string
+            description: Guidance for LLM implementing this function
+          
+          key_considerations:
+            type: array
+            items:
+              type: string
+          
+          example_code:
+            type: string
+            description: Optional example implementation or pattern
+          
+          common_mistakes:
+            type: array
+            items:
+              type: string
+          
+          dependencies:
+            type: array
+            items:
+              type: string
+              description: Other functions or modules this depends on
+      
+      references:
+        type: array
+        items:
+          type: object
+          properties:
+            type:
+              type: string
+            id:
+              type: string
+            file:
+              type: string
+
+example:
+  function:
+    id: backend_node.create_project
+    name: createProject
+    module: backend_node
+    purpose: |
+      Create a new project with the given name and configuration.
+      Initializes the project directory structure, Git repository,
+      and creates the initial project metadata.
+    
+    signature:
+      parameters:
+        - name: projectName
+          type: string
+          required: true
+          description: Name of the project (must be unique)
+          constraints:
+            - "Length between 1 and 100 characters"
+            - "Must match pattern: ^[a-zA-Z0-9_-]+$"
+        
+        - name: options
+          type: object
+          required: false
+          default: {}
+          description: Optional project configuration
+          constraints:
+            - "Must conform to ProjectOptions schema"
+      
+      returns:
+        type: Project
+        description: Created project object with ID and metadata
+        schema:
+          $ref: "spec/domain.yaml#Project"
+      
+      throws:
+        - type: ValidationError
+          condition: "projectName is invalid"
+          description: "Project name doesn't meet constraints"
+        
+        - type: ConflictError
+          condition: "Project with name already exists"
+          description: "A project with this name already exists"
+        
+        - type: FileSystemError
+          condition: "Cannot create project directory"
+          description: "File system operation failed"
+    
+    contract:
+      preconditions:
+        - "projectName is a non-empty string"
+        - "projectName matches the allowed pattern"
+        - "No project with projectName exists"
+        - "Workspace root directory is accessible"
+      
+      postconditions:
+        - "Project directory exists at workspace_root/projects/{project_id}"
+        - "Git repository is initialized in project directory"
+        - "Project metadata file exists"
+        - "Project is added to global project index"
+        - "Returns valid Project object with unique ID"
+      
+      invariants:
+        - "Project ID is unique across all projects"
+        - "Project directory structure matches template"
+      
+      side_effects:
+        - type: io_operation
+          description: Creates directory structure on file system
+          scope: workspace_root/projects/{project_id}
+        
+        - type: external_call
+          description: Initializes Git repository
+          scope: Git command execution
+        
+        - type: state_mutation
+          description: Updates global project index
+          scope: Global application state
+    
+    algorithm:
+      description: |
+        1. Validate project name
+        2. Generate unique project ID
+        3. Check for conflicts
+        4. Create project directory structure
+        5. Initialize Git repository
+        6. Create project metadata
+        7. Update global index
+        8. Return project object
+      
+      steps:
+        - step: 1
+          action: Validate projectName against constraints
+          rationale: Ensure data integrity before any side effects
+        
+        - step: 2
+          action: Generate UUID for project ID
+          rationale: Ensure unique identifier
+        
+        - step: 3
+          action: Check if project with name exists in index
+          rationale: Prevent duplicates
+        
+        - step: 4
+          action: Create directory at workspace_root/projects/{project_id}
+          rationale: Establish project workspace
+        
+        - step: 5
+          action: Execute git init in project directory
+          rationale: Enable version control
+        
+        - step: 6
+          action: Write project.yaml with metadata
+          rationale: Persist project configuration
+        
+        - step: 7
+          action: Add project to global index
+          rationale: Make project discoverable
+        
+        - step: 8
+          action: Return Project object
+          rationale: Provide caller with project reference
+      
+      fol_specification: |
+        ∀name ∈ String, options ∈ Options:
+          Valid(name) ∧ ¬Exists(name) →
+            ∃id ∈ UUID, p ∈ Project:
+              p.id = id ∧
+              p.name = name ∧
+              p.created_at = now() ∧
+              DirExists(workspace_root/projects/id) ∧
+              GitInit(workspace_root/projects/id) ∧
+              InIndex(p)
+      
+      pseudocode: |
+        function createProject(projectName, options):
+          // Validation
+          if not isValidProjectName(projectName):
+            throw ValidationError("Invalid project name")
+          
+          // Generate ID
+          projectId = generateUUID()
+          
+          // Check conflicts
+          if projectExists(projectName):
+            throw ConflictError("Project already exists")
+          
+          // Create directory
+          projectPath = join(workspaceRoot, "projects", projectId)
+          createDirectory(projectPath)
+          
+          // Initialize Git
+          gitInit(projectPath)
+          
+          // Create metadata
+          project = {
+            id: projectId,
+            name: projectName,
+            slug: slugify(projectName),
+            created_at: now(),
+            updated_at: now(),
+            ...options
+          }
+          
+          writeFile(join(projectPath, "project.yaml"), project)
+          
+          // Update index
+          addToProjectIndex(project)
+          
+          return project
+    
+    complexity:
+      time: O(1)
+      space: O(1)
+      analysis: |
+        Time: Constant time operations (validation, UUID generation, file I/O)
+        Space: Fixed size project object and metadata
+        Note: Git init is O(1) for empty repository
+    
+    data_access:
+      reads:
+        - entity: Project
+          operations: [check_exists]
+      
+      writes:
+        - entity: Project
+          operations: [create, index]
+      
+      transactions: false
+    
+    error_handling:
+      validation:
+        - parameter: projectName
+          validation: "Must match ^[a-zA-Z0-9_-]+$ and length 1-100"
+          error_code: INVALID_PROJECT_NAME
+      
+      error_cases:
+        - condition: "Project name already exists"
+          error_type: ConflictError
+          recovery: propagate
+        
+        - condition: "File system error during directory creation"
+          error_type: FileSystemError
+          recovery: propagate
+        
+        - condition: "Git init fails"
+          error_type: GitError
+          recovery: propagate
+    
+    testing:
+      unit_tests:
+        - name: "creates project with valid name"
+          scenario: "Happy path with valid project name"
+          inputs:
+            projectName: "my-project"
+            options: {}
+          expected_output:
+            type: Project
+            properties:
+              name: "my-project"
+              slug: "my-project"
+          expected_side_effects:
+            - "Directory created"
+            - "Git initialized"
+            - "Project in index"
+        
+        - name: "throws error for invalid name"
+          scenario: "Project name with invalid characters"
+          inputs:
+            projectName: "my project!"
+          expected_output:
+            error: ValidationError
+        
+        - name: "throws error for duplicate name"
+          scenario: "Project with name already exists"
+          inputs:
+            projectName: "existing-project"
+          expected_output:
+            error: ConflictError
+      
+      edge_cases:
+        - "Empty project name"
+        - "Very long project name (>100 chars)"
+        - "Project name with only special characters"
+        - "Workspace root doesn't exist"
+        - "No write permissions"
+      
+      integration_tests:
+        - "Create project and verify Git repository"
+        - "Create project and verify in project list"
+        - "Create multiple projects and verify uniqueness"
+    
+    llm_guidance:
+      implementation_hints: |
+        1. Use a validation library (e.g., Joi, Zod) for input validation
+        2. Use uuid library for ID generation
+        3. Use simple-git library for Git operations
+        4. Implement atomic operations where possible
+        5. Use try-catch for error handling
+        6. Log all operations for debugging
+      
+      key_considerations:
+        - "Ensure atomic operations to prevent partial project creation"
+        - "Handle file system errors gracefully"
+        - "Validate inputs before any side effects"
+        - "Use transactions if database is involved"
+        - "Clean up on failure (delete directory if Git init fails)"
+      
+      example_code: |
+        async function createProject(projectName, options = {}) {
+          // Validation
+          const schema = Joi.string().pattern(/^[a-zA-Z0-9_-]+$/).min(1).max(100);
+          const { error } = schema.validate(projectName);
+          if (error) throw new ValidationError('Invalid project name');
+          
+          // Generate ID
+          const projectId = uuidv4();
+          
+          // Check conflicts
+          const exists = await projectIndex.has(projectName);
+          if (exists) throw new ConflictError('Project already exists');
+          
+          // Create directory
+          const projectPath = path.join(workspaceRoot, 'projects', projectId);
+          await fs.mkdir(projectPath, { recursive: true });
+          
+          try {
+            // Initialize Git
+            const git = simpleGit(projectPath);
+            await git.init();
+            
+            // Create metadata
+            const project = {
+              id: projectId,
+              name: projectName,
+              slug: slugify(projectName),
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              ...options
+            };
+            
+            await fs.writeFile(
+              path.join(projectPath, 'project.yaml'),
+              yaml.stringify(project)
+            );
+            
+            // Update index
+            await projectIndex.add(project);
+            
+            return project;
+          } catch (err) {
+            // Cleanup on failure
+            await fs.rm(projectPath, { recursive: true, force: true });
+            throw err;
+          }
+        }
+      
+      common_mistakes:
+        - "Not validating inputs before side effects"
+        - "Not handling cleanup on failure"
+        - "Not checking for existing projects"
+        - "Using synchronous file operations"
+        - "Not logging errors"
+      
+      dependencies:
+        - "uuid library"
+        - "simple-git library"
+        - "fs/promises"
+        - "path module"
+        - "validation library (Joi/Zod)"
+    
+    references:
+      - type: entity
+        id: Project
+        file: spec/domain.yaml#Project
+      - type: module
+        id: backend_node
+        file: spec/modules/backend_node.yaml
