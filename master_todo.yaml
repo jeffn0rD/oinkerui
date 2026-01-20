@@ -75,7 +75,8 @@ current:
         and the functions of its implementation.  Functions need to have full contracts defined, inputs, outputs, side effects.  Function algorithms must be defined in first order logic and a complexity rating should be provided to assist with development planning.  Functions and modules should additionally have 'LLM prompt guidance' defined in order to assist an LLM agent with generating the required code.  This information needs to be enough to deterministically create the module and its function prototypes, and then spawn coding agents to complete the function implementation.  
         Output a new set of tasks (at least 6) with corresponding prompts and, for modules/functions/algorithms a schema for the new (yaml) file structures.  Specify how everything will be linked together and verification strategy.  Graphs (mermaid) need to generated for each step as well for human review.
         New tasks should be numbered 0.2.5.n and added to master_todo.yaml
-      
+        Split the tasks up so that each step is focused with narrow scope and clear goals / outputs.
+        
 - task:
     id: 0.3
     name: Initialize Node.js Project
