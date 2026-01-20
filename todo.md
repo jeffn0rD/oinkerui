@@ -29,4 +29,4 @@
 - [x] Create task summary in log/task_0.2_summary.yaml
 - [x] Move task from master_todo.yaml to tasks_completed.yaml
 - [x] Commit and push changes
-- [ ] Run task cleanup tool
+- [x] Run task cleanup tool
