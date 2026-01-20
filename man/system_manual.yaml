@@ -137,7 +137,7 @@ sections:
       - Shell access disabled by default
       - Strict path validation
 
-- id: development_tools
+  - id: development_tools
     title: "Development Tools"
     content: |
       The project includes several automation tools for development workflow:
