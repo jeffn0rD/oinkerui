@@ -40,24 +40,6 @@ prompt_guidance: 'Always follow these guidelines and update project documentatio
   '
 current:
 - task:
-    id: 0.3.5
-    name: Initialize Node.js Project
-    goal: Initialize Node.js project with package.json and configure dependencies.
-    prompt: ./prompts/dev/prompt_0_3_5_updated.md
-    files:
-    - prompts/dev/prompt_0_3_5_updated.md
-    - spec/modules/backend_node.yaml
-    - spec/apis.yaml
-    - spec/config.yaml
-    details:
-      focus:
-      - package.json configuration
-      - Fastify and Svelte dependencies
-      - Development tools setup
-      verification:
-      - npm list --depth=0
-      - Verify all scripts work
-- task:
     id: 0.4
     name: Initialize Python Project
     goal: Initialize Python project with requirements.txt and configure FastAPI dependencies.
