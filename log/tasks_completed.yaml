@@ -1,95 +1,160 @@
-title: "Completed Tasks Log"
-description: |
-  This file tracks all completed tasks from the master_todo.yaml file.
+title: Completed Tasks Log
+description: 'This file tracks all completed tasks from the master_todo.yaml file.
+
   Each entry includes the task details, completion date, and summary.
 
+  '
 tasks:
-  - task:
-      id: 0.0
-      name: "Add phase 0"
-      goal: "Add a phase 0 to the main specification document (./spec/spec.yaml); it needs to outline any steps to prepare for phase 1 development."
-      completed_date: 2024-01-19
-      
-      files_modified:
-        - "spec/spec.yaml"
-      
-      files_created:
-        - "log/task_0.0_notes.yaml"
-        - "log/task_0.0_summary.yaml"
-        - "man/system_manual.yaml"
-        - "man/user_manual.yaml"
-        - "verify/check_spec_refs.py"
-      
-      summary: |
-        Successfully added phase 0 to the specification with comprehensive
-        preparation and bootstrapping steps. Created placeholder manual files
-        for system and user documentation. Implemented a verification script
-        to check spec file references and ensure consistency.
-        
-        Phase 0 defines concrete steps for:
-        - Project folder structure creation
-        - Node.js and Python initialization
-        - Development environment configuration
-        - Testing infrastructure setup
-        - Documentation templates
-        - Git repository initialization
-        - Specification verification tooling
-      
-      verification:
-        script_created: true
-        script_tested: true
-        result: "PASSED (0 errors, 2 warnings)"
-      
-      git_commit: "137ae7b"
-      git_pushed: true
-  
-  - task:
-      id: 0.1
-      name: "Phase 0 preparation"
-      goal: "Create tasks and tooling in preparation for phase 0 implementation."
-      completed_date: 2025-01-19
-      
-      files_created:
-        - "tools/doc_query.py"
-        - "verify/test_doc_query.py"
-        - "prompts/dev/prompt_0_2_1.md"
-        - "prompts/dev/prompt_0_2_2.md"
-        - "prompts/dev/prompt_0_2_3.md"
-        - "prompts/dev/prompt_0_2_4.md"
-        - "prompts/dev/prompt_0_2_5.md"
-        - "prompts/dev/prompt_0_2_6.md"
-        - "prompts/dev/prompt_0_2_7.md"
-        - "prompts/dev/prompt_0_2_8.md"
-        - "prompts/dev/prompt_0_2_9.md"
-        - "log/task_0.1_summary.yaml"
-      
-      files_modified:
-        - "master_todo.yaml (added tasks 0.2-0.9)"
-      
-      summary: |
-        Successfully created tooling and tasks for Phase 0 implementation.
-        
-        Created a Python-based document query tool (doc_query.py) that provides
-        contextual retrieval from specifications, logs, and todos. The tool supports
-        multiple query modes: text search, key search, file content retrieval, and
-        related files discovery with relevance scoring.
-        
-        Developed a comprehensive test suite (test_doc_query.py) with 6 tests covering
-        all functionality. All tests pass successfully.
-        
-        Created 8 detailed LLM prompt files (prompt_0_2_1.md through prompt_0_2_9.md)
-        for each Phase 0 step. Each prompt includes:
-        - Context gathering instructions using doc_query tool
-        - Specific requirements and dependencies
-        - Step-by-step implementation instructions
-        - Expected outputs and deliverables
-        - Verification steps
-        
-        Added tasks 0.2-0.9 to master_todo.yaml for systematic Phase 0 implementation.
-        Each task corresponds to a prompt file and has clear goals and verification steps.
-      
-      verification:
-        test_results: "All 6 tests passed"
-        tool_functionality: "Verified across all query modes"
-        prompt_completeness: "All 8 prompts complete with context gathering, requirements, steps, and verification"
-        tasks_added: "Tasks 0.2-0.9 successfully added to master_todo.yaml"
+- task:
+    id: 0.0
+    name: Add phase 0
+    goal: Add a phase 0 to the main specification document (./spec/spec.yaml); it
+      needs to outline any steps to prepare for phase 1 development.
+    completed_date: 2024-01-19
+    files_modified:
+    - spec/spec.yaml
+    files_created:
+    - log/task_0.0_notes.yaml
+    - log/task_0.0_summary.yaml
+    - man/system_manual.yaml
+    - man/user_manual.yaml
+    - verify/check_spec_refs.py
+    summary: 'Successfully added phase 0 to the specification with comprehensive
+
+      preparation and bootstrapping steps. Created placeholder manual files
+
+      for system and user documentation. Implemented a verification script
+
+      to check spec file references and ensure consistency.
+
+
+      Phase 0 defines concrete steps for:
+
+      - Project folder structure creation
+
+      - Node.js and Python initialization
+
+      - Development environment configuration
+
+      - Testing infrastructure setup
+
+      - Documentation templates
+
+      - Git repository initialization
+
+      - Specification verification tooling
+
+      '
+    verification:
+      script_created: true
+      script_tested: true
+      result: PASSED (0 errors, 2 warnings)
+    git_commit: 137ae7b
+    git_pushed: true
+- task:
+    id: 0.1
+    name: Phase 0 preparation
+    goal: Create tasks and tooling in preparation for phase 0 implementation.
+    completed_date: 2025-01-19
+    files_created:
+    - tools/doc_query.py
+    - verify/test_doc_query.py
+    - prompts/dev/prompt_0_2_1.md
+    - prompts/dev/prompt_0_2_2.md
+    - prompts/dev/prompt_0_2_3.md
+    - prompts/dev/prompt_0_2_4.md
+    - prompts/dev/prompt_0_2_5.md
+    - prompts/dev/prompt_0_2_6.md
+    - prompts/dev/prompt_0_2_7.md
+    - prompts/dev/prompt_0_2_8.md
+    - prompts/dev/prompt_0_2_9.md
+    - log/task_0.1_summary.yaml
+    files_modified:
+    - master_todo.yaml (added tasks 0.2-0.9)
+    summary: 'Successfully created tooling and tasks for Phase 0 implementation.
+
+
+      Created a Python-based document query tool (doc_query.py) that provides
+
+      contextual retrieval from specifications, logs, and todos. The tool supports
+
+      multiple query modes: text search, key search, file content retrieval, and
+
+      related files discovery with relevance scoring.
+
+
+      Developed a comprehensive test suite (test_doc_query.py) with 6 tests covering
+
+      all functionality. All tests pass successfully.
+
+
+      Created 8 detailed LLM prompt files (prompt_0_2_1.md through prompt_0_2_9.md)
+
+      for each Phase 0 step. Each prompt includes:
+
+      - Context gathering instructions using doc_query tool
+
+      - Specific requirements and dependencies
+
+      - Step-by-step implementation instructions
+
+      - Expected outputs and deliverables
+
+      - Verification steps
+
+
+      Added tasks 0.2-0.9 to master_todo.yaml for systematic Phase 0 implementation.
+
+      Each task corresponds to a prompt file and has clear goals and verification
+      steps.
+
+      '
+    verification:
+      test_results: All 6 tests passed
+      tool_functionality: Verified across all query modes
+      prompt_completeness: All 8 prompts complete with context gathering, requirements,
+        steps, and verification
+      tasks_added: Tasks 0.2-0.9 successfully added to master_todo.yaml
+- task:
+    id: 0.2
+    name: Create Root Project Structure
+    goal: Create the root project folder structure for frontend, backend, tests, docs,
+      and scripts.
+    completed_date: '2026-01-20'
+    files_created:
+    - frontend/src/
+    - frontend/public/
+    - frontend/tests/
+    - frontend/README.md
+    - frontend/public/.gitkeep
+    - frontend/tests/.gitkeep
+    - backend/src/
+    - backend/tests/
+    - backend/tools/
+    - backend/README.md
+    - backend/tests/.gitkeep
+    - backend/tools/.gitkeep
+    - docs/architecture/
+    - docs/api/
+    - docs/user/
+    - docs/README.md
+    - docs/architecture/.gitkeep
+    - docs/api/.gitkeep
+    - docs/user/.gitkeep
+    - scripts/
+    - scripts/README.md
+    - scripts/.gitkeep
+    - tests/
+    - tests/.gitkeep
+    - .github/workflows/
+    - .github/workflows/.gitkeep
+    - log/task_0.2_summary.yaml
+    summary: Successfully created the root project folder structure for the oinkerui
+      application. All directories, .gitkeep files, and README.md files have been
+      created as specified. The structure supports both local development (Phase 1-3)
+      and server deployment (Phase 4+).
+    verification:
+      method: tree command
+      result: success
+      notes: All directories and files created successfully. Structure verified with
+        tree command.

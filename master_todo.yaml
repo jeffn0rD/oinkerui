@@ -1,178 +1,187 @@
 title: oinkerui master todo list
-description: |
-  This is a master development todo list for human and machine interaction.
-  
-prompt_guidance: |
-  Always follow these guidelines and update project documentation:
-  **** When possible and practical use deterministic methods (python code) to accomplish tasks.  ****
-  * When processing tasks always creae a brief summary of steps and actions in log/task_<id>_summary.yaml .
-  * when processing a task review the last task notes (log/task_<id>_notes.yaml).  There may be information needed or remaining work that needs to be completed first.
-  * In the task_<id>_summary.yaml file always provide 'justification:' for each step/action.  It is important to track the decisions made and reasoning behind them.
-  * If there are errors, inconsistencies, or inadequate information to accomplish all goals of a task append questions to ./open_questions.yaml
-  * If the task is complete mark it complete by removing the task from the list in this document and appending it to ./log/tasks_completed.yaml
-  * Tasks should be verified before considered complete, when possible use a small python script (save to ./verify/task_<id>_<descriptor>.py). The script should be well commented as to what it does and why.
-  * Always make sure system documentation is up to date with work just done! manuals go in ./man/*.yaml
-  * NOTE: All spec files need to have consistent references to each other.  This needs to be verified whenever spec files are changed.
-  **** You can create temporary files to assist with task completion but they should be removed when task is complete.  Use the files outlined here for project tracking. ****
-  **** It is important to keep the repository clean of uneccessary files. ****
-  **** Follow the task instructions closely and carefully.  Constrain work and scope to the task.  Return with questions if needed and confirm any extra work if it is outside the scope. ****
-  **** ALWAYS COMMIT AND PUSH the repository after a task. ****
-  
-current:
-  - task:
-      id: 0.2
-      name: "Create Root Project Structure"
-      goal: "Create the root project folder structure for frontend, backend, tests, docs, and scripts."
-      prompt: "./prompts/dev/prompt_0_2_1.md"
-      files:
-        - "prompts/dev/prompt_0_2_1.md"
-      details:
-        focus:
-          - "Directory structure creation"
-          - "README files for each major directory"
-        verification:
-          - "Run tree command to verify structure"
-          - "Check all directories exist"
-          
-  - task:
-      id: 0.3
-      name: "Initialize Node.js Project"
-      goal: "Initialize Node.js project with package.json and configure dependencies."
-      prompt: "./prompts/dev/prompt_0_2_2.md"
-      files:
-        - "prompts/dev/prompt_0_2_2.md"
-        - "spec/apis.yaml"
-        - "spec/ui.yaml"
-      details:
-        focus:
-          - "package.json configuration"
-          - "Fastify and Svelte dependencies"
-          - "Development tools setup"
-        verification:
-          - "npm list --depth=0"
-          - "Verify all scripts work"
-          
-  - task:
-      id: 0.4
-      name: "Initialize Python Project"
-      goal: "Initialize Python project with requirements.txt and configure FastAPI dependencies."
-      prompt: "./prompts/dev/prompt_0_2_3.md"
-      files:
-        - "prompts/dev/prompt_0_2_3.md"
-        - "spec/apis.yaml"
-        - "spec/commands.yaml"
-      details:
-        focus:
-          - "requirements.txt creation"
-          - "FastAPI and dependencies"
-          - "Python development tools"
-        verification:
-          - "pip list in virtual environment"
-          - "Verify all tools configured"
-          
-  - task:
-      id: 0.5
-      name: "Initialize Svelte Frontend"
-      goal: "Set up Svelte frontend with Vite and Tailwind CSS."
-      prompt: "./prompts/dev/prompt_0_2_4.md"
-      files:
-        - "prompts/dev/prompt_0_2_4.md"
-        - "spec/ui.yaml"
-        - "spec/context.yaml"
-      details:
-        focus:
-          - "Svelte + Vite setup"
-          - "Tailwind CSS integration"
-          - "Basic component structure"
-        verification:
-          - "npm run dev in frontend/"
-          - "npm run build works"
-          
-  - task:
-      id: 0.6
-      name: "Create Development Environment Configuration"
-      goal: "Set up environment configuration files and configuration loaders."
-      prompt: "./prompts/dev/prompt_0_2_5.md"
-      files:
-        - "prompts/dev/prompt_0_2_5.md"
-        - "spec/config.yaml"
-      details:
-        focus:
-          - ".env.example creation"
-          - "Configuration loaders for Node.js and Python"
-          - "Environment-specific configs"
-        verification:
-          - "Test configuration loading"
-          - "Verify .env is gitignored"
-          
-  - task:
-      id: 0.7
-      name: "Create Build and Development Scripts"
-      goal: "Create build scripts, development scripts, and utility scripts."
-      prompt: "./prompts/dev/prompt_0_2_6.md"
-      files:
-        - "prompts/dev/prompt_0_2_6.md"
-        - "spec/workflows.yaml"
-      details:
-        focus:
-          - "Development scripts (dev.sh, dev.bat)"
-          - "Build scripts"
-          - "Utility scripts (setup, test, lint)"
-        verification:
-          - "Run npm run dev"
-          - "Run npm run build"
-          - "Test all scripts"
-          
-  - task:
-      id: 0.8
-      name: "Create Testing Infrastructure"
-      goal: "Set up testing infrastructure for frontend (Jest) and backend (pytest)."
-      prompt: "./prompts/dev/prompt_0_2_7.md"
-      files:
-        - "prompts/dev/prompt_0_2_7.md"
-        - "spec/domain.yaml"
-        - "spec/apis.yaml"
-      details:
-        focus:
-          - "Jest configuration for Svelte"
-          - "pytest configuration"
-          - "Example tests"
-        verification:
-          - "npm run test:frontend"
-          - "npm run test:backend"
-          - "All tests pass"
-          
-  - task:
-      id: 0.9
-      name: "Create Documentation and Initialize Git"
-      goal: "Create comprehensive documentation and initialize Git repository."
-      prompt: "./prompts/dev/prompt_0_2_8.md and prompt_0_2_9.md"
-      files:
-        - "prompts/dev/prompt_0_2_8.md"
-        - "prompts/dev/prompt_0_2_9.md"
-        - "spec/*.yaml"
-      details:
-        focus:
-          - "README.md, CONTRIBUTING.md, ARCHITECTURE.md"
-          - "API documentation"
-          - ".gitignore and Git setup"
-          - "Phase 0 verification"
-          - "Entities (User, Order, Invoice, Workflow, Task, etc.)."
-          - "Relationships (owns, approves, contains, depends_on, etc.)."
-        notes:
-          - "develop mapping to data_models/types."
-        steps:
-          - "Review spec documents and determine details that need to be added for a complete domain model."
-          - "If more information is needed update ./open_questions.yaml"
-          - "New spec files can be created if appropriate.  Use verification script to verify new files are referenced correctly."
-        verification:
-          - "Run verify/verify_phase_0.py"
-          - "All documentation complete"
-          - "Git repository initialized"
+description: 'This is a master development todo list for human and machine interaction.
 
-future: 
-  - "add context re-ordering feature; prompt/responses in chat history can be re-ordered in the left side list, drag and drop and/or buttons move up/down.  Need a reset button as well."
-  - "(LLM) crawl the spec files and look for inconsistencies and areas that need elaboration, create document of questions to be addressed."
-  - "repository bootstrapping with node/fastapi"
-      
+  '
+prompt_guidance: 'Always follow these guidelines and update project documentation:
+
+  **** When possible and practical use deterministic methods (python code) to accomplish
+  tasks.  ****
+
+  * When processing tasks always creae a brief summary of steps and actions in log/task_<id>_summary.yaml
+  .
+
+  * when processing a task review the last task notes (log/task_<id>_notes.yaml).  There
+  may be information needed or remaining work that needs to be completed first.
+
+  * In the task_<id>_summary.yaml file always provide ''justification:'' for each
+  step/action.  It is important to track the decisions made and reasoning behind them.
+
+  * If there are errors, inconsistencies, or inadequate information to accomplish
+  all goals of a task append questions to ./open_questions.yaml
+
+  * If the task is complete mark it complete by removing the task from the list in
+  this document and appending it to ./log/tasks_completed.yaml
+
+  * Tasks should be verified before considered complete, when possible use a small
+  python script (save to ./verify/task_<id>_<descriptor>.py). The script should be
+  well commented as to what it does and why.
+
+  * Always make sure system documentation is up to date with work just done! manuals
+  go in ./man/*.yaml
+
+  * NOTE: All spec files need to have consistent references to each other.  This needs
+  to be verified whenever spec files are changed.
+
+  **** You can create temporary files to assist with task completion but they should
+  be removed when task is complete.  Use the files outlined here for project tracking.
+  ****
+
+  **** It is important to keep the repository clean of uneccessary files. ****
+
+  **** Follow the task instructions closely and carefully.  Constrain work and scope
+  to the task.  Return with questions if needed and confirm any extra work if it is
+  outside the scope. ****
+
+  **** ALWAYS COMMIT AND PUSH the repository after a task. ****
+
+  '
+current:
+- task:
+    id: 0.3
+    name: Initialize Node.js Project
+    goal: Initialize Node.js project with package.json and configure dependencies.
+    prompt: ./prompts/dev/prompt_0_2_2.md
+    files:
+    - prompts/dev/prompt_0_2_2.md
+    - spec/apis.yaml
+    - spec/ui.yaml
+    details:
+      focus:
+      - package.json configuration
+      - Fastify and Svelte dependencies
+      - Development tools setup
+      verification:
+      - npm list --depth=0
+      - Verify all scripts work
+- task:
+    id: 0.4
+    name: Initialize Python Project
+    goal: Initialize Python project with requirements.txt and configure FastAPI dependencies.
+    prompt: ./prompts/dev/prompt_0_2_3.md
+    files:
+    - prompts/dev/prompt_0_2_3.md
+    - spec/apis.yaml
+    - spec/commands.yaml
+    details:
+      focus:
+      - requirements.txt creation
+      - FastAPI and dependencies
+      - Python development tools
+      verification:
+      - pip list in virtual environment
+      - Verify all tools configured
+- task:
+    id: 0.5
+    name: Initialize Svelte Frontend
+    goal: Set up Svelte frontend with Vite and Tailwind CSS.
+    prompt: ./prompts/dev/prompt_0_2_4.md
+    files:
+    - prompts/dev/prompt_0_2_4.md
+    - spec/ui.yaml
+    - spec/context.yaml
+    details:
+      focus:
+      - Svelte + Vite setup
+      - Tailwind CSS integration
+      - Basic component structure
+      verification:
+      - npm run dev in frontend/
+      - npm run build works
+- task:
+    id: 0.6
+    name: Create Development Environment Configuration
+    goal: Set up environment configuration files and configuration loaders.
+    prompt: ./prompts/dev/prompt_0_2_5.md
+    files:
+    - prompts/dev/prompt_0_2_5.md
+    - spec/config.yaml
+    details:
+      focus:
+      - .env.example creation
+      - Configuration loaders for Node.js and Python
+      - Environment-specific configs
+      verification:
+      - Test configuration loading
+      - Verify .env is gitignored
+- task:
+    id: 0.7
+    name: Create Build and Development Scripts
+    goal: Create build scripts, development scripts, and utility scripts.
+    prompt: ./prompts/dev/prompt_0_2_6.md
+    files:
+    - prompts/dev/prompt_0_2_6.md
+    - spec/workflows.yaml
+    details:
+      focus:
+      - Development scripts (dev.sh, dev.bat)
+      - Build scripts
+      - Utility scripts (setup, test, lint)
+      verification:
+      - Run npm run dev
+      - Run npm run build
+      - Test all scripts
+- task:
+    id: 0.8
+    name: Create Testing Infrastructure
+    goal: Set up testing infrastructure for frontend (Jest) and backend (pytest).
+    prompt: ./prompts/dev/prompt_0_2_7.md
+    files:
+    - prompts/dev/prompt_0_2_7.md
+    - spec/domain.yaml
+    - spec/apis.yaml
+    details:
+      focus:
+      - Jest configuration for Svelte
+      - pytest configuration
+      - Example tests
+      verification:
+      - npm run test:frontend
+      - npm run test:backend
+      - All tests pass
+- task:
+    id: 0.9
+    name: Create Documentation and Initialize Git
+    goal: Create comprehensive documentation and initialize Git repository.
+    prompt: ./prompts/dev/prompt_0_2_8.md and prompt_0_2_9.md
+    files:
+    - prompts/dev/prompt_0_2_8.md
+    - prompts/dev/prompt_0_2_9.md
+    - spec/*.yaml
+    details:
+      focus:
+      - README.md, CONTRIBUTING.md, ARCHITECTURE.md
+      - API documentation
+      - .gitignore and Git setup
+      - Phase 0 verification
+      - Entities (User, Order, Invoice, Workflow, Task, etc.).
+      - Relationships (owns, approves, contains, depends_on, etc.).
+      notes:
+      - develop mapping to data_models/types.
+      steps:
+      - Review spec documents and determine details that need to be added for a complete
+        domain model.
+      - If more information is needed update ./open_questions.yaml
+      - New spec files can be created if appropriate.  Use verification script to
+        verify new files are referenced correctly.
+      verification:
+      - Run verify/verify_phase_0.py
+      - All documentation complete
+      - Git repository initialized
+future:
+- add context re-ordering feature; prompt/responses in chat history can be re-ordered
+  in the left side list, drag and drop and/or buttons move up/down.  Need a reset
+  button as well.
+- (LLM) crawl the spec files and look for inconsistencies and areas that need elaboration,
+  create document of questions to be addressed.
+- repository bootstrapping with node/fastapi
 open_questions: []
