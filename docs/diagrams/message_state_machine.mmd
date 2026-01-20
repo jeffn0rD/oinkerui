@@ -1,0 +1,94 @@
+%%{init: {'theme': 'dark', 'themeVariables': { 'primaryColor': '#1e3a5f'}}}%%
+
+stateDiagram-v2
+    [*] --> Pending: create_message(role=assistant)
+    [*] --> Complete: create_message(role=user)
+
+    state Pending {
+        [*] --> AwaitingLLM
+        AwaitingLLM --> Streaming: stream_started
+        Streaming --> AwaitingLLM: stream_paused
+        
+        AwaitingLLM: Waiting for LLM response
+        Streaming: Receiving streamed content
+    }
+
+    Pending --> Complete: processing_complete
+    Pending --> Error: processing_failed
+    Pending --> Discarded: user_cancelled
+
+    state Complete {
+        [*] --> Finalized
+        Finalized: Content is final
+        Finalized: Message persisted
+        Finalized: In context by default
+    }
+
+    Complete --> Discarded: discard_message()
+
+    state Error {
+        [*] --> Failed
+        Failed: Error captured
+        Failed: May have partial content
+        Failed: Retry may be available
+    }
+
+    Error --> Pending: retry_message()
+    Error --> Discarded: discard_message()
+
+    state Discarded {
+        [*] --> Excluded
+        Excluded: is_discarded = true
+        Excluded: include_in_context = false
+        Excluded: Terminal state
+    }
+
+    note right of Pending
+        Entry Actions:
+        - mark_chat_busy
+        - create_placeholder
+        
+        Exit Actions:
+        - clear_chat_busy
+        
+        Guards for Complete:
+        - content_received()
+    end note
+
+    note right of Complete
+        Entry Actions:
+        - update_chat_timestamp
+        - persist_message
+        - update_context_cache
+        
+        Guards for Discard:
+        - not_pinned()
+        
+        Invariants:
+        - content is finalized
+        - message is persisted
+    end note
+
+    note right of Error
+        Entry Actions:
+        - log_error
+        - store_error_info
+        
+        Guards for Retry:
+        - retry_allowed()
+    end note
+
+    note right of Discarded
+        Entry Actions:
+        - set_is_discarded_true
+        - set_include_in_context_false
+        - persist_discard_state
+        
+        Terminal State:
+        Cannot transition out
+        
+        Invariants:
+        - is_discarded = true
+        - include_in_context = false
+        - is_pinned = false
+    end note

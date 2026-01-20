@@ -1,0 +1,75 @@
+%%{init: {'theme': 'dark', 'themeVariables': { 'primaryColor': '#1e3a5f'}}}%%
+
+stateDiagram-v2
+    [*] --> Active: create_entity()
+
+    state Active {
+        [*] --> Indexed
+        Indexed --> Watching: file_watcher_enabled
+        Watching --> Indexed: file_watcher_disabled
+        
+        Indexed: Entity is indexed
+        Indexed: Content hash computed
+        Watching: Monitoring for changes
+    }
+
+    Active --> Modified: content_changed
+    Active --> Deleted: delete_entity()
+
+    state Modified {
+        [*] --> Dirty
+        Dirty: Changes detected
+        Dirty: Needs sync
+        Dirty: Hash updated
+    }
+
+    Modified --> Active: sync_complete
+    Modified --> Deleted: delete_entity()
+
+    state Deleted {
+        [*] --> RemovedFromIndex
+        RemovedFromIndex --> BackupAvailable: backup_created
+        
+        RemovedFromIndex: Not in entity index
+        BackupAvailable: Can be restored
+    }
+
+    Deleted --> Active: restore_entity()
+
+    note right of Active
+        Entry Actions:
+        - index_entity
+        - compute_hash
+        
+        Invariants:
+        - entity is indexed
+        - resource exists (file/dir)
+        
+        Guards for Delete:
+        - not_referenced_by_active_messages()
+          (soft guard - warning only)
+    end note
+
+    note right of Modified
+        Entry Actions:
+        - mark_dirty
+        - update_hash
+        
+        Invariants:
+        - dirty flag is set
+        - hash differs from previous
+    end note
+
+    note right of Deleted
+        Entry Actions:
+        - remove_from_index
+        - log_deletion
+        - clear_references
+        
+        Guards for Restore:
+        - backup_exists()
+        
+        Invariants:
+        - not in entity index
+        - references updated
+    end note

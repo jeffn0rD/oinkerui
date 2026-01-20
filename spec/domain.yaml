@@ -1,209 +1,1072 @@
-version: 0.1.0
+version: "0.1.0"
+title: Domain Model Specification
+description: |
+  Complete domain model with entities, state machines, invariants,
+  relationships, and validation rules for the OinkerUI system.
+
+# =============================================================================
+# ENTITIES
+# =============================================================================
 
 entities:
-
+  # ---------------------------------------------------------------------------
+  # Project Entity
+  # ---------------------------------------------------------------------------
   Project:
-    id: { type: uuid, required: true }
-    name: { type: string, required: true }
-    slug: { type: string, required: true }
-    description: { type: string }
-    status: { type: enum, values: [active, archived, deleted], default: active }
-    created_at: { type: datetime, required: true }
-    updated_at: { type: datetime, required: true }
+    description: |
+      A project represents a Git-backed workspace containing chats, data entities,
+      and associated metadata. Projects are the primary organizational unit.
+    
+    fields:
+      id:
+        type: uuid
+        required: true
+        description: Unique identifier for the project
+      name:
+        type: string
+        required: true
+        description: Human-readable project name
+      slug:
+        type: string
+        required: true
+        description: URL-safe identifier derived from name
+      description:
+        type: string
+        required: false
+        description: Optional project description
+      status:
+        type: enum
+        values: [initializing, active, archived, deleted]
+        default: initializing
+        description: Current lifecycle state of the project
+      created_at:
+        type: datetime
+        required: true
+        description: Timestamp when project was created
+      updated_at:
+        type: datetime
+        required: true
+        description: Timestamp of last modification
+      default_model:
+        type: string
+        required: true
+        description: Default LLM model for new chats
+      settings:
+        type: object
+        properties:
+          max_context_tokens:
+            type: integer
+            default: 32000
+          context_truncation_strategy:
+            type: enum
+            values: [drop_oldest_non_pinned]
+            default: drop_oldest_non_pinned
+          git_commit_policy:
+            type: enum
+            values: [auto_batch, manual_only]
+            default: auto_batch
+      paths:
+        type: object
+        properties:
+          root:
+            type: string
+            description: Absolute path to project root
+          chats_dir:
+            type: string
+          data_dir:
+            type: string
+          logs_dir:
+            type: string
+          public_dir:
+            type: string
 
-    default_model: { type: string, required: true } # model id from config
-    settings:
-      type: object
-      properties:
-        max_context_tokens: { type: integer, default: 32000 }
-        context_truncation_strategy:
-          type: enum
-          values: [drop_oldest_non_pinned]
-          default: drop_oldest_non_pinned
-        git_commit_policy:
-          type: enum
-          values: [auto_batch, manual_only]
-          default: auto_batch
+    # State Machine Definition
+    states:
+      - name: initializing
+        description: Project is being created and set up
+        entry_actions:
+          - create_project_directory
+          - initialize_git_repository
+          - create_metadata_files
+        exit_actions:
+          - validate_project_structure
+        transitions:
+          - to: active
+            trigger: initialization_complete
+            guards:
+              - git_repo_initialized
+              - metadata_created
+              - directory_structure_valid
+          - to: deleted
+            trigger: initialization_failed
+            guards:
+              - cleanup_required
 
-    # Filesystem-level attributes:
-    paths:
-      type: object
-      properties:
-        root: { type: string, description: "Absolute path to project root" }
-        chats_dir: { type: string }
-        data_dir: { type: string }
-        logs_dir: { type: string }
-        public_dir: { type: string }
+      - name: active
+        description: Project is ready for use
+        entry_actions:
+          - add_to_project_index
+          - emit_project_created_event
+        exit_actions:
+          - close_active_chats
+        transitions:
+          - to: archived
+            trigger: archive_project
+            guards:
+              - no_pending_operations
+          - to: deleted
+            trigger: delete_project
+            guards:
+              - user_confirmed_deletion
 
-    relations:
-      chats:
-        type: list
-        items: { $ref: Chat.id }
-      data_entities:
-        type: list
-        items: { $ref: DataEntity.id }
+      - name: archived
+        description: Project is archived but preserved
+        entry_actions:
+          - remove_from_active_index
+          - add_to_archive_index
+        exit_actions:
+          - validate_directory_exists
+        transitions:
+          - to: active
+            trigger: restore_project
+            guards:
+              - directory_exists
+              - git_repo_valid
+          - to: deleted
+            trigger: delete_project
+            guards:
+              - user_confirmed_deletion
 
+      - name: deleted
+        description: Project is marked for deletion
+        entry_actions:
+          - remove_from_all_indexes
+          - schedule_directory_cleanup
+        transitions: []
+
+    # Invariants
+    invariants:
+      - id: project_id_unique
+        description: "id is unique across all projects"
+        expression: "forall p1, p2 in Projects: p1.id = p2.id implies p1 = p2"
+      - id: project_slug_unique_active
+        description: "slug is unique within active and archived projects"
+        expression: "forall p1, p2 in Projects: (p1.status in {active, archived} and p2.status in {active, archived} and p1.slug = p2.slug) implies p1 = p2"
+      - id: timestamps_ordered
+        description: "created_at is always <= updated_at"
+        expression: "forall p in Projects: p.created_at <= p.updated_at"
+      - id: active_requires_directory
+        description: "Active projects must have existing directory"
+        expression: "forall p in Projects: p.status = active implies exists(p.paths.root)"
+      - id: active_requires_git
+        description: "Active projects must have initialized git repository"
+        expression: "forall p in Projects: p.status = active implies is_git_repo(p.paths.root)"
+      - id: deleted_no_index
+        description: "Deleted projects are not in any index"
+        expression: "forall p in Projects: p.status = deleted implies (p not_in active_index and p not_in archive_index)"
+
+    # Relationships
+    relationships:
+      - entity: Chat
+        type: one_to_many
+        cardinality: "1:N"
+        foreign_key: project_id
+        description: "A project contains zero or more chats"
+        cascade_delete: true
+        inverse: project
+      - entity: DataEntity
+        type: one_to_many
+        cardinality: "1:N"
+        foreign_key: project_id
+        description: "A project contains zero or more data entities"
+        cascade_delete: true
+        inverse: project
+      - entity: LLMRequestLogEntry
+        type: one_to_many
+        cardinality: "1:N"
+        foreign_key: project_id
+        description: "A project has zero or more LLM request logs"
+        cascade_delete: true
+        inverse: project
+      - entity: User
+        type: many_to_one
+        cardinality: "N:1"
+        foreign_key: owner_id
+        description: "A project is owned by one user (Phase 4+)"
+        cascade_delete: false
+        inverse: projects
+
+    # Validation Rules
+    validation:
+      name:
+        - rule: pattern
+          value: "^[a-zA-Z0-9][a-zA-Z0-9_\\- ]*$"
+          message: "Name must start with alphanumeric and contain only alphanumeric, underscore, hyphen, or space"
+        - rule: length
+          min: 1
+          max: 100
+          message: "Name must be between 1 and 100 characters"
+      slug:
+        - rule: pattern
+          value: "^[a-z0-9][a-z0-9-]*$"
+          message: "Slug must be lowercase alphanumeric with hyphens, starting with alphanumeric"
+        - rule: length
+          min: 1
+          max: 100
+          message: "Slug must be between 1 and 100 characters"
+        - rule: unique
+          scope: active_and_archived_projects
+          message: "Slug must be unique among active and archived projects"
+      default_model:
+        - rule: not_empty
+          message: "Default model must be specified"
+
+  # ---------------------------------------------------------------------------
+  # Chat Entity
+  # ---------------------------------------------------------------------------
   Chat:
-    id: { type: uuid, required: true }
-    project_id: { $ref: Project.id, required: true }
-    name: { type: string, required: true }  # derived but editable
-    created_at: { type: datetime, required: true }
-    updated_at: { type: datetime, required: true }
+    description: |
+      A chat represents a conversation thread within a project, containing
+      messages and associated metadata. Chats can be forked from other chats.
+    
+    fields:
+      id:
+        type: uuid
+        required: true
+        description: Unique identifier for the chat
+      project_id:
+        $ref: Project.id
+        required: true
+        description: Reference to parent project
+      name:
+        type: string
+        required: true
+        description: Human-readable chat name
+      status:
+        type: enum
+        values: [active, closed, archived]
+        default: active
+        description: Current lifecycle state of the chat
+      created_at:
+        type: datetime
+        required: true
+        description: Timestamp when chat was created
+      updated_at:
+        type: datetime
+        required: true
+        description: Timestamp of last modification
+      forked_from_chat_id:
+        type: uuid
+        nullable: true
+        description: ID of chat this was forked from (if any)
+      forked_at_message_id:
+        type: uuid
+        nullable: true
+        description: Message ID where fork occurred
+      system_prelude:
+        type: object
+        properties:
+          source_type:
+            type: enum
+            values: [inline, template]
+            default: inline
+          template_id:
+            type: string
+            nullable: true
+          content:
+            type: string
+            required: true
+      storage_path:
+        type: string
+        required: true
+        description: Path to chat storage file (JSONL)
 
-    forked_from_chat_id: { type: uuid, nullable: true }
-    forked_at_message_id: { type: uuid, nullable: true }
+    # State Machine Definition
+    states:
+      - name: active
+        description: Chat is open and accepting messages
+        entry_actions:
+          - load_message_history
+          - initialize_context
+        exit_actions:
+          - save_pending_changes
+        transitions:
+          - to: closed
+            trigger: close_chat
+            guards: []
+          - to: archived
+            trigger: archive_chat
+            guards:
+              - no_pending_llm_requests
 
-    # System prelude for this chat (snapshot)
-    system_prelude:
-      type: object
-      properties:
-        source_type: { type: enum, values: [inline, template], default: inline }
-        template_id: { type: string, nullable: true }
-        content: { type: string, required: true }
+      - name: closed
+        description: Chat is closed but can be reopened
+        entry_actions:
+          - save_final_state
+        exit_actions: []
+        transitions:
+          - to: active
+            trigger: reopen_chat
+            guards:
+              - project_is_active
+          - to: archived
+            trigger: archive_chat
+            guards: []
 
-    # Path to JSONL log file
-    storage_path: { type: string, required: true }
+      - name: archived
+        description: Chat is archived and read-only
+        entry_actions:
+          - mark_read_only
+        exit_actions: []
+        transitions:
+          - to: active
+            trigger: restore_chat
+            guards:
+              - project_is_active
 
+    # Invariants
+    invariants:
+      - id: chat_id_unique
+        description: "id is unique across all chats"
+        expression: "forall c1, c2 in Chats: c1.id = c2.id implies c1 = c2"
+      - id: chat_project_exists
+        description: "project_id must reference existing project"
+        expression: "forall c in Chats: exists p in Projects: c.project_id = p.id"
+      - id: chat_timestamps_ordered
+        description: "created_at is always <= updated_at"
+        expression: "forall c in Chats: c.created_at <= c.updated_at"
+      - id: fork_consistency
+        description: "If forked_from_chat_id is set, forked_at_message_id must also be set"
+        expression: "forall c in Chats: (c.forked_from_chat_id != null) implies (c.forked_at_message_id != null)"
+      - id: fork_reference_valid
+        description: "forked_from_chat_id must reference existing chat"
+        expression: "forall c in Chats: (c.forked_from_chat_id != null) implies (exists c2 in Chats: c.forked_from_chat_id = c2.id)"
+      - id: active_chat_active_project
+        description: "Active chats must belong to active projects"
+        expression: "forall c in Chats: c.status = active implies (exists p in Projects: c.project_id = p.id and p.status = active)"
+
+    # Relationships
+    relationships:
+      - entity: Project
+        type: many_to_one
+        cardinality: "N:1"
+        foreign_key: project_id
+        description: "A chat belongs to one project"
+        cascade_delete: false
+        inverse: chats
+      - entity: Message
+        type: one_to_many
+        cardinality: "1:N"
+        foreign_key: chat_id
+        description: "A chat contains zero or more messages"
+        cascade_delete: true
+        inverse: chat
+      - entity: Chat
+        type: many_to_one
+        cardinality: "N:1"
+        foreign_key: forked_from_chat_id
+        description: "A chat may be forked from another chat"
+        cascade_delete: false
+        inverse: forked_chats
+
+    # Validation Rules
+    validation:
+      name:
+        - rule: length
+          min: 1
+          max: 200
+          message: "Chat name must be between 1 and 200 characters"
+      storage_path:
+        - rule: not_empty
+          message: "Storage path must be specified"
+        - rule: pattern
+          value: "^[^/].*\\.jsonl$"
+          message: "Storage path must be relative and end with .jsonl"
+
+  # ---------------------------------------------------------------------------
+  # Message Entity
+  # ---------------------------------------------------------------------------
   Message:
-    id: { type: uuid, required: true }
-    chat_id: { $ref: Chat.id, required: true }
-    project_id: { $ref: Project.id, required: true }
+    description: |
+      A message represents a single turn in a chat conversation. Messages have
+      various flags controlling their inclusion in context and display behavior.
+    
+    fields:
+      id:
+        type: uuid
+        required: true
+        description: Unique identifier for the message
+      chat_id:
+        $ref: Chat.id
+        required: true
+        description: Reference to parent chat
+      project_id:
+        $ref: Project.id
+        required: true
+        description: Reference to parent project (denormalized for queries)
+      role:
+        type: enum
+        values: [system, user, assistant, tool]
+        required: true
+        description: Role of the message sender
+      content:
+        type: string
+        required: true
+        description: Message content (may be empty for tool messages)
+      status:
+        type: enum
+        values: [pending, complete, error, discarded]
+        default: complete
+        description: Current state of the message
+      raw_template:
+        type: object
+        nullable: true
+        properties:
+          template_id:
+            type: string
+          template_text:
+            type: string
+          variables_used:
+            type: object
+      created_at:
+        type: datetime
+        required: true
+        description: Timestamp when message was created
+      include_in_context:
+        type: boolean
+        default: true
+        description: Whether to include in LLM context
+      is_aside:
+        type: boolean
+        default: false
+        description: Aside message (excluded from future context)
+      pure_aside:
+        type: boolean
+        default: false
+        description: Pure aside (context ignores all prior messages)
+      is_pinned:
+        type: boolean
+        default: false
+        description: Pinned messages are always included in context
+      is_discarded:
+        type: boolean
+        default: false
+        description: Discarded messages are never included
+      parent_message_id:
+        type: uuid
+        nullable: true
+        description: For branching/requery scenarios
+      llm_info:
+        type: object
+        nullable: true
+        properties:
+          model:
+            type: string
+          request_id:
+            type: uuid
+          output_format_hint:
+            type: enum
+            values: [text, markdown, json]
+            default: text
+          usage:
+            type: object
+            properties:
+              prompt_tokens:
+                type: integer
+              completion_tokens:
+                type: integer
+              total_tokens:
+                type: integer
+          timings:
+            type: object
+            properties:
+              latency_ms:
+                type: integer
+              duration_ms:
+                type: integer
+      related_entity_ids:
+        type: list
+        items:
+          $ref: DataEntity.id
 
-    role:
-      type: enum
-      values: [system, user, assistant, tool]
-      required: true
+    # State Machine Definition
+    states:
+      - name: pending
+        description: Message is being processed (e.g., awaiting LLM response)
+        entry_actions:
+          - mark_chat_busy
+        exit_actions: []
+        transitions:
+          - to: complete
+            trigger: processing_complete
+            guards:
+              - content_received
+          - to: error
+            trigger: processing_failed
+            guards: []
+          - to: discarded
+            trigger: user_cancelled
+            guards: []
 
-    content: { type: string, required: true } # fully resolved text
-    raw_template:
-      type: object
-      nullable: true
-      properties:
-        template_id: { type: string }
-        template_text: { type: string }
-        variables_used: { type: object } # name -> value
+      - name: complete
+        description: Message is complete and finalized
+        entry_actions:
+          - update_chat_timestamp
+          - log_message
+        exit_actions: []
+        transitions:
+          - to: discarded
+            trigger: discard_message
+            guards:
+              - not_pinned
 
-    created_at: { type: datetime, required: true }
+      - name: error
+        description: Message processing encountered an error
+        entry_actions:
+          - log_error
+        exit_actions: []
+        transitions:
+          - to: pending
+            trigger: retry_message
+            guards:
+              - retry_allowed
+          - to: discarded
+            trigger: discard_message
+            guards: []
 
-    # Context & behavior flags
-    include_in_context: { type: boolean, default: true }
-    is_aside: { type: boolean, default: false }
-    pure_aside: { type: boolean, default: false }  # ignore all previous history
-    is_pinned: { type: boolean, default: false }
-    is_discarded: { type: boolean, default: false } # e.g., from requery
+      - name: discarded
+        description: Message is discarded and excluded from context
+        entry_actions:
+          - set_is_discarded_true
+          - set_include_in_context_false
+        exit_actions: []
+        transitions: []
 
-    parent_message_id: { type: uuid, nullable: true } # for threading / requery branches
+    # Invariants
+    invariants:
+      - id: message_id_unique
+        description: "id is unique across all messages"
+        expression: "forall m1, m2 in Messages: m1.id = m2.id implies m1 = m2"
+      - id: message_chat_exists
+        description: "chat_id must reference existing chat"
+        expression: "forall m in Messages: exists c in Chats: m.chat_id = c.id"
+      - id: message_project_consistent
+        description: "project_id must match chat's project_id"
+        expression: "forall m in Messages: exists c in Chats: m.chat_id = c.id and m.project_id = c.project_id"
+      - id: pinned_not_discarded
+        description: "Pinned messages cannot be discarded"
+        expression: "forall m in Messages: m.is_pinned implies not m.is_discarded"
+      - id: discarded_not_in_context
+        description: "Discarded messages are not included in context"
+        expression: "forall m in Messages: m.is_discarded implies not m.include_in_context"
+      - id: pure_aside_is_aside
+        description: "Pure aside implies aside"
+        expression: "forall m in Messages: m.pure_aside implies m.is_aside"
+      - id: aside_not_in_future_context
+        description: "Aside messages are excluded from future context"
+        expression: "forall m in Messages: m.is_aside implies not m.include_in_context"
+      - id: system_role_constraints
+        description: "System messages cannot be asides or pinned"
+        expression: "forall m in Messages: m.role = system implies (not m.is_aside and not m.is_pinned)"
+      - id: assistant_has_llm_info
+        description: "Assistant messages should have llm_info"
+        expression: "forall m in Messages: (m.role = assistant and m.status = complete) implies m.llm_info != null"
 
-    # LLM/tool metadata for assistant/tool messages
-    llm_info:
-      type: object
-      nullable: true
-      properties:
-        model: { type: string }
-        request_id: { type: uuid }
-        output_format_hint:
-          type: enum
-          values: [text, markdown, json]
-          default: text
-        usage:
-          type: object
-          properties:
-            prompt_tokens: { type: integer }
-            completion_tokens: { type: integer }
-            total_tokens: { type: integer }
-        timings:
-          type: object
-          properties:
-            latency_ms: { type: integer }
-            duration_ms: { type: integer }
+    # Relationships
+    relationships:
+      - entity: Chat
+        type: many_to_one
+        cardinality: "N:1"
+        foreign_key: chat_id
+        description: "A message belongs to one chat"
+        cascade_delete: false
+        inverse: messages
+      - entity: Project
+        type: many_to_one
+        cardinality: "N:1"
+        foreign_key: project_id
+        description: "A message belongs to one project"
+        cascade_delete: false
+        inverse: messages
+      - entity: DataEntity
+        type: many_to_many
+        cardinality: "N:M"
+        join_field: related_entity_ids
+        description: "A message may reference multiple data entities"
+        cascade_delete: false
+        inverse: referencing_messages
+      - entity: LLMRequestLogEntry
+        type: many_to_one
+        cardinality: "N:1"
+        foreign_key: llm_info.request_id
+        description: "A message may be linked to an LLM request log"
+        cascade_delete: false
+        inverse: messages
+      - entity: Message
+        type: many_to_one
+        cardinality: "N:1"
+        foreign_key: parent_message_id
+        description: "A message may have a parent (for branching)"
+        cascade_delete: false
+        inverse: child_messages
 
-    related_entity_ids:
-      type: list
-      items: { $ref: DataEntity.id }
+    # Validation Rules
+    validation:
+      role:
+        - rule: required
+          message: "Role must be specified"
+      content:
+        - rule: max_length
+          value: 1000000
+          message: "Content must not exceed 1MB"
 
+  # ---------------------------------------------------------------------------
+  # DataEntity Entity
+  # ---------------------------------------------------------------------------
   DataEntity:
-    id: { type: uuid, required: true }
-    project_id: { $ref: Project.id, required: true }
-    name: { type: string, required: true }
-    type:
-      type: enum
-      values: [object, file, directory, db_table, env_var_set]
-      required: true
+    description: |
+      A data entity represents a piece of data within a project, such as a file,
+      JSON object, or database table reference.
+    
+    fields:
+      id:
+        type: uuid
+        required: true
+        description: Unique identifier for the entity
+      project_id:
+        $ref: Project.id
+        required: true
+        description: Reference to parent project
+      name:
+        type: string
+        required: true
+        description: Human-readable entity name
+      type:
+        type: enum
+        values: [object, file, directory, db_table, env_var_set]
+        required: true
+        description: Type of data entity
+      status:
+        type: enum
+        values: [active, modified, deleted]
+        default: active
+        description: Current state of the entity
+      path:
+        type: string
+        required: true
+        description: Path to entity (relative to project root)
+      created_at:
+        type: datetime
+        required: true
+        description: Timestamp when entity was created
+      updated_at:
+        type: datetime
+        required: true
+        description: Timestamp of last modification
+      created_by:
+        type: enum
+        values: [user, llm]
+        default: user
+        description: Who created this entity
+      properties:
+        type: object
+        additionalProperties: true
+        description: Type-specific properties
+      tags:
+        type: list
+        items:
+          type: string
+        description: User-defined tags for organization
 
-    path: { type: string, required: true } # relative to project root
-    created_at: { type: datetime, required: true }
-    updated_at: { type: datetime, required: true }
-    created_by:
-      type: enum
-      values: [user, llm]
-      default: user
+    # State Machine Definition
+    states:
+      - name: active
+        description: Entity exists and is current
+        entry_actions:
+          - index_entity
+        exit_actions: []
+        transitions:
+          - to: modified
+            trigger: content_changed
+            guards: []
+          - to: deleted
+            trigger: delete_entity
+            guards:
+              - not_referenced_by_active_messages
 
-    properties:
-      type: object
-      additionalProperties: true
+      - name: modified
+        description: Entity has been modified since last sync
+        entry_actions:
+          - mark_dirty
+        exit_actions: []
+        transitions:
+          - to: active
+            trigger: sync_complete
+            guards: []
+          - to: deleted
+            trigger: delete_entity
+            guards: []
 
-    tags:
-      type: list
-      items: { type: string }
+      - name: deleted
+        description: Entity has been deleted
+        entry_actions:
+          - remove_from_index
+          - log_deletion
+        exit_actions: []
+        transitions:
+          - to: active
+            trigger: restore_entity
+            guards:
+              - backup_exists
 
+    # Invariants
+    invariants:
+      - id: entity_id_unique
+        description: "id is unique across all entities"
+        expression: "forall e1, e2 in DataEntities: e1.id = e2.id implies e1 = e2"
+      - id: entity_project_exists
+        description: "project_id must reference existing project"
+        expression: "forall e in DataEntities: exists p in Projects: e.project_id = p.id"
+      - id: entity_path_unique_per_project
+        description: "path is unique within a project"
+        expression: "forall e1, e2 in DataEntities: (e1.project_id = e2.project_id and e1.path = e2.path) implies e1 = e2"
+      - id: entity_timestamps_ordered
+        description: "created_at is always <= updated_at"
+        expression: "forall e in DataEntities: e.created_at <= e.updated_at"
+      - id: file_entity_exists
+        description: "File entities must have existing file (unless deleted)"
+        expression: "forall e in DataEntities: (e.type = file and e.status != deleted) implies file_exists(e.path)"
+
+    # Relationships
+    relationships:
+      - entity: Project
+        type: many_to_one
+        cardinality: "N:1"
+        foreign_key: project_id
+        description: "An entity belongs to one project"
+        cascade_delete: false
+        inverse: data_entities
+      - entity: Message
+        type: many_to_many
+        cardinality: "N:M"
+        join_field: referencing_messages
+        description: "An entity may be referenced by multiple messages"
+        cascade_delete: false
+        inverse: related_entity_ids
+
+    # Validation Rules
+    validation:
+      name:
+        - rule: length
+          min: 1
+          max: 255
+          message: "Name must be between 1 and 255 characters"
+      path:
+        - rule: not_empty
+          message: "Path must be specified"
+        - rule: pattern
+          value: "^[^/].*"
+          message: "Path must be relative (not start with /)"
+        - rule: no_path_traversal
+          message: "Path must not contain .. traversal"
+
+  # ---------------------------------------------------------------------------
+  # LLMRequestLogEntry Entity
+  # ---------------------------------------------------------------------------
   LLMRequestLogEntry:
-    id: { type: uuid, required: true }
-    project_id: { $ref: Project.id, required: true }
-    chat_id: { $ref: Chat.id, required: true }
-    timestamp_start: { type: datetime, required: true }
-    timestamp_end: { type: datetime, required: true }
+    description: |
+      A log entry for an LLM API request, capturing request details, response
+      metadata, and causal tracking information.
+    
+    fields:
+      id:
+        type: uuid
+        required: true
+        description: Unique identifier for the log entry
+      project_id:
+        $ref: Project.id
+        required: true
+        description: Reference to parent project
+      chat_id:
+        $ref: Chat.id
+        required: true
+        description: Reference to parent chat
+      status:
+        type: enum
+        values: [pending, success, error, timeout]
+        default: pending
+        description: Current state of the request
+      timestamp_start:
+        type: datetime
+        required: true
+        description: When request was initiated
+      timestamp_end:
+        type: datetime
+        required: false
+        description: When request completed
+      model:
+        type: string
+        required: true
+        description: LLM model used
+      request_type:
+        type: enum
+        values: [chat, tool, workflow]
+        default: chat
+        description: Type of request
+      messages_included:
+        type: list
+        items:
+          $ref: Message.id
+        description: Message IDs included in context
+      usage:
+        type: object
+        properties:
+          prompt_tokens:
+            type: integer
+          completion_tokens:
+            type: integer
+          total_tokens:
+            type: integer
+      timings:
+        type: object
+        properties:
+          latency_ms:
+            type: integer
+          total_duration_ms:
+            type: integer
+      output_format_hint:
+        type: enum
+        values: [text, markdown, json]
+        default: text
+      touched_files:
+        type: list
+        items:
+          type: string
+        description: Files modified as result of this request
+      touched_entities:
+        type: list
+        items:
+          $ref: DataEntity.id
+        description: Entities modified as result of this request
+      http_status:
+        type: integer
+        description: HTTP status code from API
+      error:
+        type: object
+        nullable: true
+        properties:
+          code:
+            type: string
+          message:
+            type: string
 
-    model: { type: string, required: true }
-    request_type:
-      type: enum
-      values: [chat, tool, workflow]
-      default: chat
+    # State Machine Definition
+    states:
+      - name: pending
+        description: Request is in progress
+        entry_actions:
+          - log_request_start
+        exit_actions: []
+        transitions:
+          - to: success
+            trigger: response_received
+            guards:
+              - http_status_ok
+          - to: error
+            trigger: request_failed
+            guards: []
+          - to: timeout
+            trigger: request_timeout
+            guards: []
 
-    messages_included:
-      type: list
-      items: { $ref: Message.id }
+      - name: success
+        description: Request completed successfully
+        entry_actions:
+          - log_request_complete
+          - update_usage_stats
+        exit_actions: []
+        transitions: []
 
-    usage:
-      type: object
-      properties:
-        prompt_tokens: { type: integer }
-        completion_tokens: { type: integer }
-        total_tokens: { type: integer }
+      - name: error
+        description: Request failed with error
+        entry_actions:
+          - log_error_details
+        exit_actions: []
+        transitions: []
 
-    timings:
-      type: object
-      properties:
-        latency_ms: { type: integer }
-        total_duration_ms: { type: integer }
+      - name: timeout
+        description: Request timed out
+        entry_actions:
+          - log_timeout
+        exit_actions: []
+        transitions: []
 
-    output_format_hint:
-      type: enum
-      values: [text, markdown, json]
-      default: text
+    # Invariants
+    invariants:
+      - id: log_id_unique
+        description: "id is unique across all log entries"
+        expression: "forall l1, l2 in LLMRequestLogEntries: l1.id = l2.id implies l1 = l2"
+      - id: log_project_exists
+        description: "project_id must reference existing project"
+        expression: "forall l in LLMRequestLogEntries: exists p in Projects: l.project_id = p.id"
+      - id: log_chat_exists
+        description: "chat_id must reference existing chat"
+        expression: "forall l in LLMRequestLogEntries: exists c in Chats: l.chat_id = c.id"
+      - id: log_timestamps_ordered
+        description: "timestamp_start <= timestamp_end when both set"
+        expression: "forall l in LLMRequestLogEntries: (l.timestamp_end != null) implies l.timestamp_start <= l.timestamp_end"
+      - id: success_has_usage
+        description: "Successful requests should have usage data"
+        expression: "forall l in LLMRequestLogEntries: l.status = success implies l.usage != null"
 
-    touched_files:
-      type: list
-      items: { type: string }
-    touched_entities:
-      type: list
-      items: { $ref: DataEntity.id }
+    # Relationships
+    relationships:
+      - entity: Project
+        type: many_to_one
+        cardinality: "N:1"
+        foreign_key: project_id
+        description: "A log entry belongs to one project"
+        cascade_delete: false
+        inverse: llm_request_logs
+      - entity: Chat
+        type: many_to_one
+        cardinality: "N:1"
+        foreign_key: chat_id
+        description: "A log entry belongs to one chat"
+        cascade_delete: false
+        inverse: llm_request_logs
+      - entity: Message
+        type: one_to_many
+        cardinality: "1:N"
+        foreign_key: messages_included
+        description: "A log entry references messages included in context"
+        cascade_delete: false
+        inverse: llm_requests
 
-    http_status: { type: integer }
-    error:
-      type: object
-      nullable: true
-      properties:
-        code: { type: string }
-        message: { type: string }
+    # Validation Rules
+    validation:
+      model:
+        - rule: not_empty
+          message: "Model must be specified"
+      http_status:
+        - rule: range
+          min: 100
+          max: 599
+          message: "HTTP status must be valid (100-599)"
 
+  # ---------------------------------------------------------------------------
+  # User Entity (Phase 4+)
+  # ---------------------------------------------------------------------------
   User:
-    # used later with Supabase
-    id: { type: uuid, required: true }
-    email: { type: string, required: true }
-    display_name: { type: string }
-    created_at: { type: datetime, required: true }
-    updated_at: { type: datetime, required: true }
-    role:
-      type: enum
-      values: [admin, user, read_only]
-      default: user
+    description: |
+      A user account for multi-user deployments (Phase 4+). Minimal definition
+      for early phases.
+    
+    fields:
+      id:
+        type: uuid
+        required: true
+        description: Unique identifier for the user
+      email:
+        type: string
+        required: true
+        description: User email address
+      display_name:
+        type: string
+        required: false
+        description: Display name
+      status:
+        type: enum
+        values: [active, suspended, deleted]
+        default: active
+        description: Current state of the user account
+      created_at:
+        type: datetime
+        required: true
+        description: Timestamp when user was created
+      updated_at:
+        type: datetime
+        required: true
+        description: Timestamp of last modification
+      role:
+        type: enum
+        values: [admin, user, read_only]
+        default: user
+        description: User role for permissions
+
+    # State Machine Definition
+    states:
+      - name: active
+        description: User account is active
+        entry_actions:
+          - send_welcome_email
+        exit_actions: []
+        transitions:
+          - to: suspended
+            trigger: suspend_user
+            guards:
+              - admin_action
+          - to: deleted
+            trigger: delete_user
+            guards:
+              - admin_action
+              - no_owned_projects
+
+      - name: suspended
+        description: User account is suspended
+        entry_actions:
+          - revoke_sessions
+        exit_actions: []
+        transitions:
+          - to: active
+            trigger: reactivate_user
+            guards:
+              - admin_action
+          - to: deleted
+            trigger: delete_user
+            guards:
+              - admin_action
+
+      - name: deleted
+        description: User account is deleted
+        entry_actions:
+          - anonymize_data
+          - transfer_projects
+        exit_actions: []
+        transitions: []
+
+    # Invariants
+    invariants:
+      - id: user_id_unique
+        description: "id is unique across all users"
+        expression: "forall u1, u2 in Users: u1.id = u2.id implies u1 = u2"
+      - id: user_email_unique
+        description: "email is unique across active users"
+        expression: "forall u1, u2 in Users: (u1.status != deleted and u2.status != deleted and u1.email = u2.email) implies u1 = u2"
+      - id: user_timestamps_ordered
+        description: "created_at is always <= updated_at"
+        expression: "forall u in Users: u.created_at <= u.updated_at"
+
+    # Relationships
+    relationships:
+      - entity: Project
+        type: one_to_many
+        cardinality: "1:N"
+        foreign_key: owner_id
+        description: "A user owns zero or more projects"
+        cascade_delete: false
+        inverse: owner
+
+    # Validation Rules
+    validation:
+      email:
+        - rule: pattern
+          value: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+          message: "Email must be valid format"
+        - rule: unique
+          scope: active_users
+          message: "Email must be unique among active users"
+      display_name:
+        - rule: length
+          max: 100
+          message: "Display name must not exceed 100 characters"

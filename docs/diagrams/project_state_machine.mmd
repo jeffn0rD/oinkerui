@@ -1,0 +1,84 @@
+%%{init: {'theme': 'dark', 'themeVariables': { 'primaryColor': '#1e3a5f'}}}%%
+
+stateDiagram-v2
+    [*] --> Initializing: create_project()
+
+    state Initializing {
+        [*] --> CreatingDirectory
+        CreatingDirectory --> InitializingGit: directory created
+        InitializingGit --> CreatingMetadata: git initialized
+        CreatingMetadata --> ValidatingStructure: metadata created
+        ValidatingStructure --> [*]: validation passed
+    }
+
+    Initializing --> Active: initialization_complete
+    Initializing --> Deleted: initialization_failed
+
+    state Active {
+        [*] --> Ready
+        Ready --> Processing: operation started
+        Processing --> Ready: operation complete
+    }
+
+    Active --> Archived: archive_project()
+    Active --> Deleted: delete_project()
+
+    state Archived {
+        [*] --> ReadOnly
+        ReadOnly: No modifications allowed
+        ReadOnly: Chats are closed
+    }
+
+    Archived --> Active: restore_project()
+    Archived --> Deleted: delete_project()
+
+    state Deleted {
+        [*] --> CleanupScheduled
+        CleanupScheduled --> CleanupComplete: cleanup finished
+        CleanupComplete --> [*]
+    }
+
+    Deleted --> [*]: cleanup_complete
+
+    note right of Initializing
+        Entry Actions:
+        - create_project_directory
+        - initialize_git_repository
+        - create_metadata_files
+        
+        Guards for Active:
+        - git_repo_initialized
+        - metadata_created
+        - directory_structure_valid
+    end note
+
+    note right of Active
+        Entry Actions:
+        - add_to_project_index
+        - emit_project_created_event
+        
+        Invariants:
+        - directory exists
+        - git repo valid
+        - in active index
+    end note
+
+    note right of Archived
+        Entry Actions:
+        - remove_from_active_index
+        - add_to_archive_index
+        - close_all_chats
+        
+        Guards for Restore:
+        - directory_exists
+        - git_repo_valid
+    end note
+
+    note right of Deleted
+        Entry Actions:
+        - remove_from_all_indexes
+        - schedule_directory_cleanup
+        
+        Terminal State:
+        Cannot transition out
+    end note

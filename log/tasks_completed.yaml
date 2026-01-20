@@ -8,7 +8,8 @@ tasks:
 - task:
     id: 0.0
     name: Add phase 0
-    goal: Add a phase 0 to the main specification document (./spec/spec.yaml); it needs to outline any steps to prepare for phase 1 development.
+    goal: Add a phase 0 to the main specification document (./spec/spec.yaml); it needs to outline any steps to prepare for
+      phase 1 development.
     completed_date: 2024-01-19
     files_modified:
     - spec/spec.yaml
@@ -145,7 +146,9 @@ tasks:
     - .github/workflows/
     - .github/workflows/.gitkeep
     - log/task_0.2_summary.yaml
-    summary: Successfully created the root project folder structure for the oinkerui application. All directories, .gitkeep files, and README.md files have been created as specified. The structure supports both local development (Phase 1-3) and server deployment (Phase 4+).
+    summary: Successfully created the root project folder structure for the oinkerui application. All directories, .gitkeep
+      files, and README.md files have been created as specified. The structure supports both local development (Phase 1-3)
+      and server deployment (Phase 4+).
     verification:
       method: tree command
       result: success
@@ -169,8 +172,54 @@ tasks:
     - log/task_0.2.5_summary.yaml
     files_modified:
     - 'master_todo.yaml (added 6 new tasks: 0.2.5.1 - 0.2.5.6)'
-    summary: Successfully created comprehensive specification refinement plan with 6 focused subtasks, detailed prompts, schema definitions, and verification strategies. Created 100+ pages of documentation covering domain modeling, modules, functions, APIs, workflows, and verification.
+    summary: Successfully created comprehensive specification refinement plan with 6 focused subtasks, detailed prompts, schema
+      definitions, and verification strategies. Created 100+ pages of documentation covering domain modeling, modules, functions,
+      APIs, workflows, and verification.
     verification:
       method: Manual review
       result: success
       notes: 'All deliverables created: 1 analysis doc, 2 schemas, 6 prompts, 6 tasks'
+- task:
+    id: 0.2.5.1
+    name: Domain Model & State Refinement
+    goal: Refine domain.yaml with complete state transitions, invariants, relationships, and validation rules. Create state
+      machine specifications and diagrams.
+    completed_date: '2026-01-20'
+    files_created:
+    - spec/state_machines.yaml
+    - docs/diagrams/domain_model.mmd
+    - docs/diagrams/project_state_machine.mmd
+    - docs/diagrams/chat_state_machine.mmd
+    - docs/diagrams/message_state_machine.mmd
+    - docs/diagrams/data_entity_state_machine.mmd
+    - docs/diagrams/llm_request_state_machine.mmd
+    - log/task_0.2.5.1_summary.yaml
+    files_modified:
+    - spec/domain.yaml
+    summary: 'Successfully refined the domain model with complete state transitions, invariants, relationships, and validation
+      rules for all 6 entities (Project, Chat, Message, DataEntity, LLMRequestLogEntry, User).
+
+
+      Created spec/state_machines.yaml with detailed state machine definitions including:
+
+      - Entry/exit actions for each state
+
+      - Transition guards with error messages
+
+      - Guard and action function definitions
+
+      - Implementation notes and testing requirements
+
+
+      Created 6 Mermaid diagrams for visual documentation:
+
+      - Entity relationship diagram (domain_model.mmd)
+
+      - State machine diagrams for Project, Chat, Message, DataEntity, and LLMRequestLogEntry
+
+
+      All YAML files validated successfully (23 files).'
+    verification:
+      method: YAML validation
+      result: success
+      notes: All 23 YAML files valid. All entities have states, invariants, relationships, and validation rules.

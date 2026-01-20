@@ -1,0 +1,97 @@
+%%{init: {'theme': 'dark', 'themeVariables': { 'primaryColor': '#1e3a5f'}}}%%
+
+stateDiagram-v2
+    [*] --> Pending: initiate_request()
+
+    state Pending {
+        [*] --> Queued
+        Queued --> Sending: connection_established
+        Sending --> Streaming: stream_started
+        Streaming --> Sending: stream_chunk_received
+        
+        Queued: Request queued
+        Sending: Request in flight
+        Streaming: Receiving response
+    }
+
+    Pending --> Success: response_received [http_status_ok]
+    Pending --> Error: request_failed
+    Pending --> Timeout: request_timeout
+
+    state Success {
+        [*] --> Logged
+        Logged: Request logged
+        Logged: Usage recorded
+        Logged: Touched resources tracked
+    }
+
+    state Error {
+        [*] --> ErrorLogged
+        ErrorLogged: Error captured
+        ErrorLogged: HTTP status recorded
+        ErrorLogged: Error details stored
+    }
+
+    state Timeout {
+        [*] --> TimeoutLogged
+        TimeoutLogged: Timeout recorded
+        TimeoutLogged: Partial response saved
+    }
+
+    Success --> [*]
+    Error --> [*]
+    Timeout --> [*]
+
+    note right of Pending
+        Entry Actions:
+        - log_request_start
+        - increment_pending_count
+        
+        Exit Actions:
+        - decrement_pending_count
+        
+        Invariants:
+        - timestamp_start is set
+        - timestamp_end is null
+    end note
+
+    note right of Success
+        Entry Actions:
+        - log_request_complete
+        - update_usage_stats
+        - record_touched_resources
+        
+        Guards:
+        - http_status_ok()
+          (status 200-299)
+        
+        Invariants:
+        - timestamp_end is set
+        - usage data recorded
+        
+        Terminal State
+    end note
+
+    note right of Error
+        Entry Actions:
+        - log_error_details
+        - update_error_stats
+        
+        Invariants:
+        - timestamp_end is set
+        - error object populated
+        
+        Terminal State
+    end note
+
+    note right of Timeout
+        Entry Actions:
+        - log_timeout
+        - update_timeout_stats
+        
+        Invariants:
+        - timestamp_end is set
+        - error indicates timeout
+        
+        Terminal State
+    end note

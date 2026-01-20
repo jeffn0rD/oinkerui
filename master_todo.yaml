@@ -8,51 +8,37 @@ prompt_guidance: 'Always follow these guidelines and update project documentatio
 
   * When processing tasks always creae a brief summary of steps and actions in log/task_<id>_summary.yaml .
 
-  * when processing a task review the last task notes (log/task_<id>_notes.yaml).  There may be information needed or remaining work that needs to be completed first.
+  * when processing a task review the last task notes (log/task_<id>_notes.yaml).  There may be information needed or remaining
+  work that needs to be completed first.
 
-  * In the task_<id>_summary.yaml file always provide ''justification:'' for each step/action.  It is important to track the decisions made and reasoning behind them.
+  * In the task_<id>_summary.yaml file always provide ''justification:'' for each step/action.  It is important to track the
+  decisions made and reasoning behind them.
 
-  * If there are errors, inconsistencies, or inadequate information to accomplish all goals of a task append questions to ./open_questions.yaml
+  * If there are errors, inconsistencies, or inadequate information to accomplish all goals of a task append questions to
+  ./open_questions.yaml
 
   * If the task is complete mark it complete by removing the task from the list in this document and appending it to ./log/tasks_completed.yaml
 
-  * Tasks should be verified before considered complete, when possible use a small python script (save to ./verify/task_<id>_<descriptor>.py). The script should be well commented as to what it does and why.
+  * Tasks should be verified before considered complete, when possible use a small python script (save to ./verify/task_<id>_<descriptor>.py).
+  The script should be well commented as to what it does and why.
 
   * Always make sure system documentation is up to date with work just done! manuals go in ./man/*.yaml
 
-  * NOTE: All spec files need to have consistent references to each other.  This needs to be verified whenever spec files are changed.
+  * NOTE: All spec files need to have consistent references to each other.  This needs to be verified whenever spec files
+  are changed.
 
-  **** You can create temporary files to assist with task completion but they should be removed when task is complete.  Use the files outlined here for project tracking. ****
+  **** You can create temporary files to assist with task completion but they should be removed when task is complete.  Use
+  the files outlined here for project tracking. ****
 
   **** It is important to keep the repository clean of uneccessary files. ****
 
-  **** Follow the task instructions closely and carefully.  Constrain work and scope to the task.  Return with questions if needed and confirm any extra work if it is outside the scope. ****
+  **** Follow the task instructions closely and carefully.  Constrain work and scope to the task.  Return with questions if
+  needed and confirm any extra work if it is outside the scope. ****
 
   **** ALWAYS COMMIT AND PUSH the repository after a task. ****
 
   '
 current:
-- task:
-    id: 0.2.5.1
-    name: Domain Model & State Refinement
-    goal: Refine domain.yaml with complete state transitions, invariants, relationships, and validation rules. Create state machine specifications and diagrams.
-    prompt: ./prompts/dev/prompt_0_2_5_1.md
-    files:
-    - spec/domain.yaml
-    - spec/state_machines.yaml
-    - docs/diagrams/domain_model.mmd
-    - docs/diagrams/state_machine.mmd
-    details:
-      focus:
-      - Entity state transitions
-      - Invariants and validation rules
-      - Relationship cardinalities
-      - State machine diagrams
-      verification:
-      - All entities have complete state definitions
-      - All state transitions have guards
-      - All invariants are checkable
-      - Diagrams render correctly
 - task:
     id: 0.2.5.2
     name: Module Specification Creation
@@ -79,7 +65,8 @@ current:
 - task:
     id: 0.2.5.3
     name: Function Specification Framework
-    goal: Create detailed function specifications for 20+ critical functions with contracts, FOL algorithms, and complexity analysis.
+    goal: Create detailed function specifications for 20+ critical functions with contracts, FOL algorithms, and complexity
+      analysis.
     prompt: ./prompts/dev/prompt_0_2_5_3.md
     files:
     - spec/functions/backend_node/*.yaml
@@ -298,7 +285,9 @@ current:
       - All documentation complete
       - Git repository initialized
 future:
-- add context re-ordering feature; prompt/responses in chat history can be re-ordered in the left side list, drag and drop and/or buttons move up/down.  Need a reset button as well.
-- (LLM) crawl the spec files and look for inconsistencies and areas that need elaboration, create document of questions to be addressed.
+- add context re-ordering feature; prompt/responses in chat history can be re-ordered in the left side list, drag and drop
+  and/or buttons move up/down.  Need a reset button as well.
+- (LLM) crawl the spec files and look for inconsistencies and areas that need elaboration, create document of questions to
+  be addressed.
 - repository bootstrapping with node/fastapi
 open_questions: []

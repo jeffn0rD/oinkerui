@@ -1,0 +1,100 @@
+%%{init: {'theme': 'dark', 'themeVariables': { 'primaryColor': '#1e3a5f', 'primaryTextColor': '#fff', 'primaryBorderColor': '#7C0000', 'lineColor': '#F8B229', 'secondaryColor': '#006100', 'tertiaryColor': '#fff'}}}%%
+
+erDiagram
+    User ||--o{ Project : owns
+    Project ||--o{ Chat : contains
+    Project ||--o{ DataEntity : contains
+    Project ||--o{ LLMRequestLogEntry : logs
+    Chat ||--o{ Message : contains
+    Chat }o--o| Chat : forked_from
+    Message }o--o{ DataEntity : references
+    Message }o--o| LLMRequestLogEntry : logged_by
+    Message }o--o| Message : parent_of
+
+    User {
+        uuid id PK "Unique identifier"
+        string email UK "User email"
+        string display_name "Display name"
+        enum status "active|suspended|deleted"
+        datetime created_at "Creation timestamp"
+        datetime updated_at "Last update"
+        enum role "admin|user|read_only"
+    }
+
+    Project {
+        uuid id PK "Unique identifier"
+        string name "Project name"
+        string slug UK "URL-safe identifier"
+        string description "Optional description"
+        enum status "initializing|active|archived|deleted"
+        datetime created_at "Creation timestamp"
+        datetime updated_at "Last update"
+        string default_model "Default LLM model"
+        json settings "Project settings"
+        json paths "Directory paths"
+    }
+
+    Chat {
+        uuid id PK "Unique identifier"
+        uuid project_id FK "Parent project"
+        string name "Chat name"
+        enum status "active|closed|archived"
+        datetime created_at "Creation timestamp"
+        datetime updated_at "Last update"
+        uuid forked_from_chat_id FK "Source chat if forked"
+        uuid forked_at_message_id FK "Fork point message"
+        json system_prelude "System prompt config"
+        string storage_path "JSONL file path"
+    }
+
+    Message {
+        uuid id PK "Unique identifier"
+        uuid chat_id FK "Parent chat"
+        uuid project_id FK "Parent project"
+        enum role "system|user|assistant|tool"
+        string content "Message content"
+        enum status "pending|complete|error|discarded"
+        json raw_template "Template info if used"
+        datetime created_at "Creation timestamp"
+        boolean include_in_context "Include in LLM context"
+        boolean is_aside "Aside message flag"
+        boolean pure_aside "Pure aside flag"
+        boolean is_pinned "Pinned message flag"
+        boolean is_discarded "Discarded flag"
+        uuid parent_message_id FK "Parent for branching"
+        json llm_info "LLM response metadata"
+        array related_entity_ids "Referenced entities"
+    }
+
+    DataEntity {
+        uuid id PK "Unique identifier"
+        uuid project_id FK "Parent project"
+        string name "Entity name"
+        enum type "object|file|directory|db_table|env_var_set"
+        enum status "active|modified|deleted"
+        string path "Relative path"
+        datetime created_at "Creation timestamp"
+        datetime updated_at "Last update"
+        enum created_by "user|llm"
+        json properties "Type-specific props"
+        array tags "User tags"
+    }
+
+    LLMRequestLogEntry {
+        uuid id PK "Unique identifier"
+        uuid project_id FK "Parent project"
+        uuid chat_id FK "Parent chat"
+        enum status "pending|success|error|timeout"
+        datetime timestamp_start "Request start"
+        datetime timestamp_end "Request end"
+        string model "LLM model used"
+        enum request_type "chat|tool|workflow"
+        array messages_included "Context message IDs"
+        json usage "Token usage stats"
+        json timings "Timing metrics"
+        enum output_format_hint "text|markdown|json"
+        array touched_files "Modified files"
+        array touched_entities "Modified entities"
+        integer http_status "API response code"
+        json error "Error details if failed"
+    }

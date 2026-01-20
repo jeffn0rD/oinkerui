@@ -1,0 +1,72 @@
+%%{init: {'theme': 'dark', 'themeVariables': { 'primaryColor': '#1e3a5f'}}}%%
+
+stateDiagram-v2
+    [*] --> Active: create_chat()
+
+    state Active {
+        [*] --> Idle
+        Idle --> AwaitingResponse: send_message()
+        AwaitingResponse --> Idle: response_received
+        AwaitingResponse --> Idle: request_cancelled
+        
+        Idle: Ready for user input
+        AwaitingResponse: LLM request in progress
+    }
+
+    Active --> Closed: close_chat()
+    Active --> Archived: archive_chat()
+
+    state Closed {
+        [*] --> Inactive
+        Inactive: Chat is closed
+        Inactive: Can be reopened
+        Inactive: Messages preserved
+    }
+
+    Closed --> Active: reopen_chat()
+    Closed --> Archived: archive_chat()
+
+    state Archived {
+        [*] --> ReadOnly
+        ReadOnly: No modifications allowed
+        ReadOnly: Historical reference only
+        ReadOnly: May be compressed
+    }
+
+    Archived --> Active: restore_chat()
+
+    note right of Active
+        Entry Actions:
+        - load_message_history
+        - initialize_context
+        - register_with_project
+        
+        Exit Actions:
+        - save_pending_changes
+        - flush_context_cache
+        
+        Invariants:
+        - parent project is active
+        - storage file exists
+    end note
+
+    note right of Closed
+        Entry Actions:
+        - save_final_state
+        - unregister_from_active
+        
+        Guards for Reopen:
+        - project_is_active()
+    end note
+
+    note right of Archived
+        Entry Actions:
+        - mark_read_only
+        - compress_storage (optional)
+        
+        Guards for Restore:
+        - project_is_active()
+        
+        Invariants:
+        - read-only mode enabled
+    end note

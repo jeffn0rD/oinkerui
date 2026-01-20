@@ -1,0 +1,911 @@
+version: "1.0.0"
+title: State Machine Specifications
+description: |
+  Formal state machine definitions for all stateful entities in the OinkerUI system.
+  These specifications define the complete lifecycle of each entity including states,
+  transitions, guards, actions, and invariants.
+
+# =============================================================================
+# STATE MACHINES
+# =============================================================================
+
+state_machines:
+  # ---------------------------------------------------------------------------
+  # Project Lifecycle State Machine
+  # ---------------------------------------------------------------------------
+  project_lifecycle:
+    entity: Project
+    initial_state: initializing
+    description: |
+      Manages the complete lifecycle of a project from creation through
+      deletion. Projects start in initializing state and must complete
+      setup before becoming active.
+
+    states:
+      initializing:
+        description: "Project is being created and initialized"
+        entry_actions:
+          - action: create_project_directory
+            description: "Create the project root directory"
+            idempotent: true
+          - action: initialize_git_repository
+            description: "Initialize Git repository in project root"
+            idempotent: true
+          - action: create_metadata_files
+            description: "Create project.json and other metadata"
+            idempotent: true
+          - action: create_directory_structure
+            description: "Create chats/, data/, logs/, public/ directories"
+            idempotent: true
+        exit_actions:
+          - action: validate_project_structure
+            description: "Verify all required files and directories exist"
+        invariants:
+          - "directory creation in progress or complete"
+          - "not yet in project index"
+
+      active:
+        description: "Project is ready for use"
+        entry_actions:
+          - action: add_to_project_index
+            description: "Add project to active projects index"
+          - action: emit_project_created_event
+            description: "Emit event for UI updates"
+          - action: start_file_watcher
+            description: "Start watching for file changes (optional)"
+        exit_actions:
+          - action: close_active_chats
+            description: "Close any open chats gracefully"
+          - action: stop_file_watcher
+            description: "Stop file watcher if running"
+        invariants:
+          - "project directory exists"
+          - "git repository is initialized"
+          - "metadata files are valid"
+          - "project is in active index"
+
+      archived:
+        description: "Project is archived but preserved"
+        entry_actions:
+          - action: remove_from_active_index
+            description: "Remove from active projects list"
+          - action: add_to_archive_index
+            description: "Add to archived projects list"
+          - action: close_all_chats
+            description: "Close all chats in project"
+        exit_actions:
+          - action: validate_directory_exists
+            description: "Verify project directory still exists before restore"
+        invariants:
+          - "project directory exists"
+          - "not in active index"
+          - "in archive index"
+          - "no active chats"
+
+      deleted:
+        description: "Project is marked for deletion"
+        entry_actions:
+          - action: remove_from_all_indexes
+            description: "Remove from both active and archive indexes"
+          - action: schedule_directory_cleanup
+            description: "Schedule background cleanup of project files"
+          - action: emit_project_deleted_event
+            description: "Emit event for UI updates"
+        exit_actions: []
+        invariants:
+          - "not in any index"
+          - "cleanup scheduled or complete"
+        terminal: true
+
+    transitions:
+      - id: init_to_active
+        from: initializing
+        to: active
+        trigger: initialization_complete
+        description: "Project setup completed successfully"
+        guards:
+          - condition: "git_repo_initialized()"
+            error_message: "Git repository not initialized"
+          - condition: "metadata_exists()"
+            error_message: "Project metadata not found"
+          - condition: "directory_structure_valid()"
+            error_message: "Required directories missing"
+        actions:
+          - validate_project_structure
+          - update_status_to_active
+          - record_creation_timestamp
+
+      - id: init_to_deleted
+        from: initializing
+        to: deleted
+        trigger: initialization_failed
+        description: "Project setup failed, cleanup required"
+        guards:
+          - condition: "cleanup_required()"
+            error_message: "No cleanup needed"
+        actions:
+          - log_initialization_failure
+          - cleanup_partial_files
+          - update_status_to_deleted
+
+      - id: active_to_archived
+        from: active
+        to: archived
+        trigger: archive_project
+        description: "User archives the project"
+        guards:
+          - condition: "no_pending_operations()"
+            error_message: "Cannot archive project with pending operations"
+        actions:
+          - close_all_chats
+          - update_status_to_archived
+          - update_timestamp
+
+      - id: active_to_deleted
+        from: active
+        to: deleted
+        trigger: delete_project
+        description: "User deletes the project"
+        guards:
+          - condition: "user_confirmed_deletion()"
+            error_message: "User confirmation required for deletion"
+        actions:
+          - close_all_chats
+          - mark_for_deletion
+          - schedule_cleanup
+          - update_status_to_deleted
+
+      - id: archived_to_active
+        from: archived
+        to: active
+        trigger: restore_project
+        description: "User restores archived project"
+        guards:
+          - condition: "directory_exists()"
+            error_message: "Project directory not found"
+          - condition: "git_repo_valid()"
+            error_message: "Git repository is corrupted"
+        actions:
+          - validate_project_structure
+          - update_status_to_active
+          - update_timestamp
+
+      - id: archived_to_deleted
+        from: archived
+        to: deleted
+        trigger: delete_project
+        description: "User deletes archived project"
+        guards:
+          - condition: "user_confirmed_deletion()"
+            error_message: "User confirmation required for deletion"
+        actions:
+          - mark_for_deletion
+          - schedule_cleanup
+          - update_status_to_deleted
+
+  # ---------------------------------------------------------------------------
+  # Chat Lifecycle State Machine
+  # ---------------------------------------------------------------------------
+  chat_lifecycle:
+    entity: Chat
+    initial_state: active
+    description: |
+      Manages the lifecycle of a chat conversation within a project.
+      Chats are created in active state and can be closed or archived.
+
+    states:
+      active:
+        description: "Chat is open and accepting messages"
+        entry_actions:
+          - action: load_message_history
+            description: "Load messages from storage file"
+          - action: initialize_context
+            description: "Initialize context calculation state"
+          - action: register_with_project
+            description: "Register chat with parent project"
+        exit_actions:
+          - action: save_pending_changes
+            description: "Persist any unsaved messages"
+          - action: flush_context_cache
+            description: "Clear context calculation cache"
+        invariants:
+          - "parent project is active"
+          - "storage file exists and is writable"
+          - "message history is loaded"
+
+      closed:
+        description: "Chat is closed but can be reopened"
+        entry_actions:
+          - action: save_final_state
+            description: "Persist final state to storage"
+          - action: unregister_from_active
+            description: "Remove from active chats list"
+        exit_actions: []
+        invariants:
+          - "all messages persisted"
+          - "no pending LLM requests"
+
+      archived:
+        description: "Chat is archived and read-only"
+        entry_actions:
+          - action: mark_read_only
+            description: "Set read-only flag"
+          - action: compress_storage
+            description: "Optionally compress storage file"
+        exit_actions: []
+        invariants:
+          - "read-only mode enabled"
+          - "no modifications allowed"
+
+    transitions:
+      - id: active_to_closed
+        from: active
+        to: closed
+        trigger: close_chat
+        description: "User closes the chat"
+        guards: []
+        actions:
+          - save_all_messages
+          - update_status_to_closed
+          - update_timestamp
+
+      - id: active_to_archived
+        from: active
+        to: archived
+        trigger: archive_chat
+        description: "User archives the chat directly"
+        guards:
+          - condition: "no_pending_llm_requests()"
+            error_message: "Cannot archive chat with pending LLM requests"
+        actions:
+          - save_all_messages
+          - update_status_to_archived
+          - update_timestamp
+
+      - id: closed_to_active
+        from: closed
+        to: active
+        trigger: reopen_chat
+        description: "User reopens a closed chat"
+        guards:
+          - condition: "project_is_active()"
+            error_message: "Cannot reopen chat in inactive project"
+        actions:
+          - reload_message_history
+          - update_status_to_active
+          - update_timestamp
+
+      - id: closed_to_archived
+        from: closed
+        to: archived
+        trigger: archive_chat
+        description: "User archives a closed chat"
+        guards: []
+        actions:
+          - update_status_to_archived
+          - update_timestamp
+
+      - id: archived_to_active
+        from: archived
+        to: active
+        trigger: restore_chat
+        description: "User restores an archived chat"
+        guards:
+          - condition: "project_is_active()"
+            error_message: "Cannot restore chat in inactive project"
+        actions:
+          - decompress_storage_if_needed
+          - reload_message_history
+          - clear_read_only_flag
+          - update_status_to_active
+          - update_timestamp
+
+  # ---------------------------------------------------------------------------
+  # Message Lifecycle State Machine
+  # ---------------------------------------------------------------------------
+  message_lifecycle:
+    entity: Message
+    initial_state: pending
+    description: |
+      Manages the lifecycle of a message within a chat. Messages start
+      as pending (for assistant messages awaiting LLM response) or
+      complete (for user messages).
+
+    states:
+      pending:
+        description: "Message is being processed"
+        entry_actions:
+          - action: mark_chat_busy
+            description: "Indicate chat has pending operation"
+          - action: create_placeholder
+            description: "Create placeholder in message list"
+        exit_actions:
+          - action: clear_chat_busy
+            description: "Clear busy indicator if no other pending"
+        invariants:
+          - "chat is in active state"
+          - "content may be empty or partial"
+
+      complete:
+        description: "Message is complete and finalized"
+        entry_actions:
+          - action: update_chat_timestamp
+            description: "Update chat's updated_at"
+          - action: persist_message
+            description: "Write message to storage"
+          - action: update_context_cache
+            description: "Update context calculation cache"
+        exit_actions: []
+        invariants:
+          - "content is finalized"
+          - "message is persisted"
+
+      error:
+        description: "Message processing encountered an error"
+        entry_actions:
+          - action: log_error
+            description: "Log error details"
+          - action: store_error_info
+            description: "Store error in message metadata"
+        exit_actions: []
+        invariants:
+          - "error information is captured"
+          - "message may have partial content"
+
+      discarded:
+        description: "Message is discarded and excluded from context"
+        entry_actions:
+          - action: set_is_discarded_true
+            description: "Set is_discarded flag"
+          - action: set_include_in_context_false
+            description: "Exclude from context"
+          - action: persist_discard_state
+            description: "Persist updated flags"
+        exit_actions: []
+        invariants:
+          - "is_discarded = true"
+          - "include_in_context = false"
+          - "is_pinned = false"
+        terminal: true
+
+    transitions:
+      - id: pending_to_complete
+        from: pending
+        to: complete
+        trigger: processing_complete
+        description: "Message processing finished successfully"
+        guards:
+          - condition: "content_received()"
+            error_message: "No content received"
+        actions:
+          - finalize_content
+          - set_llm_info
+          - update_status_to_complete
+          - persist_message
+
+      - id: pending_to_error
+        from: pending
+        to: error
+        trigger: processing_failed
+        description: "Message processing failed"
+        guards: []
+        actions:
+          - capture_error_details
+          - update_status_to_error
+          - persist_error_state
+
+      - id: pending_to_discarded
+        from: pending
+        to: discarded
+        trigger: user_cancelled
+        description: "User cancelled pending message"
+        guards: []
+        actions:
+          - cancel_llm_request
+          - update_status_to_discarded
+          - persist_discard_state
+
+      - id: complete_to_discarded
+        from: complete
+        to: discarded
+        trigger: discard_message
+        description: "User discards a complete message"
+        guards:
+          - condition: "not_pinned()"
+            error_message: "Cannot discard pinned message"
+        actions:
+          - update_status_to_discarded
+          - update_context_flags
+          - persist_discard_state
+
+      - id: error_to_pending
+        from: error
+        to: pending
+        trigger: retry_message
+        description: "User retries failed message"
+        guards:
+          - condition: "retry_allowed()"
+            error_message: "Retry not allowed for this error type"
+        actions:
+          - clear_error_state
+          - update_status_to_pending
+          - resubmit_llm_request
+
+      - id: error_to_discarded
+        from: error
+        to: discarded
+        trigger: discard_message
+        description: "User discards failed message"
+        guards: []
+        actions:
+          - update_status_to_discarded
+          - persist_discard_state
+
+  # ---------------------------------------------------------------------------
+  # DataEntity Lifecycle State Machine
+  # ---------------------------------------------------------------------------
+  data_entity_lifecycle:
+    entity: DataEntity
+    initial_state: active
+    description: |
+      Manages the lifecycle of a data entity within a project.
+      Entities track files, objects, and other data artifacts.
+
+    states:
+      active:
+        description: "Entity exists and is current"
+        entry_actions:
+          - action: index_entity
+            description: "Add to entity index"
+          - action: compute_hash
+            description: "Compute content hash for change detection"
+        exit_actions: []
+        invariants:
+          - "entity is indexed"
+          - "underlying resource exists (for file/directory types)"
+
+      modified:
+        description: "Entity has been modified since last sync"
+        entry_actions:
+          - action: mark_dirty
+            description: "Mark entity as needing sync"
+          - action: update_hash
+            description: "Update content hash"
+        exit_actions: []
+        invariants:
+          - "dirty flag is set"
+          - "previous hash differs from current"
+
+      deleted:
+        description: "Entity has been deleted"
+        entry_actions:
+          - action: remove_from_index
+            description: "Remove from entity index"
+          - action: log_deletion
+            description: "Log deletion event"
+          - action: clear_references
+            description: "Update referencing messages"
+        exit_actions: []
+        invariants:
+          - "not in entity index"
+          - "references updated"
+        terminal: false  # Can be restored
+
+    transitions:
+      - id: active_to_modified
+        from: active
+        to: modified
+        trigger: content_changed
+        description: "Entity content was modified"
+        guards: []
+        actions:
+          - detect_changes
+          - update_hash
+          - update_timestamp
+          - mark_dirty
+
+      - id: active_to_deleted
+        from: active
+        to: deleted
+        trigger: delete_entity
+        description: "Entity is deleted"
+        guards:
+          - condition: "not_referenced_by_active_messages()"
+            error_message: "Entity is referenced by active messages"
+            soft: true  # Warning, not blocking
+        actions:
+          - backup_if_configured
+          - remove_from_index
+          - update_status_to_deleted
+          - log_deletion
+
+      - id: modified_to_active
+        from: modified
+        to: active
+        trigger: sync_complete
+        description: "Entity changes have been synced"
+        guards: []
+        actions:
+          - clear_dirty_flag
+          - update_timestamp
+          - update_status_to_active
+
+      - id: modified_to_deleted
+        from: modified
+        to: deleted
+        trigger: delete_entity
+        description: "Modified entity is deleted"
+        guards: []
+        actions:
+          - backup_if_configured
+          - remove_from_index
+          - update_status_to_deleted
+          - log_deletion
+
+      - id: deleted_to_active
+        from: deleted
+        to: active
+        trigger: restore_entity
+        description: "Deleted entity is restored"
+        guards:
+          - condition: "backup_exists()"
+            error_message: "No backup available for restoration"
+        actions:
+          - restore_from_backup
+          - add_to_index
+          - update_status_to_active
+          - update_timestamp
+
+  # ---------------------------------------------------------------------------
+  # LLMRequestLogEntry Lifecycle State Machine
+  # ---------------------------------------------------------------------------
+  llm_request_lifecycle:
+    entity: LLMRequestLogEntry
+    initial_state: pending
+    description: |
+      Manages the lifecycle of an LLM API request from initiation
+      through completion or failure.
+
+    states:
+      pending:
+        description: "Request is in progress"
+        entry_actions:
+          - action: log_request_start
+            description: "Record request start time"
+          - action: increment_pending_count
+            description: "Increment project's pending request count"
+        exit_actions:
+          - action: decrement_pending_count
+            description: "Decrement project's pending request count"
+        invariants:
+          - "timestamp_start is set"
+          - "timestamp_end is null"
+
+      success:
+        description: "Request completed successfully"
+        entry_actions:
+          - action: log_request_complete
+            description: "Record completion time and details"
+          - action: update_usage_stats
+            description: "Update project usage statistics"
+          - action: record_touched_resources
+            description: "Record files/entities touched"
+        exit_actions: []
+        invariants:
+          - "timestamp_end is set"
+          - "http_status is 2xx"
+          - "usage data is recorded"
+        terminal: true
+
+      error:
+        description: "Request failed with error"
+        entry_actions:
+          - action: log_error_details
+            description: "Record error information"
+          - action: update_error_stats
+            description: "Update error statistics"
+        exit_actions: []
+        invariants:
+          - "timestamp_end is set"
+          - "error object is populated"
+        terminal: true
+
+      timeout:
+        description: "Request timed out"
+        entry_actions:
+          - action: log_timeout
+            description: "Record timeout event"
+          - action: update_timeout_stats
+            description: "Update timeout statistics"
+        exit_actions: []
+        invariants:
+          - "timestamp_end is set"
+          - "error indicates timeout"
+        terminal: true
+
+    transitions:
+      - id: pending_to_success
+        from: pending
+        to: success
+        trigger: response_received
+        description: "Successful response received from API"
+        guards:
+          - condition: "http_status_ok()"
+            error_message: "HTTP status indicates failure"
+        actions:
+          - set_timestamp_end
+          - record_usage
+          - record_timings
+          - update_status_to_success
+
+      - id: pending_to_error
+        from: pending
+        to: error
+        trigger: request_failed
+        description: "Request failed with error"
+        guards: []
+        actions:
+          - set_timestamp_end
+          - capture_error
+          - update_status_to_error
+
+      - id: pending_to_timeout
+        from: pending
+        to: timeout
+        trigger: request_timeout
+        description: "Request exceeded timeout limit"
+        guards: []
+        actions:
+          - set_timestamp_end
+          - record_timeout_error
+          - update_status_to_timeout
+
+  # ---------------------------------------------------------------------------
+  # User Lifecycle State Machine (Phase 4+)
+  # ---------------------------------------------------------------------------
+  user_lifecycle:
+    entity: User
+    initial_state: active
+    description: |
+      Manages the lifecycle of a user account. Minimal for Phase 1-3,
+      expanded in Phase 4 for multi-user support.
+
+    states:
+      active:
+        description: "User account is active"
+        entry_actions:
+          - action: send_welcome_email
+            description: "Send welcome email (Phase 4+)"
+            conditional: "is_new_user"
+          - action: initialize_preferences
+            description: "Set default user preferences"
+        exit_actions: []
+        invariants:
+          - "email is verified (Phase 4+)"
+          - "can access owned projects"
+
+      suspended:
+        description: "User account is suspended"
+        entry_actions:
+          - action: revoke_sessions
+            description: "Invalidate all active sessions"
+          - action: notify_user
+            description: "Send suspension notification"
+        exit_actions: []
+        invariants:
+          - "cannot log in"
+          - "projects remain accessible to admins"
+
+      deleted:
+        description: "User account is deleted"
+        entry_actions:
+          - action: anonymize_data
+            description: "Anonymize personal data per GDPR"
+          - action: transfer_projects
+            description: "Transfer projects to admin or delete"
+          - action: revoke_all_access
+            description: "Remove all access permissions"
+        exit_actions: []
+        invariants:
+          - "personal data anonymized"
+          - "no active sessions"
+        terminal: true
+
+    transitions:
+      - id: active_to_suspended
+        from: active
+        to: suspended
+        trigger: suspend_user
+        description: "Admin suspends user account"
+        guards:
+          - condition: "admin_action()"
+            error_message: "Only admins can suspend users"
+        actions:
+          - revoke_sessions
+          - update_status_to_suspended
+          - log_suspension
+
+      - id: active_to_deleted
+        from: active
+        to: deleted
+        trigger: delete_user
+        description: "User account is deleted"
+        guards:
+          - condition: "admin_action() OR self_deletion()"
+            error_message: "Unauthorized deletion attempt"
+          - condition: "no_owned_projects() OR projects_transferred()"
+            error_message: "Must transfer or delete owned projects first"
+        actions:
+          - anonymize_data
+          - transfer_or_delete_projects
+          - update_status_to_deleted
+          - log_deletion
+
+      - id: suspended_to_active
+        from: suspended
+        to: active
+        trigger: reactivate_user
+        description: "Admin reactivates suspended user"
+        guards:
+          - condition: "admin_action()"
+            error_message: "Only admins can reactivate users"
+        actions:
+          - update_status_to_active
+          - notify_user_reactivated
+          - log_reactivation
+
+      - id: suspended_to_deleted
+        from: suspended
+        to: deleted
+        trigger: delete_user
+        description: "Suspended user account is deleted"
+        guards:
+          - condition: "admin_action()"
+            error_message: "Only admins can delete suspended users"
+        actions:
+          - anonymize_data
+          - transfer_or_delete_projects
+          - update_status_to_deleted
+          - log_deletion
+
+# =============================================================================
+# GUARD FUNCTION DEFINITIONS
+# =============================================================================
+
+guard_functions:
+  # Project guards
+  git_repo_initialized:
+    description: "Check if Git repository is initialized in project root"
+    implementation: "fs.existsSync(path.join(projectPath, '.git'))"
+    
+  metadata_exists:
+    description: "Check if project metadata file exists"
+    implementation: "fs.existsSync(path.join(projectPath, 'project.json'))"
+    
+  directory_structure_valid:
+    description: "Check if required directories exist"
+    implementation: |
+      ['chats', 'data', 'logs', 'public'].every(dir => 
+        fs.existsSync(path.join(projectPath, dir)))
+    
+  directory_exists:
+    description: "Check if project directory exists"
+    implementation: "fs.existsSync(projectPath)"
+    
+  git_repo_valid:
+    description: "Check if Git repository is valid and not corrupted"
+    implementation: "await git.checkIsRepo(projectPath)"
+    
+  no_pending_operations:
+    description: "Check if project has no pending LLM requests or file operations"
+    implementation: "project.pendingOperations.length === 0"
+    
+  user_confirmed_deletion:
+    description: "Check if user has confirmed deletion"
+    implementation: "confirmationToken && confirmationToken.valid"
+    
+  cleanup_required:
+    description: "Check if partial files need cleanup after failed init"
+    implementation: "fs.existsSync(projectPath)"
+
+  # Chat guards
+  no_pending_llm_requests:
+    description: "Check if chat has no pending LLM requests"
+    implementation: "chat.pendingRequests.length === 0"
+    
+  project_is_active:
+    description: "Check if parent project is in active state"
+    implementation: "project.status === 'active'"
+
+  # Message guards
+  content_received:
+    description: "Check if message content has been received"
+    implementation: "message.content !== null && message.content !== undefined"
+    
+  not_pinned:
+    description: "Check if message is not pinned"
+    implementation: "!message.is_pinned"
+    
+  retry_allowed:
+    description: "Check if retry is allowed for this error type"
+    implementation: "message.error?.retryable !== false"
+
+  # DataEntity guards
+  not_referenced_by_active_messages:
+    description: "Check if entity is not referenced by active messages"
+    implementation: |
+      !messages.some(m => 
+        m.status !== 'discarded' && 
+        m.related_entity_ids.includes(entity.id))
+    
+  backup_exists:
+    description: "Check if backup exists for restoration"
+    implementation: "await backupService.exists(entity.id)"
+
+  # LLMRequest guards
+  http_status_ok:
+    description: "Check if HTTP status indicates success"
+    implementation: "httpStatus >= 200 && httpStatus < 300"
+
+  # User guards
+  admin_action:
+    description: "Check if action is performed by admin"
+    implementation: "currentUser.role === 'admin'"
+    
+  self_deletion:
+    description: "Check if user is deleting their own account"
+    implementation: "currentUser.id === targetUser.id"
+    
+  no_owned_projects:
+    description: "Check if user owns no projects"
+    implementation: "user.ownedProjects.length === 0"
+    
+  projects_transferred:
+    description: "Check if all projects have been transferred"
+    implementation: "user.ownedProjects.every(p => p.transferred)"
+
+# =============================================================================
+# ACTION FUNCTION DEFINITIONS
+# =============================================================================
+
+action_functions:
+  # Common actions
+  update_timestamp:
+    description: "Update entity's updated_at timestamp"
+    implementation: "entity.updated_at = new Date().toISOString()"
+    
+  persist_message:
+    description: "Write message to storage file"
+    implementation: "await storage.appendMessage(chat.storage_path, message)"
+
+  # Logging actions
+  log_error:
+    description: "Log error to system log"
+    implementation: "logger.error({ entity, error })"
+    
+  log_deletion:
+    description: "Log deletion event"
+    implementation: "logger.info({ event: 'deletion', entity })"
+
+# =============================================================================
+# STATE MACHINE METADATA
+# =============================================================================
+
+metadata:
+  version: "1.0.0"
+  last_updated: "2024-01-01"
+  author: "OinkerUI Specification"
+  
+  implementation_notes:
+    - "State machines should be implemented using a state machine library or pattern"
+    - "All transitions must be atomic - either complete fully or rollback"
+    - "Guards are evaluated before any transition actions execute"
+    - "Entry actions execute after state change, exit actions before"
+    - "Terminal states cannot transition to other states"
+    - "All state changes should be logged for debugging"
+    
+  testing_requirements:
+    - "Each state machine should have unit tests for all transitions"
+    - "Guard functions should be tested independently"
+    - "Integration tests should verify state persistence"
+    - "Edge cases: rapid state changes, concurrent transitions"
