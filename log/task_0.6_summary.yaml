@@ -80,36 +80,36 @@ dependencies_installed:
 
 environment_variables:
   server:
-    - NODE_ENV: Environment mode (development/production/test)
-    - NODE_PORT: Node.js backend port (default: 3000)
-    - PYTHON_PORT: Python tools port (default: 8000)
-    - FRONTEND_PORT: Frontend dev server port (default: 5173)
-    - HOST: Server host (default: 0.0.0.0)
+    NODE_ENV: "Environment mode (development/production/test)"
+    NODE_PORT: "Node.js backend port (default: 3000)"
+    PYTHON_PORT: "Python tools port (default: 8000)"
+    FRONTEND_PORT: "Frontend dev server port (default: 5173)"
+    HOST: "Server host (default: 0.0.0.0)"
   
   api:
-    - OPENROUTER_API_KEY: OpenRouter API key (required)
-    - OPENROUTER_BASE_URL: API base URL
-    - API_TIMEOUT: Request timeout in milliseconds
+    OPENROUTER_API_KEY: "OpenRouter API key (required)"
+    OPENROUTER_BASE_URL: "API base URL"
+    API_TIMEOUT: "Request timeout in milliseconds"
   
   workspace:
-    - WORKSPACE_ROOT: Root directory for workspaces
-    - DATA_DIR: Application data directory
-    - TEMPLATES_DIR: Jinja2 templates directory
-    - SANDBOXES_DIR: Code execution sandboxes directory
+    WORKSPACE_ROOT: "Root directory for workspaces"
+    DATA_DIR: "Application data directory"
+    TEMPLATES_DIR: "Jinja2 templates directory"
+    SANDBOXES_DIR: "Code execution sandboxes directory"
   
   git:
-    - GIT_USER_NAME: Default Git user name
-    - GIT_USER_EMAIL: Default Git user email
-    - AUTO_COMMIT_ENABLED: Enable/disable auto-commit
+    GIT_USER_NAME: "Default Git user name"
+    GIT_USER_EMAIL: "Default Git user email"
+    AUTO_COMMIT_ENABLED: "Enable/disable auto-commit"
   
   security:
-    - SECRET_KEY: Secret key for sessions (Phase 4+)
-    - CORS_ORIGINS: Allowed CORS origins (comma-separated)
+    SECRET_KEY: "Secret key for sessions (Phase 4+)"
+    CORS_ORIGINS: "Allowed CORS origins (comma-separated)"
   
   development:
-    - DEBUG: Enable debug mode
-    - LOG_LEVEL: Logging level (debug/info/warn/error)
-    - LOG_FORMAT: Log format (json/text)
+    DEBUG: "Enable debug mode"
+    LOG_LEVEL: "Logging level (debug/info/warn/error)"
+    LOG_FORMAT: "Log format (json/text)"
 
 verification_results:
   setup_script:
