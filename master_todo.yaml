@@ -40,22 +40,6 @@ prompt_guidance: 'Always follow these guidelines and update project documentatio
   '
 current:
 - task:
-    id: 0.3.0
-    name: Review and Update phase 0 tasks
-    goal: Specifications have been expanded; review tasks 0.3.5, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9 (phase 0) and update if necessary; tasks should be ready for full phase 0 implementation
-    files:
-    - spec/**
-    - master_todo.yaml
-    - prompts/dev/*
-    details:
-      focus:
-      - successful phase 0 task set      
-    notes: |
-      The specification documents have been considerably expanded to accomodate through phase 2 implementation.  Review each of the remaining 0.* tasks,
-      use the doc_query tool to look up relevant specifications (there are new subdirectories spec/functions, spec/modules, spec/schemas); if the task is
-      no longer in compliance with the specifications then it should be regenerated.  Make sure to review the prompts associated with each task. 
-      
-- task:
     id: 0.3.5
     name: Initialize Node.js Project
     goal: Initialize Node.js project with package.json and configure dependencies.
