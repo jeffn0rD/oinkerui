@@ -1,4 +1,4 @@
-%%{init: {'theme': 'dark'}}%%
+%%{init: {"theme": "dark"}}%%
 
 graph TD
     %% Module Dependency Graph
@@ -18,9 +18,9 @@ graph TD
     ext_dompurify((dompurify))
     ext_fastapi((fastapi))
     ext_fastify((fastify))
-    ext_fastify_cors((@fastify/cors))
-    ext_fastify_static((@fastify/static))
-    ext_highlight.js((highlight.js))
+    ext_fastify_cors(("@fastify/cors"))
+    ext_fastify_static(("@fastify/static"))
+    ext_highlight_js((highlight.js))
     ext_jinja2((jinja2))
     ext_marked((marked))
     ext_pino((pino))
@@ -49,23 +49,25 @@ graph TD
     frontend_svelte -.-> ext_svelte
     frontend_svelte -.-> ext_vite
     frontend_svelte -.-> ext_tailwindcss
+
     logging_and_metrics -.-> ext_pino
     logging_and_metrics -.-> ext_pino_pretty
     logging_and_metrics -.-> ext_rotating_file_stream
+
     git_integration -.-> ext_simple_git
     git_integration -.-> ext_diff
+
     backend_node -.-> ext_fastify
     backend_node -.-> ext_fastify_cors
     backend_node -.-> ext_fastify_static
+
     backend_python_tools -.-> ext_fastapi
     backend_python_tools -.-> ext_uvicorn
     backend_python_tools -.-> ext_jinja2
 
     %% Styling
-    classDef module fill:#2d3748,stroke:#4a5568
-    classDef external fill:#553c9a,stroke:#6b46c1
-    class frontend_svelte module
-    class logging_and_metrics module
-    class git_integration module
-    class backend_node module
-    class backend_python_tools module
+    classDef module fill:#2d3748,stroke:#4a5568,color:#f7fafc
+    classDef external fill:#553c9a,stroke:#6b46c1,color:#f7fafc
+
+    class frontend_svelte,logging_and_metrics,git_integration,backend_node,backend_python_tools module
+    class ext_axios,ext_date_fns,ext_diff,ext_dompurify,ext_fastapi,ext_fastify,ext_fastify_cors,ext_fastify_static,ext_highlight_js,ext_jinja2,ext_marked,ext_pino,ext_pino_pretty,ext_pydantic,ext_python_multipart,ext_rotating_file_stream,ext_simple_git,ext_slugify,ext_svelte,ext_tailwindcss,ext_tiktoken,ext_uuid,ext_uvicorn,ext_vite external
