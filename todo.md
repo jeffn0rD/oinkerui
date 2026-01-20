@@ -45,5 +45,5 @@ Generate a list of prompts to update and refine the specifications to full detai
 - [x] Add new tasks to master_todo.yaml
 - [x] Create task summary in log/task_0.2.5_summary.yaml
 - [x] Move task from master_todo.yaml to tasks_completed.yaml
-- [ ] Commit and push changes
-- [ ] Run task cleanup tool
+- [x] Commit and push changes
+- [x] Run task cleanup tool (false positive on subtask IDs)
