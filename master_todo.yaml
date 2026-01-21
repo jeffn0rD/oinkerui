@@ -57,37 +57,6 @@ current:
       verification:
       - npm run dev in frontend/
       - npm run build works
-- task:
-    id: 0.9
-    name: Create Documentation and Initialize Git
-    goal: Create comprehensive documentation and initialize Git repository.
-    prompt: ./prompts/dev/prompt_0_9_updated.md
-    files:
-    - prompts/dev/prompt_0_9_updated.md
-    - spec/spec.yaml
-    - spec/domain.yaml
-    - spec/apis.yaml
-    - spec/workflows.yaml
-    - spec/modules/
-    - spec/functions/
-    details:
-      focus:
-      - README.md, CONTRIBUTING.md, ARCHITECTURE.md
-      - API documentation
-      - .gitignore and Git setup
-      - Phase 0 verification
-      - Entities (User, Order, Invoice, Workflow, Task, etc.).
-      - Relationships (owns, approves, contains, depends_on, etc.).
-      notes:
-      - develop mapping to data_models/types.
-      steps:
-      - Review spec documents and determine details that need to be added for a complete domain model.
-      - If more information is needed update ./open_questions.yaml
-      - New spec files can be created if appropriate.  Use verification script to verify new files are referenced correctly.
-      verification:
-      - Run verify/verify_phase_0.py
-      - All documentation complete
-      - Git repository initialized
 future:
 - add context re-ordering feature; prompt/responses in chat history can be re-ordered in the left side list, drag and drop
   and/or buttons move up/down.  Need a reset button as well.
