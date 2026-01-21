@@ -21,7 +21,11 @@ import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Any, Optional, Tuple
-import yaml
+
+# Import YAML tools
+sys.path.insert(0, str(Path(__file__).parent))
+from task_manager import TaskManager
+from validate_schemas import validate_master_todo, validate_tasks_completed
 
 
 class TaskCleanup:
@@ -34,6 +38,7 @@ class TaskCleanup:
         self.max_iterations = max_iterations
         self.issues = []
         self.warnings = []
+        self.task_manager = TaskManager(self.base_path)
         
     def run_cleanup(self, dry_run: bool = False) -> bool:
         """
@@ -100,70 +105,39 @@ class TaskCleanup:
     
     def _check_task_moved(self):
         """Check if task was moved from master_todo.yaml to tasks_completed.yaml."""
-        print("\n1. Checking task movement...")
+        print("\\n1. Checking task movement...")
         
-        # Check master_todo.yaml
-        master_todo_path = self.base_path / "master_todo.yaml"
-        if not master_todo_path.exists():
-            self.issues.append({
-                "type": "file_missing",
-                "file": "master_todo.yaml",
-                "message": "master_todo.yaml not found",
-                "severity": "error"
-            })
-            return
-        
+        # Use TaskManager to check task location
         try:
-            with open(master_todo_path, 'r') as f:
-                # Read as text to avoid YAML parsing errors
-                content = f.read()
-                if f"id: {self.task_id}" in content:
-                    self.issues.append({
-                        "type": "task_not_moved",
-                        "file": "master_todo.yaml",
-                        "message": f"Task {self.task_id} still in master_todo.yaml",
-                        "severity": "error",
-                        "action": f"Remove task {self.task_id} from master_todo.yaml"
-                    })
-                else:
-                    print(f"   ✓ Task {self.task_id} not in master_todo.yaml")
+            # Check if task is in master_todo
+            task_in_master = self.task_manager.get_task_from_master(self.task_id)
+            if task_in_master:
+                self.issues.append({
+                    "type": "task_not_moved",
+                    "file": "master_todo.yaml",
+                    "message": f"Task {self.task_id} still in master_todo.yaml",
+                    "severity": "error",
+                    "action": f"Remove task {self.task_id} from master_todo.yaml"
+                })
+            else:
+                print(f"   ✓ Task {self.task_id} not in master_todo.yaml")
+            
+            # Check if task is in tasks_completed
+            task_in_completed = self.task_manager.get_task_from_completed(self.task_id)
+            if task_in_completed:
+                print(f"   ✓ Task {self.task_id} in tasks_completed.yaml")
+            else:
+                self.issues.append({
+                    "type": "task_not_completed",
+                    "file": "log/tasks_completed.yaml",
+                    "message": f"Task {self.task_id} not in tasks_completed.yaml",
+                    "severity": "error",
+                    "action": f"Add task {self.task_id} to tasks_completed.yaml"
+                })
         except Exception as e:
             self.issues.append({
-                "type": "read_error",
-                "file": "master_todo.yaml",
-                "message": f"Error reading master_todo.yaml: {str(e)}",
-                "severity": "error"
-            })
-        
-        # Check tasks_completed.yaml
-        completed_path = self.base_path / "log" / "tasks_completed.yaml"
-        if not completed_path.exists():
-            self.issues.append({
-                "type": "file_missing",
-                "file": "log/tasks_completed.yaml",
-                "message": "tasks_completed.yaml not found",
-                "severity": "error"
-            })
-            return
-        
-        try:
-            with open(completed_path, 'r') as f:
-                content = f.read()
-                if f"id: {self.task_id}" in content:
-                    print(f"   ✓ Task {self.task_id} in tasks_completed.yaml")
-                else:
-                    self.issues.append({
-                        "type": "task_not_completed",
-                        "file": "log/tasks_completed.yaml",
-                        "message": f"Task {self.task_id} not in tasks_completed.yaml",
-                        "severity": "error",
-                        "action": f"Add task {self.task_id} to tasks_completed.yaml"
-                    })
-        except Exception as e:
-            self.issues.append({
-                "type": "read_error",
-                "file": "log/tasks_completed.yaml",
-                "message": f"Error reading tasks_completed.yaml: {str(e)}",
+                "type": "check_error",
+                "message": f"Error checking task location: {str(e)}",
                 "severity": "error"
             })
     
@@ -207,48 +181,40 @@ class TaskCleanup:
             })
     
     def _run_validations(self):
-        """Run YAML validation."""
-        print("\n3. Running YAML validation...")
-        
-        validator_path = self.base_path / "verify" / "validate_yaml.py"
-        if not validator_path.exists():
-            self.warnings.append({
-                "type": "validator_missing",
-                "message": "YAML validator not found, skipping validation",
-                "severity": "warning"
-            })
-            return
+        """Run YAML validation using new validation tools."""
+        print("\\n3. Running YAML validation...")
         
         try:
-            result = subprocess.run(
-                ["python3", str(validator_path), "--all", "--json"],
-                capture_output=True,
-                text=True,
-                cwd=str(self.base_path)
-            )
+            # Validate master_todo.yaml
+            master_todo_path = self.base_path / "master_todo.yaml"
+            is_valid, errors = validate_master_todo(master_todo_path)
             
-            if result.returncode == 0:
-                print("   ✓ All YAML files valid")
-            else:
-                # Parse JSON output
-                try:
-                    validation_results = json.loads(result.stdout)
-                    if validation_results.get("errors"):
-                        for error in validation_results["errors"]:
-                            self.issues.append({
-                                "type": "yaml_validation_error",
-                                "file": error.get("file", "unknown"),
-                                "message": error.get("message", "Unknown error"),
-                                "severity": "error",
-                                "details": error
-                            })
-                except json.JSONDecodeError:
+            if not is_valid:
+                for error in errors:
                     self.issues.append({
-                        "type": "validation_error",
-                        "message": "YAML validation failed",
-                        "severity": "error",
-                        "output": result.stdout
+                        "type": "yaml_validation_error",
+                        "file": "master_todo.yaml",
+                        "message": error,
+                        "severity": "error"
                     })
+            else:
+                print("   ✓ master_todo.yaml is valid")
+            
+            # Validate tasks_completed.yaml
+            tasks_completed_path = self.base_path / "log" / "tasks_completed.yaml"
+            is_valid, errors = validate_tasks_completed(tasks_completed_path)
+            
+            if not is_valid:
+                for error in errors:
+                    self.issues.append({
+                        "type": "yaml_validation_error",
+                        "file": "log/tasks_completed.yaml",
+                        "message": error,
+                        "severity": "error"
+                    })
+            else:
+                print("   ✓ tasks_completed.yaml is valid")
+                
         except Exception as e:
             self.warnings.append({
                 "type": "validation_error",
