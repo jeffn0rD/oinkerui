@@ -58,27 +58,6 @@ current:
       - npm run dev in frontend/
       - npm run build works
 - task:
-    id: 0.8
-    name: Create Testing Infrastructure
-    goal: Set up testing infrastructure for frontend (Vitest), Node.js backend (Jest), and Python backend (pytest).
-    prompt: ./prompts/dev/prompt_0_8_updated.md
-    files:
-    - prompts/dev/prompt_0_8_updated.md
-    - spec/functions/
-    - spec/domain.yaml
-    - spec/apis.yaml
-    - spec/modules/backend_node.yaml
-    - spec/modules/frontend_svelte.yaml
-    details:
-      focus:
-      - Jest configuration for Svelte
-      - pytest configuration
-      - Example tests
-      verification:
-      - npm run test:frontend
-      - npm run test:backend
-      - All tests pass
-- task:
     id: 0.9
     name: Create Documentation and Initialize Git
     goal: Create comprehensive documentation and initialize Git repository.
