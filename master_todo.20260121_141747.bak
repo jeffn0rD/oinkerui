@@ -38,7 +38,10 @@ prompt_guidance: "Always follow these guidelines and update project documentatio
   \ project tracking.\n* It is important to keep the repository clean of unnecessary files.\n* Follow the task instructions\
   \ closely and carefully. Constrain work and scope to the task. Return with questions if\nneeded and confirm any extra work\
   \ if it is outside the scope.\n* ALWAYS COMMIT AND PUSH the repository after a task.\n"
-current:
+current: []
+future:
+- add context re-ordering feature; prompt/responses in chat history can be re-ordered in the left side list, drag and drop
+  and/or buttons move up/down.  Need a reset button as well.
 - task:
     id: 1.0.0
     name: Implement Project CRUD Operations
@@ -237,7 +240,4 @@ current:
       - Security audit
       - Documentation review
       - User acceptance testing
-future:
-- add context re-ordering feature; prompt/responses in chat history can be re-ordered in the left side list, drag and drop
-  and/or buttons move up/down.  Need a reset button as well.
 open_questions: []

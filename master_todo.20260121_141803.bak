@@ -59,6 +59,9 @@ current:
       - Unit tests for each CRUD operation
       - Integration test for project lifecycle
       - Verify Git repo created for each project
+future:
+- add context re-ordering feature; prompt/responses in chat history can be re-ordered in the left side list, drag and drop
+  and/or buttons move up/down.  Need a reset button as well.
 - task:
     id: 1.1.0
     name: Implement Chat CRUD Operations
@@ -237,7 +240,4 @@ current:
       - Security audit
       - Documentation review
       - User acceptance testing
-future:
-- add context re-ordering feature; prompt/responses in chat history can be re-ordered in the left side list, drag and drop
-  and/or buttons move up/down.  Need a reset button as well.
 open_questions: []

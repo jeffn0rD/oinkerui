@@ -218,6 +218,9 @@ current:
       - Test state updates
       - Test store subscriptions
       - Verify persistence
+future:
+- add context re-ordering feature; prompt/responses in chat history can be re-ordered in the left side list, drag and drop
+  and/or buttons move up/down.  Need a reset button as well.
 - task:
     id: 1.9.0
     name: Phase 1 Integration and End-to-End Testing
@@ -237,7 +240,4 @@ current:
       - Security audit
       - Documentation review
       - User acceptance testing
-future:
-- add context re-ordering feature; prompt/responses in chat history can be re-ordered in the left side list, drag and drop
-  and/or buttons move up/down.  Need a reset button as well.
 open_questions: []

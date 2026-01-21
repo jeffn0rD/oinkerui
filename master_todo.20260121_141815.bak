@@ -97,6 +97,9 @@ current:
       - Unit tests for message operations
       - Verify JSONL format
       - Test message ordering
+future:
+- add context re-ordering feature; prompt/responses in chat history can be re-ordered in the left side list, drag and drop
+  and/or buttons move up/down.  Need a reset button as well.
 - task:
     id: 1.3.0
     name: Implement OpenRouter LLM Integration
@@ -237,7 +240,4 @@ current:
       - Security audit
       - Documentation review
       - User acceptance testing
-future:
-- add context re-ordering feature; prompt/responses in chat history can be re-ordered in the left side list, drag and drop
-  and/or buttons move up/down.  Need a reset button as well.
 open_questions: []

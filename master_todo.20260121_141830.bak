@@ -198,6 +198,9 @@ current:
       - Visual regression tests
       - Test dark theme
       - Test responsive layout
+future:
+- add context re-ordering feature; prompt/responses in chat history can be re-ordered in the left side list, drag and drop
+  and/or buttons move up/down.  Need a reset button as well.
 - task:
     id: 1.8.0
     name: Implement Frontend State Management
@@ -237,7 +240,4 @@ current:
       - Security audit
       - Documentation review
       - User acceptance testing
-future:
-- add context re-ordering feature; prompt/responses in chat history can be re-ordered in the left side list, drag and drop
-  and/or buttons move up/down.  Need a reset button as well.
 open_questions: []
