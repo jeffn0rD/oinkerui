@@ -2,42 +2,30 @@ title: oinkerui master todo list
 description: 'This is a master development todo list for human and machine interaction.
 
   '
-prompt_guidance: 'Always follow these guidelines and update project documentation:
-
+prompt_guidance: |
+  Always follow these guidelines and update project documentation:
+  **** ALWAYS PULL the repository before starting a task. ****
   **** When possible and practical use deterministic methods (python code) to accomplish tasks.  ****
-
   * When processing tasks always creae a brief summary of steps and actions in log/task_<id>_summary.yaml .
-
   * when processing a task review the last task notes (log/task_<id>_notes.yaml).  There may be information needed or remaining
   work that needs to be completed first.
-
   * In the task_<id>_summary.yaml file always provide ''justification:'' for each step/action.  It is important to track the
   decisions made and reasoning behind them.
-
   * If there are errors, inconsistencies, or inadequate information to accomplish all goals of a task append questions to
   ./open_questions.yaml
-
   * If the task is complete mark it complete by removing the task from the list in this document and appending it to ./log/tasks_completed.yaml
-
   * Tasks should be verified before considered complete, when possible use a small python script (save to ./verify/task_<id>_<descriptor>.py).
   The script should be well commented as to what it does and why.
-
   * Always make sure system documentation is up to date with work just done! manuals go in ./man/*.yaml
-
   * NOTE: All spec files need to have consistent references to each other.  This needs to be verified whenever spec files
   are changed.
-
   **** You can create temporary files to assist with task completion but they should be removed when task is complete.  Use
   the files outlined here for project tracking. ****
-
   **** It is important to keep the repository clean of uneccessary files. ****
-
   **** Follow the task instructions closely and carefully.  Constrain work and scope to the task.  Return with questions if
   needed and confirm any extra work if it is outside the scope. ****
-
   **** ALWAYS COMMIT AND PUSH the repository after a task. ****
 
-  '
 current:
 - task:
     id: 0.5
