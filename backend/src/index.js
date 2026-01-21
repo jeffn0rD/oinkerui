@@ -9,6 +9,9 @@ fastify.register(require('@fastify/static'), {
   prefix: '/',
 });
 
+// Register routes
+fastify.register(require('./routes/projects'));
+
 // Health check endpoint
 fastify.get('/api/health', async (_request, _reply) => {
   return { status: 'ok', timestamp: new Date().toISOString() };
