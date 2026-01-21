@@ -29,9 +29,6 @@ current: []
 future:
 - add context re-ordering feature; prompt/responses in chat history can be re-ordered in the left side list, drag and drop
   and/or buttons move up/down.  Need a reset button as well.
-- (LLM) crawl the spec files and look for inconsistencies and areas that need elaboration, create document of questions to
-  be addressed.
-- repository bootstrapping with node/fastapi
 - task:
     id: 1.0.0
     name: Implement Project CRUD Operations
