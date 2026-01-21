@@ -1,0 +1,337 @@
+title: OinkerUI Development Tools Manual
+version: "1.0.0"
+last_updated: "2024-01-21"
+description: |
+  This manual documents all development tools available in the tools/ directory.
+  These tools are designed to support deterministic, specification-driven development.
+
+tools:
+  yaml_db:
+    file: tools/yaml_db.py
+    purpose: Core YAML database operations with safe loading, saving, and manipulation
+    description: |
+      Provides a YAMLDatabase class for managing YAML files as structured databases.
+      Features atomic file operations, automatic backups, and dot-notation path access.
+    
+    features:
+      - Safe YAML loading and dumping
+      - Automatic backup creation before modifications
+      - Dot-notation path access (get/set)
+      - List operations (append, remove, find)
+      - Schema validation support
+      - Atomic file operations (write to temp, then rename)
+    
+    usage:
+      python_api: |
+        from yaml_db import YAMLDatabase
+        
+        # Load and modify
+        db = YAMLDatabase('master_todo.yaml')
+        data = db.load()
+        db.set('current.0.task.name', 'New Name')
+        db.save()
+        
+        # Convenience functions
+        from yaml_db import load_yaml, save_yaml
+        data = load_yaml('file.yaml')
+        save_yaml('file.yaml', data)
+    
+    notes:
+      - Always creates backups before modifications
+      - Handles mixed types (string, int, float) in paths
+      - Thread-safe for single operations
+
+  task_manager:
+    file: tools/task_manager.py
+    purpose: High-level task management operations for master_todo.yaml and tasks_completed.yaml
+    description: |
+      Provides TaskManager class and CLI for managing tasks across the project.
+      Handles moving tasks between sections, adding new tasks, and querying task status.
+    
+    features:
+      - Move tasks from master_todo to tasks_completed
+      - Move tasks from future to current (activate)
+      - Add new tasks to master_todo
+      - List tasks by status
+      - Query tasks by ID (handles mixed types)
+      - Validate task structure
+    
+    cli_commands:
+      list: |
+        python3 tools/task_manager.py list --status all|current|future|completed
+        
+        Lists tasks by status. Use --status all for complete summary.
+      
+      move: |
+        python3 tools/task_manager.py move <task_id> --date YYYY-MM-DD --commit <hash> --summary "..."
+        
+        Moves a task from master_todo.yaml to tasks_completed.yaml.
+        Adds completion metadata (date, commit, summary).
+      
+      activate: |
+        python3 tools/task_manager.py activate <task_id>
+        
+        Moves a task from 'future' section to 'current' section.
+        Use this when starting work on a task.
+      
+      add: |
+        python3 tools/task_manager.py add <task_id> <name> <goal> --prompt <path> --section current|future
+        
+        Adds a new task to master_todo.yaml.
+    
+    notes:
+      - Handles task IDs as strings, ints, or floats
+      - Creates backups before modifications
+      - Validates task structure
+
+  validate_schemas:
+    file: tools/validate_schemas.py
+    purpose: Schema validation for YAML files
+    description: |
+      Validates master_todo.yaml and tasks_completed.yaml against defined schemas.
+      Ensures data integrity and catches structural errors.
+    
+    cli_usage: |
+      python3 tools/validate_schemas.py --file all|master_todo|tasks_completed
+    
+    schemas_validated:
+      - master_todo.yaml (title, description, prompt_guidance, current, future)
+      - tasks_completed.yaml (title, description, tasks)
+
+  code_generator:
+    file: tools/code_generator.py
+    purpose: Generate code scaffolding from specification files
+    description: |
+      Deterministically generates code from module and function specifications.
+      Creates module files, function signatures, and documentation comments.
+      Language-aware (JavaScript/Node.js and Python).
+    
+    features:
+      - Language-aware code generation
+      - Module header generation with responsibilities
+      - Import statement generation from dependencies
+      - Function signature generation with JSDoc/docstrings
+      - FOL algorithm comments
+      - Spec reference comments (doc_query commands)
+      - Error class generation
+      - Extensible for additional languages
+    
+    cli_commands:
+      preview_module: |
+        python3 tools/code_generator.py --module <module_id> --preview
+        
+        Preview generated code for a module without writing files.
+      
+      generate_module: |
+        python3 tools/code_generator.py --module <module_id> --output <dir>
+        
+        Generate module code to specified directory.
+      
+      preview_function: |
+        python3 tools/code_generator.py --function <module.function> --preview
+        
+        Preview generated code for a single function.
+      
+      generate_all: |
+        python3 tools/code_generator.py --all --output <dir>
+        
+        Generate code for all modules.
+    
+    module_language_mapping:
+      backend_node: javascript
+      frontend_svelte: javascript
+      backend_python_tools: python
+      git_integration: javascript
+      logging_and_metrics: javascript
+    
+    notes:
+      - Generated code includes TODO markers for implementation
+      - Spec references are included as comments
+      - FOL specifications are preserved in comments
+      - If algorithm cannot be implemented, report issue to regenerate spec
+
+  prompt_generator:
+    file: tools/prompt_generator.py
+    purpose: Generate detailed LLM prompts for tasks
+    description: |
+      Creates comprehensive prompts for task implementation based on:
+      - Task definition from master_todo.yaml
+      - Module specifications from spec/modules/
+      - Function specifications from spec/functions/
+      - Code generator tool references
+    
+    features:
+      - Context gathering commands (doc_query)
+      - Code generator commands
+      - Requirements from specs
+      - Function details with signatures and contracts
+      - Verification steps
+      - Completion checklist
+    
+    cli_commands:
+      single_task: |
+        python3 tools/prompt_generator.py --task <task_id>
+        
+        Generate prompt for a single task.
+      
+      preview: |
+        python3 tools/prompt_generator.py --task <task_id> --preview
+        
+        Preview prompt without saving.
+      
+      all_phase: |
+        python3 tools/prompt_generator.py --all-phase <N>
+        
+        Generate prompts for all tasks in phase N.
+    
+    output_location: prompts/dev/prompt_<task_id>.md
+    
+    notes:
+      - Prompts reference code generator for scaffolding
+      - Include doc_query commands for context gathering
+      - Generated prompts are comprehensive and self-contained
+
+  doc_query:
+    file: tools/doc_query.py
+    purpose: Query and search specification and documentation files
+    description: |
+      Enhanced document query tool with predicate-based filtering.
+      Searches YAML files for tasks, specifications, and documentation.
+    
+    features:
+      - Text search across files
+      - Path-based queries with predicates
+      - Task-specific queries
+      - File content retrieval
+      - Related files discovery
+    
+    cli_commands:
+      task_query: |
+        python3 tools/doc_query.py --query "<task_id>" --mode task --pretty
+        
+        Query for a specific task by ID.
+      
+      text_search: |
+        python3 tools/doc_query.py --query "<pattern>" --mode text --pretty
+        
+        Search for text pattern across files.
+      
+      file_content: |
+        python3 tools/doc_query.py --query "<file_path>" --mode file --pretty
+        
+        Get contents of a specific file.
+      
+      path_query: |
+        python3 tools/doc_query.py --query "current[*].task.{name~pattern}" --mode path --pretty
+        
+        Query using path with predicates.
+    
+    notes:
+      - Searches both current and future sections in master_todo.yaml
+      - Handles mixed ID types (string, int, float)
+      - Returns related files (summary, notes, prompts)
+
+  task_executor:
+    file: tools/task_executor.py
+    purpose: Automate task execution workflow
+    description: |
+      Coordinates task execution by loading task data, generating orchestrator
+      prompts, and providing execution instructions.
+    
+    cli_commands:
+      execute_task: |
+        python3 tools/task_executor.py --task-id <task_id>
+        
+        Execute a specific task.
+      
+      generate_only: |
+        python3 tools/task_executor.py --task-id <task_id> --generate-only
+        
+        Generate orchestrator prompt without executing.
+      
+      next_task: |
+        python3 tools/task_executor.py --next
+        
+        Execute the next task in the queue.
+
+  task_cleanup:
+    file: tools/task_cleanup.py
+    purpose: Automate task finalization and verification
+    description: |
+      Verifies task completion, runs validations, and handles
+      commit/push operations.
+    
+    cli_usage: |
+      python3 tools/task_cleanup.py --task-id <task_id> [--dry-run]
+    
+    checks_performed:
+      - Task moved from master_todo to tasks_completed
+      - Log files exist (summary, notes)
+      - YAML validation passes
+      - Task-specific tests pass
+
+workflow:
+  task_creation:
+    description: Creating a new task
+    steps:
+      - step: 1
+        action: Add task to master_todo.yaml
+        command: python3 tools/task_manager.py add <task_id> "<name>" "<goal>" --prompt ./prompts/dev/prompt_<id>.md --section future
+      
+      - step: 2
+        action: Generate prompt for the task
+        command: python3 tools/prompt_generator.py --task <task_id>
+      
+      - step: 3
+        action: Verify task was added
+        command: python3 tools/task_manager.py list --status future
+  
+  task_execution:
+    description: Executing a task
+    steps:
+      - step: 1
+        action: Activate the task (move to current)
+        command: python3 tools/task_manager.py activate <task_id>
+      
+      - step: 2
+        action: Review the prompt
+        command: cat prompts/dev/prompt_<task_id>.md
+      
+      - step: 3
+        action: Gather context
+        command: (run doc_query commands from prompt)
+      
+      - step: 4
+        action: Generate code scaffolding
+        command: python3 tools/code_generator.py --module <module_id> --output <dir>
+      
+      - step: 5
+        action: Implement the task
+        note: Follow the algorithm steps in function specs
+      
+      - step: 6
+        action: Run task cleanup
+        command: python3 tools/task_cleanup.py --task-id <task_id>
+  
+  task_completion:
+    description: Completing a task
+    steps:
+      - step: 1
+        action: Verify all requirements met
+        note: Check verification items in prompt
+      
+      - step: 2
+        action: Move task to completed
+        command: python3 tools/task_manager.py move <task_id> --date YYYY-MM-DD --commit <hash> --summary "..."
+      
+      - step: 3
+        action: Commit and push
+        command: git add -A && git commit -m "Complete task <task_id>" && git push
+
+best_practices:
+  - Always use YAML tools instead of manual editing
+  - Generate code scaffolding before implementing
+  - Follow spec algorithms exactly
+  - Report spec issues if implementation is impossible
+  - Create verification scripts for complex tasks
+  - Keep prompts up to date with spec changes

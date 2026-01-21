@@ -211,6 +211,60 @@ class TaskManager:
         print(f"Warning: Task {task_id} not found in current or future tasks")
         return False
     
+    def move_task_to_current(self, task_id: Union[str, int, float]) -> bool:
+        """
+        Move a task from 'future' section to 'current' section.
+        
+        Args:
+            task_id: ID of the task to move
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        self.master_todo_db.load()
+        
+        # Normalize task_id for comparison
+        def normalize_id(tid):
+            if isinstance(tid, str):
+                try:
+                    return float(tid)
+                except ValueError:
+                    return tid
+            return tid
+        
+        normalized_search_id = normalize_id(task_id)
+        
+        # Find task in future
+        future_tasks = self.master_todo_db.get('future', [])
+        task_to_move = None
+        task_index = None
+        
+        for i, task_entry in enumerate(future_tasks):
+            if isinstance(task_entry, dict) and 'task' in task_entry:
+                entry_id = task_entry.get('task', {}).get('id')
+                if normalize_id(entry_id) == normalized_search_id:
+                    task_to_move = task_entry
+                    task_index = i
+                    break
+        
+        if task_to_move is None:
+            print(f"Error: Task {task_id} not found in future section")
+            return False
+        
+        # Remove from future
+        future_tasks.pop(task_index)
+        self.master_todo_db.set('future', future_tasks)
+        
+        # Add to current
+        current_tasks = self.master_todo_db.get('current', [])
+        current_tasks.append(task_to_move)
+        self.master_todo_db.set('current', current_tasks)
+        
+        self.master_todo_db.save()
+        print(f"✓ Moved task {task_id} from future to current")
+        
+        return True
+    
     def add_task_to_master(
         self,
         task_id: str,
@@ -419,12 +473,16 @@ def main():
     list_parser.add_argument('--status', choices=['current', 'future', 'completed', 'all'],
                             default='all', help='Task status to list')
     
-    # Move command
+    # Move command (to completed)
     move_parser = subparsers.add_parser('move', help='Move task to completed')
     move_parser.add_argument('task_id', help='Task ID to move')
     move_parser.add_argument('--date', help='Completion date (YYYY-MM-DD)')
     move_parser.add_argument('--commit', help='Git commit hash')
     move_parser.add_argument('--summary', help='Task summary')
+    
+    # Activate command (move from future to current)
+    activate_parser = subparsers.add_parser('activate', help='Move task from future to current')
+    activate_parser.add_argument('task_id', help='Task ID to activate')
     
     # Add command
     add_parser = subparsers.add_parser('add', help='Add new task')
@@ -482,6 +540,14 @@ def main():
             print(f"\n✓ Successfully added task {args.task_id}")
         else:
             print(f"\n✗ Failed to add task {args.task_id}")
+            sys.exit(1)
+    
+    elif args.command == 'activate':
+        success = manager.move_task_to_current(args.task_id)
+        if success:
+            print(f"\n✓ Successfully activated task {args.task_id}")
+        else:
+            print(f"\n✗ Failed to activate task {args.task_id}")
             sys.exit(1)
 
 

@@ -316,6 +316,7 @@ class EnhancedDocQuery:
         master_todo = self.base_path / "master_todo.yaml"
         if master_todo.exists():
             data = self._load_yaml_safe(master_todo)
+            # Search current section
             if data and "current" in data:
                 for item in data["current"]:
                     if isinstance(item, dict) and "task" in item:
@@ -327,6 +328,26 @@ class EnhancedDocQuery:
                             results["task_found"] = True
                             results["current_task"] = {
                                 "file": "master_todo.yaml",
+                                "section": "current",
+                                "task": task,
+                                "prompt_file": task.get("prompt"),
+                                "related_specs": task.get("files", [])
+                            }
+                            break
+            
+            # Also search future section if not found in current
+            if not results["task_found"] and data and "future" in data:
+                for item in data["future"]:
+                    if isinstance(item, dict) and "task" in item:
+                        task = item["task"]
+                        task_item_id = task.get("id")
+                        # Match both string and numeric IDs
+                        if (str(task_item_id) == task_id or 
+                            (task_id_num is not None and task_item_id == task_id_num)):
+                            results["task_found"] = True
+                            results["current_task"] = {
+                                "file": "master_todo.yaml",
+                                "section": "future",
                                 "task": task,
                                 "prompt_file": task.get("prompt"),
                                 "related_specs": task.get("files", [])
