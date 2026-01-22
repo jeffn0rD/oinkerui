@@ -17,27 +17,12 @@ const { v4: uuidv4 } = require('uuid');
 const { format } = require('date-fns');
 const projectService = require('./projectService');
 
-// Custom error classes
-class ValidationError extends Error {
-  constructor(message) {
-    super(message);
-    this.name = 'ValidationError';
-  }
-}
-
-class NotFoundError extends Error {
-  constructor(message) {
-    super(message);
-    this.name = 'NotFoundError';
-  }
-}
-
-class FileSystemError extends Error {
-  constructor(message) {
-    super(message);
-    this.name = 'FileSystemError';
-  }
-}
+// Import shared error classes
+const {
+  ValidationError,
+  NotFoundError,
+  FileSystemError
+} = require('../errors');
 
 /**
  * Validate UUID format

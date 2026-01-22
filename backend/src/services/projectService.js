@@ -14,46 +14,14 @@ const slugify = require('slugify');
 const simpleGit = require('simple-git');
 const config = require('../config');
 
-// Custom error classes
-class ValidationError extends Error {
-  constructor(message, details = {}) {
-    super(message);
-    this.name = 'ValidationError';
-    this.details = details;
-  }
-}
-
-class ConflictError extends Error {
-  constructor(message, details = {}) {
-    super(message);
-    this.name = 'ConflictError';
-    this.details = details;
-  }
-}
-
-class NotFoundError extends Error {
-  constructor(message, details = {}) {
-    super(message);
-    this.name = 'NotFoundError';
-    this.details = details;
-  }
-}
-
-class FileSystemError extends Error {
-  constructor(message, details = {}) {
-    super(message);
-    this.name = 'FileSystemError';
-    this.details = details;
-  }
-}
-
-class GitError extends Error {
-  constructor(message, details = {}) {
-    super(message);
-    this.name = 'GitError';
-    this.details = details;
-  }
-}
+// Import shared error classes
+const {
+  ValidationError,
+  ConflictError,
+  NotFoundError,
+  FileSystemError,
+  GitError
+} = require('../errors');
 
 /**
  * Project index management
@@ -338,7 +306,7 @@ async function updateProject(projectId, updates) {
   const project = await getProject(projectId);
 
   // Update allowed fields
-  const allowedFields = ['name', 'description', 'default_model', 'settings', 'status'];
+  const allowedFields = ['name', 'description', 'default_model', 'settings', 'status', 'chats'];
   for (const field of allowedFields) {
     if (updates[field] !== undefined) {
       project[field] = updates[field];

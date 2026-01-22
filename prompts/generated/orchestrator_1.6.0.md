@@ -1,9 +1,9 @@
 # Task Orchestrator Prompt
 
 ## Task Information
-- **Task ID**: 1.3.0
-- **Task Name**: Implement OpenRouter LLM Integration
-- **Task Goal**: Implement LLM request handling with OpenRouter API, including context construction and response processing.
+- **Task ID**: 1.6.0
+- **Task Name**: Implement Git Operations
+- **Task Goal**: Implement Git integration for project versioning, including auto-commit functionality.
 
 ## Orchestrator Role
 
@@ -16,40 +16,39 @@ You are the orchestrator for this task. Your responsibilities:
 
 ## Task Details
 'focus':
-  - "callLLM function"
-  - "constructContext function"
-  - "OpenRouter API integration"
-  - "Model selection from config"
-  - "Response streaming support"
-  - "Error handling and retries"
+  - "autoCommit function"
+  - "getDiff function"
+  - "Dirty file detection"
+  - "Commit message generation"
+  - "Git status tracking"
 'functions':
-  - backend_node/call_llm.yaml
-  - backend_node/construct_context.yaml
+  - git_integration/auto_commit.yaml
+  - git_integration/get_diff.yaml
 'verification':
-  - "Unit tests with mocked API"
-  - "Integration test with real API"
-  - "Test context construction"
-  - "Verify streaming works"
+  - "Unit tests for Git operations"
+  - "Test auto-commit batching"
+  - "Verify commit messages"
+  - "Test diff generation"
 
 ## Task Additional Prompt 
 
-# Prompt 1.3.0: Implement OpenRouter LLM Integration
+# Prompt 1.6.0: Implement Git Operations
 
 ## Task Description
-Implement LLM request handling with OpenRouter API, including context construction and response processing.
+Implement Git integration for project versioning, including auto-commit functionality.
 
 ## Context Gathering
 Before starting, gather context using the doc_query tool:
 
 ```bash
-# Get backend_node module specification
-python3 tools/doc_query.py --query "spec/modules/backend_node.yaml" --mode file --pretty
+# Get git_integration module specification
+python3 tools/doc_query.py --query "spec/modules/git_integration.yaml" --mode file --pretty
 
-# Get call_llm function specification
-python3 tools/doc_query.py --query "spec/functions/backend_node/call_llm.yaml" --mode file --pretty
+# Get auto_commit function specification
+python3 tools/doc_query.py --query "spec/functions/git_integration/auto_commit.yaml" --mode file --pretty
 
-# Get construct_context function specification
-python3 tools/doc_query.py --query "spec/functions/backend_node/construct_context.yaml" --mode file --pretty
+# Get get_diff function specification
+python3 tools/doc_query.py --query "spec/functions/git_integration/get_diff.yaml" --mode file --pretty
 
 # Get domain entities
 python3 tools/doc_query.py --query "spec/domain.yaml" --mode file --pretty
@@ -62,65 +61,55 @@ python3 tools/doc_query.py --query "spec/apis.yaml" --mode file --pretty
 Use the code generator to create scaffolding:
 
 ```bash
-# Generate backend_node module scaffolding
-python3 tools/code_generator.py --module backend_node --preview
+# Generate git_integration module scaffolding
+python3 tools/code_generator.py --module git_integration --preview
 
 # Or generate to files:
-python3 tools/code_generator.py --module backend_node --output backend/src
+python3 tools/code_generator.py --module git_integration --output backend/src
 ```
 
 ## Requirements
 
 ### Focus Areas
-- callLLM function
-- constructContext function
-- OpenRouter API integration
-- Model selection from config
-- Response streaming support
-- Error handling and retries
+- autoCommit function
+- getDiff function
+- Dirty file detection
+- Commit message generation
+- Git status tracking
 
 ### Functions to Implement
 
-#### callLLM
-- **Purpose**: Make an API call to OpenRouter to get an LLM response. Handles authentication,
-- **Signature**: `callLLM(request: LLMRequest)`
-- **Returns**: `LLMResponse` - LLM response with content and metadata
+#### autoCommit
+- **Purpose**: Automatically commit changes in a project repository with intelligent
+- **Signature**: `autoCommit(projectPath: string, options: AutoCommitOptions)`
+- **Returns**: `AutoCommitResult` - Commit result
 - **Preconditions**:
-  - OPENROUTER_API_KEY environment variable is set
-  - request.model is valid OpenRouter model ID
-  - request.messages is non-empty array
+  - projectPath is valid Git repository
+  - Repository has changes to commit (or force=true)
 - **Postconditions**:
-  - Returns LLMResponse with non-empty content
-  - Usage statistics are populated
-  - Request ID is available for tracking
-- **Spec**: `spec/functions/backend_node/call_llm.yaml`
+  - If committed: new commit exists with changes
+  - If skipped: no changes to repository
+  - Working directory is clean after commit
+- **Spec**: `spec/functions/git_integration/auto_commit.yaml`
 
-#### constructContext
-- **Purpose**: Build the message context array for an LLM request following the context
-- **Signature**: `constructContext(chat: Chat, currentMessage: Message, modelId: string)`
-- **Returns**: `ContextMessage[]` - Array of messages formatted for LLM API
+#### getDiff
+- **Purpose**: Get the diff for a file, commit, or range of commits. Returns formatted
+- **Signature**: `getDiff(projectPath: string, options: DiffOptions)`
+- **Returns**: `DiffResult` - Diff result
 - **Preconditions**:
-  - chat is valid Chat object
-  - chat.storage_path exists and is readable
-  - currentMessage is valid Message object
+  - projectPath is valid Git repository
+  - If commit specified, commit exists
+  - If file specified, file exists or existed
 - **Postconditions**:
-  - Returned array contains system prelude if present
-  - Returned array contains currentMessage
-  - All pinned messages are included
-- **Spec**: `spec/functions/backend_node/construct_context.yaml`
+  - Returns diff string
+  - File statistics are accurate
+- **Spec**: `spec/functions/git_integration/get_diff.yaml`
 
 ### Module Dependencies
 
-**backend_node** external dependencies:
-- `fastify` ^4.26.0
-- `@fastify/cors` ^9.0.0
-- `@fastify/static` ^7.0.0
+**git_integration** external dependencies:
 - `simple-git` ^3.22.0
-- `axios` ^1.6.0
-- `uuid` ^9.0.0
-- `date-fns` ^3.3.0
-- `tiktoken` ^1.0.0
-- `slugify` ^1.6.0
+- `diff` ^5.2.0
 
 ## Implementation Steps
 
@@ -145,10 +134,10 @@ python3 tools/code_generator.py --module backend_node --output backend/src
 
 ## Verification
 
-- [ ] Unit tests with mocked API
-- [ ] Integration test with real API
-- [ ] Test context construction
-- [ ] Verify streaming works
+- [ ] Unit tests for Git operations
+- [ ] Test auto-commit batching
+- [ ] Verify commit messages
+- [ ] Test diff generation
 
 ## Completion Checklist
 
@@ -162,18 +151,18 @@ python3 tools/code_generator.py --module backend_node --output backend/src
 
 After completing the task:
 ```bash
-python3 tools/task_cleanup.py --task-id 1.3.0
+python3 tools/task_cleanup.py --task-id 1.6.0
 ```
 
 ---
-*Generated: 2026-01-21T17:28:55.428673*
-*Spec Reference: python3 tools/doc_query.py --query &quot;1.3.0&quot; --mode task --pretty*
+*Generated: 2026-01-21T17:28:55.532627*
+*Spec Reference: python3 tools/doc_query.py --query &quot;1.6.0&quot; --mode task --pretty*
 
 ## Prompt Guidance (Orchestrator Scope)
 
 ### Task Execution Guidelines
 - **Deterministic Methods**: Use Python code for tasks when possible and practical
-- **Documentation**: Create task summary in log/task_1.3.0_summary.yaml
+- **Documentation**: Create task summary in log/task_1.6.0_summary.yaml
 - **Review Previous Work**: Check log/task_{previous_task_id}_notes.yaml for context
 - **Justification**: Provide clear justification for each step in the summary
 - **Error Handling**: If errors occur, document in ./open_questions.yaml
@@ -185,9 +174,9 @@ python3 tools/task_cleanup.py --task-id 1.3.0
 - **Commit and Push**: ALWAYS commit and push after completing a task
 
 ### File Organization
-- Task summaries: `log/task_1.3.0_summary.yaml`
-- Task notes: `log/task_1.3.0_notes.yaml` (if needed)
-- Verification scripts: `verify/task_1.3.0_*.py`
+- Task summaries: `log/task_1.6.0_summary.yaml`
+- Task notes: `log/task_1.6.0_notes.yaml` (if needed)
+- Verification scripts: `verify/task_1.6.0_*.py`
 - System manuals: `man/system_manual.yaml`, `man/user_manual.yaml`
 
 ### Completion Criteria
@@ -206,7 +195,7 @@ Use the doc_query tool to gather relevant context:
 
 ```bash
 # Get complete task information
-python3 tools/doc_query.py --query &quot;1.3.0&quot; --mode task --pretty
+python3 tools/doc_query.py --query &quot;1.6.0&quot; --mode task --pretty
 
 # Example: Find tasks by name pattern
 python3 tools/doc_query.py --query &quot;current[*].task.{name~pattern}&quot; --mode path --pretty
@@ -239,7 +228,7 @@ python3 tools/doc_query.py --query "spec/spec.yaml" --mode related --pretty
 
 1. Run task cleanup tool:
    ```bash
-   python3 tools/task_cleanup.py --task-id 1.3.0
+   python3 tools/task_cleanup.py --task-id 1.6.0
    ```
 
 2. If cleanup finds issues, repair and re-run

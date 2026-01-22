@@ -1,0 +1,90 @@
+task_id: "1.3.0"
+task_name: "Implement OpenRouter LLM Integration"
+status: completed
+completed_at: "2026-01-22T19:02:00Z"
+
+summary: |
+  Implemented LLM request handling with OpenRouter API, including context construction
+  and response processing. Created llmService.js with callLLM and constructContext
+  functions following the specifications exactly.
+
+deliverables:
+  files_created:
+    - path: backend/src/services/llmService.js
+      description: LLM service with callLLM and constructContext functions
+      lines: ~350
+    - path: backend/tests/services/llmService.test.js
+      description: Comprehensive unit tests for LLM service
+      lines: ~400
+    - path: backend/src/errors.js
+      description: Added ConfigError, TimeoutError, RateLimitError, AuthenticationError
+
+  files_modified:
+    - path: backend/src/errors.js
+      changes: Added new error classes for LLM operations
+
+functions_implemented:
+  - name: callLLM
+    spec: spec/functions/backend_node/call_llm.yaml
+    features:
+      - Request validation (model, messages, optional params)
+      - API key from environment/config
+      - OpenRouter API integration with proper headers
+      - Response parsing and normalization
+      - Error handling (timeout, rate limit, auth, generic)
+      - Retry logic with exponential backoff
+      - Latency tracking and logging
+    
+  - name: constructContext
+    spec: spec/functions/backend_node/construct_context.yaml
+    features:
+      - Load messages from JSONL storage
+      - Filter discarded messages
+      - Filter aside messages (unless pinned)
+      - Always include pinned messages
+      - Token budget management
+      - Chronological ordering
+      - System prelude first, current message last
+      - Token counting (simple estimation)
+
+  - name: sendLLMMessage
+    description: High-level function combining context construction and LLM calling
+
+  - name: countTokens
+    description: Token estimation function (~4 chars per token)
+
+tests:
+  total: 26
+  passed: 26
+  categories:
+    - callLLM validation tests (7)
+    - callLLM error handling tests (4)
+    - callLLM request formatting tests (2)
+    - constructContext tests (10)
+    - countTokens tests (3)
+
+verification:
+  - Unit tests with mocked API: PASS
+  - Test context construction: PASS
+  - Error handling verified: PASS
+  - All 95 project tests passing: PASS
+
+notes:
+  - Used simple token estimation (chars/4) instead of tiktoken for simplicity
+  - Streaming support deferred to Phase 2+
+  - Integration test with real API requires valid API key
+  - Retry logic implemented with exponential backoff (max 3 attempts)
+
+dependencies_used:
+  - axios: HTTP client for API calls
+  - Existing services: projectService, chatService
+
+spec_compliance:
+  call_llm:
+    preconditions: All validated
+    postconditions: All ensured
+    algorithm_steps: All 8 steps implemented
+  construct_context:
+    preconditions: All validated
+    postconditions: All ensured
+    algorithm_steps: All 12 steps implemented

@@ -1,9 +1,9 @@
 # Task Orchestrator Prompt
 
 ## Task Information
-- **Task ID**: 1.3.0
-- **Task Name**: Implement OpenRouter LLM Integration
-- **Task Goal**: Implement LLM request handling with OpenRouter API, including context construction and response processing.
+- **Task ID**: 1.7.0
+- **Task Name**: Implement Core UI Components
+- **Task Goal**: Implement Svelte components for project list, chat interface, and message display.
 
 ## Orchestrator Role
 
@@ -16,40 +16,40 @@ You are the orchestrator for this task. Your responsibilities:
 
 ## Task Details
 'focus':
-  - "callLLM function"
-  - "constructContext function"
-  - "OpenRouter API integration"
-  - "Model selection from config"
-  - "Response streaming support"
-  - "Error handling and retries"
+  - "ProjectList component"
+  - "ChatList component"
+  - "MessageList component"
+  - "MessageInput component"
+  - "Component styling with Tailwind"
+  - "Dark theme implementation"
 'functions':
-  - backend_node/call_llm.yaml
-  - backend_node/construct_context.yaml
+  - frontend_svelte/render_message.yaml
+  - frontend_svelte/handle_send_message.yaml
 'verification':
-  - "Unit tests with mocked API"
-  - "Integration test with real API"
-  - "Test context construction"
-  - "Verify streaming works"
+  - "Component unit tests"
+  - "Visual regression tests"
+  - "Test dark theme"
+  - "Test responsive layout"
 
 ## Task Additional Prompt 
 
-# Prompt 1.3.0: Implement OpenRouter LLM Integration
+# Prompt 1.7.0: Implement Core UI Components
 
 ## Task Description
-Implement LLM request handling with OpenRouter API, including context construction and response processing.
+Implement Svelte components for project list, chat interface, and message display.
 
 ## Context Gathering
 Before starting, gather context using the doc_query tool:
 
 ```bash
-# Get backend_node module specification
-python3 tools/doc_query.py --query "spec/modules/backend_node.yaml" --mode file --pretty
+# Get frontend_svelte module specification
+python3 tools/doc_query.py --query "spec/modules/frontend_svelte.yaml" --mode file --pretty
 
-# Get call_llm function specification
-python3 tools/doc_query.py --query "spec/functions/backend_node/call_llm.yaml" --mode file --pretty
+# Get render_message function specification
+python3 tools/doc_query.py --query "spec/functions/frontend_svelte/render_message.yaml" --mode file --pretty
 
-# Get construct_context function specification
-python3 tools/doc_query.py --query "spec/functions/backend_node/construct_context.yaml" --mode file --pretty
+# Get handle_send_message function specification
+python3 tools/doc_query.py --query "spec/functions/frontend_svelte/handle_send_message.yaml" --mode file --pretty
 
 # Get domain entities
 python3 tools/doc_query.py --query "spec/domain.yaml" --mode file --pretty
@@ -62,65 +62,62 @@ python3 tools/doc_query.py --query "spec/apis.yaml" --mode file --pretty
 Use the code generator to create scaffolding:
 
 ```bash
-# Generate backend_node module scaffolding
-python3 tools/code_generator.py --module backend_node --preview
+# Generate frontend_svelte module scaffolding
+python3 tools/code_generator.py --module frontend_svelte --preview
 
 # Or generate to files:
-python3 tools/code_generator.py --module backend_node --output backend/src
+python3 tools/code_generator.py --module frontend_svelte --output frontend/src/lib
 ```
 
 ## Requirements
 
 ### Focus Areas
-- callLLM function
-- constructContext function
-- OpenRouter API integration
-- Model selection from config
-- Response streaming support
-- Error handling and retries
+- ProjectList component
+- ChatList component
+- MessageList component
+- MessageInput component
+- Component styling with Tailwind
+- Dark theme implementation
 
 ### Functions to Implement
 
-#### callLLM
-- **Purpose**: Make an API call to OpenRouter to get an LLM response. Handles authentication,
-- **Signature**: `callLLM(request: LLMRequest)`
-- **Returns**: `LLMResponse` - LLM response with content and metadata
+#### renderMessage
+- **Purpose**: Render a chat message with proper formatting, markdown parsing, syntax
+- **Signature**: `renderMessage(message: Message, options: RenderOptions)`
+- **Returns**: `SvelteComponent` - Rendered message component
 - **Preconditions**:
-  - OPENROUTER_API_KEY environment variable is set
-  - request.model is valid OpenRouter model ID
-  - request.messages is non-empty array
+  - message is valid Message object
+  - message.role is valid role
+  - message.content is string
 - **Postconditions**:
-  - Returns LLMResponse with non-empty content
-  - Usage statistics are populated
-  - Request ID is available for tracking
-- **Spec**: `spec/functions/backend_node/call_llm.yaml`
+  - Returns renderable Svelte component
+  - Markdown is parsed and sanitized
+  - Code blocks have syntax highlighting
+- **Spec**: `spec/functions/frontend_svelte/render_message.yaml`
 
-#### constructContext
-- **Purpose**: Build the message context array for an LLM request following the context
-- **Signature**: `constructContext(chat: Chat, currentMessage: Message, modelId: string)`
-- **Returns**: `ContextMessage[]` - Array of messages formatted for LLM API
+#### handleSendMessage
+- **Purpose**: Handle the user action of sending a message. Validates input, updates UI
+- **Signature**: `handleSendMessage(content: string, options: SendOptions)`
+- **Returns**: `Promise<SendResult>` - Result of send operation
 - **Preconditions**:
-  - chat is valid Chat object
-  - chat.storage_path exists and is readable
-  - currentMessage is valid Message object
+  - Active project is selected
+  - Active chat is selected
+  - content is non-empty string
 - **Postconditions**:
-  - Returned array contains system prelude if present
-  - Returned array contains currentMessage
-  - All pinned messages are included
-- **Spec**: `spec/functions/backend_node/construct_context.yaml`
+  - User message appears in chat
+  - If not slash command: assistant message appears
+  - Prompt input is cleared
+- **Spec**: `spec/functions/frontend_svelte/handle_send_message.yaml`
 
 ### Module Dependencies
 
-**backend_node** external dependencies:
-- `fastify` ^4.26.0
-- `@fastify/cors` ^9.0.0
-- `@fastify/static` ^7.0.0
-- `simple-git` ^3.22.0
-- `axios` ^1.6.0
-- `uuid` ^9.0.0
-- `date-fns` ^3.3.0
-- `tiktoken` ^1.0.0
-- `slugify` ^1.6.0
+**frontend_svelte** external dependencies:
+- `svelte` ^4.0.0
+- `vite` ^5.0.0
+- `tailwindcss` ^3.4.0
+- `marked` ^12.0.0
+- `highlight.js` ^11.9.0
+- `dompurify` ^3.0.0
 
 ## Implementation Steps
 
@@ -145,10 +142,10 @@ python3 tools/code_generator.py --module backend_node --output backend/src
 
 ## Verification
 
-- [ ] Unit tests with mocked API
-- [ ] Integration test with real API
-- [ ] Test context construction
-- [ ] Verify streaming works
+- [ ] Component unit tests
+- [ ] Visual regression tests
+- [ ] Test dark theme
+- [ ] Test responsive layout
 
 ## Completion Checklist
 
@@ -162,18 +159,18 @@ python3 tools/code_generator.py --module backend_node --output backend/src
 
 After completing the task:
 ```bash
-python3 tools/task_cleanup.py --task-id 1.3.0
+python3 tools/task_cleanup.py --task-id 1.7.0
 ```
 
 ---
-*Generated: 2026-01-21T17:28:55.428673*
-*Spec Reference: python3 tools/doc_query.py --query &quot;1.3.0&quot; --mode task --pretty*
+*Generated: 2026-01-21T17:28:55.580295*
+*Spec Reference: python3 tools/doc_query.py --query &quot;1.7.0&quot; --mode task --pretty*
 
 ## Prompt Guidance (Orchestrator Scope)
 
 ### Task Execution Guidelines
 - **Deterministic Methods**: Use Python code for tasks when possible and practical
-- **Documentation**: Create task summary in log/task_1.3.0_summary.yaml
+- **Documentation**: Create task summary in log/task_1.7.0_summary.yaml
 - **Review Previous Work**: Check log/task_{previous_task_id}_notes.yaml for context
 - **Justification**: Provide clear justification for each step in the summary
 - **Error Handling**: If errors occur, document in ./open_questions.yaml
@@ -185,9 +182,9 @@ python3 tools/task_cleanup.py --task-id 1.3.0
 - **Commit and Push**: ALWAYS commit and push after completing a task
 
 ### File Organization
-- Task summaries: `log/task_1.3.0_summary.yaml`
-- Task notes: `log/task_1.3.0_notes.yaml` (if needed)
-- Verification scripts: `verify/task_1.3.0_*.py`
+- Task summaries: `log/task_1.7.0_summary.yaml`
+- Task notes: `log/task_1.7.0_notes.yaml` (if needed)
+- Verification scripts: `verify/task_1.7.0_*.py`
 - System manuals: `man/system_manual.yaml`, `man/user_manual.yaml`
 
 ### Completion Criteria
@@ -206,7 +203,7 @@ Use the doc_query tool to gather relevant context:
 
 ```bash
 # Get complete task information
-python3 tools/doc_query.py --query &quot;1.3.0&quot; --mode task --pretty
+python3 tools/doc_query.py --query &quot;1.7.0&quot; --mode task --pretty
 
 # Example: Find tasks by name pattern
 python3 tools/doc_query.py --query &quot;current[*].task.{name~pattern}&quot; --mode path --pretty
@@ -239,7 +236,7 @@ python3 tools/doc_query.py --query "spec/spec.yaml" --mode related --pretty
 
 1. Run task cleanup tool:
    ```bash
-   python3 tools/task_cleanup.py --task-id 1.3.0
+   python3 tools/task_cleanup.py --task-id 1.7.0
    ```
 
 2. If cleanup finds issues, repair and re-run

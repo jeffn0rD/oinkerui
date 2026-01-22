@@ -61,11 +61,22 @@ function validateConfig() {
 
 validateConfig();
 
-// Export config with a reset function for tests
-module.exports = config;
-module.exports.reset = function(overrides = {}) {
+// Reset function for tests - defined separately to avoid being deleted
+function reset(overrides = {}) {
   const newConfig = buildConfig();
-  Object.keys(config).forEach(key => delete config[key]);
+  // Delete all keys except 'reset'
+  Object.keys(config).forEach(key => {
+    if (key !== 'reset') {
+      delete config[key];
+    }
+  });
+  // Apply new config and overrides
   Object.assign(config, newConfig, overrides);
   return config;
-};
+}
+
+// Add reset function to config object
+config.reset = reset;
+
+// Export config with reset function attached
+module.exports = config;
