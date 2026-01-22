@@ -721,7 +721,7 @@ tasks:
     git_commit: 7327f88
     summary: Successfully initialized the Svelte frontend with Vite, configured Tailwind CSS with custom theme, created component
       structure, set up Svelte stores for state management, and verified dev server and build process working correctly.
-  - task:
+- task:
     id: 1.0.0
     name: Implement Project CRUD Operations
     goal: Implement backend functions for creating, reading, updating, and deleting projects.
