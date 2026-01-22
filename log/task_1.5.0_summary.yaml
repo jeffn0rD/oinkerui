@@ -1,0 +1,97 @@
+task_id: "1.5.0"
+task_name: "Implement Data Entity Management"
+status: completed
+completed_at: "2026-01-22T19:15:00Z"
+
+summary: |
+  Implemented backend functions for creating and managing data entities (files and objects).
+  Created dataEntityService.js with full CRUD operations for file, object, directory,
+  db_table, and env_var_set entity types. Includes entity indexing and content management.
+
+deliverables:
+  files_created:
+    - path: backend/src/services/dataEntityService.js
+      description: Data entity service with CRUD operations
+      lines: ~400
+    - path: backend/tests/services/dataEntityService.test.js
+      description: Comprehensive unit tests for data entity service
+      lines: ~400
+
+functions_implemented:
+  - name: createDataEntity
+    features:
+      - Support for file, object, directory, db_table, env_var_set types
+      - Path validation (relative, no traversal)
+      - Name validation
+      - Content storage for file/object types
+      - MIME type detection
+      - Entity indexing
+    
+  - name: getDataEntity
+    features:
+      - Retrieve by ID
+      - Optional content inclusion
+      - JSON parsing for object entities
+
+  - name: listDataEntities
+    features:
+      - List all entities in project
+      - Filter by type
+      - Filter by status
+      - Filter by path prefix
+
+  - name: updateDataEntity
+    features:
+      - Update name, status, metadata
+      - Update content for file/object types
+      - Automatic status change to 'modified'
+
+  - name: deleteDataEntity
+    features:
+      - Soft delete (mark as deleted)
+      - Hard delete (remove file and index entry)
+      - Directory deletion support
+
+  - name: readEntityContent
+    description: Convenience function to read entity content
+
+  - name: writeEntityContent
+    description: Convenience function to write entity content
+
+entity_types_supported:
+  - file: Text/binary files with content storage
+  - object: JSON objects with automatic serialization
+  - directory: Filesystem directories
+  - db_table: Metadata-only database table references
+  - env_var_set: Metadata-only environment variable sets
+
+tests:
+  total: 37
+  passed: 37
+  categories:
+    - createDataEntity tests (12)
+    - getDataEntity tests (5)
+    - listDataEntities tests (5)
+    - updateDataEntity tests (8)
+    - deleteDataEntity tests (4)
+    - readEntityContent/writeEntityContent tests (2)
+    - Entity index persistence tests (1)
+
+verification:
+  - Unit tests for entity operations: PASS
+  - Test file upload/download: PASS
+  - Test object serialization: PASS
+  - Verify path constraints: PASS
+  - All 159 project tests passing: PASS
+
+notes:
+  - Entity index stored in project/data/entities.json
+  - Path validation prevents directory traversal attacks
+  - MIME type detection based on file extension
+  - Soft delete preserves files, hard delete removes them
+
+spec_compliance:
+  DataEntity:
+    - All fields implemented (id, project_id, name, type, status, path, created_at, updated_at, metadata)
+    - All entity types supported
+    - All status values supported (active, modified, deleted)

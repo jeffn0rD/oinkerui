@@ -912,23 +912,3 @@ tasks:
       - Verify token counting
     completed_date: '2026-01-22'
     summary: Implemented logging and LLM request tracking with logLLMRequest and getStats functions
-- task:
-    id: 1.5.0
-    name: Implement Data Entity Management
-    goal: Implement backend functions for creating and managing data entities (files and objects).
-    prompt: ./prompts/dev/prompt_1_5_0.md
-    details:
-      focus:
-      - createDataEntity function
-      - getDataEntity function
-      - listDataEntities function
-      - File storage and retrieval
-      - JSON/YAML object storage
-      - Entity-project relationship
-      verification:
-      - Unit tests for entity operations
-      - Test file upload/download
-      - Test object serialization
-      - Verify path constraints
-    completed_date: '2026-01-22'
-    summary: Implemented data entity management with CRUD operations for files, objects, and directories

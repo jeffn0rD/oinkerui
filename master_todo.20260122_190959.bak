@@ -40,6 +40,24 @@ prompt_guidance: "Always follow these guidelines and update project documentatio
   \ if it is outside the scope.\n* ALWAYS COMMIT AND PUSH the repository after a task.\n"
 current:
 - task:
+    id: 1.5.0
+    name: Implement Data Entity Management
+    goal: Implement backend functions for creating and managing data entities (files and objects).
+    prompt: ./prompts/dev/prompt_1_5_0.md
+    details:
+      focus:
+      - createDataEntity function
+      - getDataEntity function
+      - listDataEntities function
+      - File storage and retrieval
+      - JSON/YAML object storage
+      - Entity-project relationship
+      verification:
+      - Unit tests for entity operations
+      - Test file upload/download
+      - Test object serialization
+      - Verify path constraints
+- task:
     id: 1.6.0
     name: Implement Git Operations
     goal: Implement Git integration for project versioning, including auto-commit functionality.
