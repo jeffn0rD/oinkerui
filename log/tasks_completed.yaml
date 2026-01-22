@@ -826,3 +826,31 @@ tasks:
     completed_date: '2025-01-22'
     git_commit: 7a1ccc3
     summary: Fixed multiple test-related issues. Added config.reset() function for test isolation, refactored index.js to export buildApp() function preventing auto-start on import, updated health.test.js for Fastify+Supertest compatibility, and added proper cleanup to prevent test hanging. All test files updated for proper isolation and resource cleanup.
+- task:
+    id: 1.2.0
+    name: Implement Message Operations
+    goal: Implement backend functions for creating, storing, and retrieving messages
+    files:
+    - backend/src/services/messageService.js
+    - backend/src/routes/messages.js
+    - backend/tests/services/messageService.test.js
+    - backend/src/index.js (registered message routes)
+    - log/task_1.2.0_summary.yaml
+    details:
+      focus:
+      - saveMessage function (JSONL persistence)
+      - getMessage function
+      - listMessages function
+      - sendMessage function (simplified)
+      - Message persistence (JSONL format)
+      - Message-chat relationship
+      functions:
+      - backend_node/save_message.yaml
+      - backend_node/send_message.yaml
+      verification:
+      - Unit tests for message operations
+      - JSONL format verified
+      - Message ordering tested
+    completed_date: '2025-01-22'
+    git_commit: 540323d
+    summary: Successfully implemented all message CRUD operations following spec algorithms. Created messageService with 7-step saveMessage algorithm using JSONL persistence (append/update modes), getMessage for retrieval, listMessages with filtering, and simplified sendMessage. Comprehensive unit tests verify JSONL format, message ordering, and all error cases. Full LLM integration deferred to future task.
