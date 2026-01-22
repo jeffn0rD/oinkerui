@@ -954,26 +954,3 @@ tasks:
       - Test diff generation
     completed_date: '2026-01-22'
     summary: Implemented Git operations with auto-commit, diff, status tracking, and comprehensive tests
-- task:
-    id: 1.7.0
-    name: Implement Core UI Components
-    goal: Implement Svelte components for project list, chat interface, and message display.
-    prompt: ./prompts/dev/prompt_1_7_0.md
-    details:
-      focus:
-      - ProjectList component
-      - ChatList component
-      - MessageList component
-      - MessageInput component
-      - Component styling with Tailwind
-      - Dark theme implementation
-      functions:
-      - frontend_svelte/render_message.yaml
-      - frontend_svelte/handle_send_message.yaml
-      verification:
-      - Component unit tests
-      - Visual regression tests
-      - Test dark theme
-      - Test responsive layout
-    completed_date: '2026-01-22'
-    summary: Implemented core UI components with Tailwind styling and dark theme support

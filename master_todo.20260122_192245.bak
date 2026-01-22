@@ -40,6 +40,27 @@ prompt_guidance: "Always follow these guidelines and update project documentatio
   \ if it is outside the scope.\n* ALWAYS COMMIT AND PUSH the repository after a task.\n"
 current:
 - task:
+    id: 1.7.0
+    name: Implement Core UI Components
+    goal: Implement Svelte components for project list, chat interface, and message display.
+    prompt: ./prompts/dev/prompt_1_7_0.md
+    details:
+      focus:
+      - ProjectList component
+      - ChatList component
+      - MessageList component
+      - MessageInput component
+      - Component styling with Tailwind
+      - Dark theme implementation
+      functions:
+      - frontend_svelte/render_message.yaml
+      - frontend_svelte/handle_send_message.yaml
+      verification:
+      - Component unit tests
+      - Visual regression tests
+      - Test dark theme
+      - Test responsive layout
+- task:
     id: 1.8.0
     name: Implement Frontend State Management
     goal: Implement Svelte stores for managing application state (projects, chats, messages, UI).
