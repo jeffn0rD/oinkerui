@@ -5,7 +5,8 @@ echo "Running all tests..."
 
 # Run backend tests
 echo "Running Node.js backend tests..."
-npm run test
+cd backend && npx jest
+cd ..
 
 # Run Python tests
 echo "Running Python tests..."

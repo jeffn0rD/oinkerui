@@ -40,24 +40,7 @@ prompt_guidance: "Always follow these guidelines and update project documentatio
   \ if it is outside the scope.\n* ALWAYS COMMIT AND PUSH the repository after a task.\n"
 current:
 
-- task:
-    id: 1.1.0
-    name: Implement Chat CRUD Operations
-    goal: Implement backend functions for creating, reading, and managing chats within projects.
-    prompt: ./prompts/dev/prompt_1_1_0.md
-    details:
-      focus:
-      - createChat function
-      - getChat function
-      - listChats function
-      - Chat data persistence
-      - Chat-project relationship
-      functions:
-      - backend_node/create_chat.yaml
-      verification:
-      - Unit tests for chat operations
-      - Verify chat belongs to project
-      - Test chat listing and retrieval
+
 - task:
     id: 1.2.0
     name: Implement Message Operations

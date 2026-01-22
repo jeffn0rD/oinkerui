@@ -168,7 +168,7 @@ async function createProject(projectName, options = {}) {
   const slug = slugify(projectName, { lower: true, strict: true });
 
   // Step 3: Check conflicts
-  const projectIndex = new ProjectIndex(config.workspaceRoot);
+  const projectIndex = new ProjectIndex(config.workspace.root);
   const existing = await projectIndex.findBySlug(slug);
   if (existing) {
     throw new ConflictError('Project with this name already exists', { slug });
@@ -178,7 +178,7 @@ async function createProject(projectName, options = {}) {
   const projectId = uuidv4();
 
   // Step 5: Create directory structure
-  const projectPath = path.join(config.workspaceRoot, 'projects', slug);
+  const projectPath = path.join(config.workspace.root, 'projects', slug);
   
   try {
     await fs.mkdir(projectPath, { recursive: true });
@@ -279,7 +279,7 @@ async function getProject(projectId) {
     throw new ValidationError('Project ID is required');
   }
 
-  const projectIndex = new ProjectIndex(config.workspaceRoot);
+  const projectIndex = new ProjectIndex(config.workspace.root);
   const projectMeta = await projectIndex.findById(projectId);
 
   if (!projectMeta) {
@@ -287,7 +287,7 @@ async function getProject(projectId) {
   }
 
   // Load full project data from project.json
-  const projectPath = path.join(config.workspaceRoot, 'projects', projectMeta.slug);
+  const projectPath = path.join(config.workspace.root, 'projects', projectMeta.slug);
   const projectJsonPath = path.join(projectPath, 'project.json');
 
   try {
@@ -307,7 +307,7 @@ async function getProject(projectId) {
  * @returns {Promise<Array>} Array of project objects
  */
 async function listProjects(filter = {}) {
-  const projectIndex = new ProjectIndex(config.workspaceRoot);
+  const projectIndex = new ProjectIndex(config.workspace.root);
   const projects = await projectIndex.list(filter);
 
   // Load full project data for each
@@ -348,7 +348,7 @@ async function updateProject(projectId, updates) {
   project.updated_at = new Date().toISOString();
 
   // Save to project.json
-  const projectPath = path.join(config.workspaceRoot, 'projects', project.slug);
+  const projectPath = path.join(config.workspace.root, 'projects', project.slug);
   await fs.writeFile(
     path.join(projectPath, 'project.json'),
     JSON.stringify(project, null, 2),
@@ -356,7 +356,7 @@ async function updateProject(projectId, updates) {
   );
 
   // Update index
-  const projectIndex = new ProjectIndex(config.workspaceRoot);
+  const projectIndex = new ProjectIndex(config.workspace.root);
   await projectIndex.update(project);
 
   return project;
@@ -376,11 +376,11 @@ async function deleteProject(projectId, options = {}) {
 
   if (options.hard) {
     // Hard delete - remove from filesystem
-    const projectPath = path.join(config.workspaceRoot, 'projects', project.slug);
+    const projectPath = path.join(config.workspace.root, 'projects', project.slug);
     await fs.rm(projectPath, { recursive: true, force: true });
 
     // Remove from index
-    const projectIndex = new ProjectIndex(config.workspaceRoot);
+    const projectIndex = new ProjectIndex(config.workspace.root);
     const index = await projectIndex.load();
     index.projects = index.projects.filter(p => p.id !== projectId);
     await projectIndex.save(index);
@@ -390,12 +390,42 @@ async function deleteProject(projectId, options = {}) {
   }
 }
 
+/**
+ * Add a chat to a project's chat list
+ * 
+ * @param {string} projectId - UUID of the project
+ * @param {Object} chat - Chat object to add
+ * @returns {Promise<void>}
+ */
+async function addChatToProject(projectId, chat) {
+  const project = await getProject(projectId);
+  
+  if (!project.chats) {
+    project.chats = [];
+  }
+  
+  project.chats.push(chat);
+  
+  // Save updated project
+  const projectPath = path.join(config.workspace.root, 'projects', project.slug);
+  await fs.writeFile(
+    path.join(projectPath, 'project.json'),
+    JSON.stringify(project, null, 2),
+    'utf8'
+  );
+
+  // Update index
+  const projectIndex = new ProjectIndex(config.workspace.root);
+  await projectIndex.update(project);
+}
+
 module.exports = {
   createProject,
   getProject,
   listProjects,
   updateProject,
   deleteProject,
+  addChatToProject,
   ValidationError,
   ConflictError,
   NotFoundError,

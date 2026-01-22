@@ -1,0 +1,194 @@
+/**
+ * Chat Routes
+ * 
+ * REST API endpoints for chat operations
+ * 
+ * Routes:
+ * - POST   /api/projects/:projectId/chats - Create a new chat
+ * - GET    /api/projects/:projectId/chats - List all chats in a project
+ * - GET    /api/projects/:projectId/chats/:chatId - Get a specific chat
+ * - PUT    /api/projects/:projectId/chats/:chatId - Update a chat
+ * - DELETE /api/projects/:projectId/chats/:chatId - Delete a chat
+ */
+
+const chatService = require('../services/chatService');
+
+async function chatRoutes(fastify, options) {
+  /**
+   * Create a new chat
+   * POST /api/projects/:projectId/chats
+   */
+  fastify.post('/api/projects/:projectId/chats', async (request, reply) => {
+    try {
+      const { projectId } = request.params;
+      const options = request.body;
+
+      const chat = await chatService.createChat(projectId, options);
+
+      reply.code(201).send({
+        success: true,
+        data: chat
+      });
+    } catch (error) {
+      if (error.name === 'ValidationError') {
+        reply.code(400).send({
+          success: false,
+          error: error.message
+        });
+      } else if (error.name === 'NotFoundError') {
+        reply.code(404).send({
+          success: false,
+          error: error.message
+        });
+      } else if (error.name === 'FileSystemError') {
+        reply.code(500).send({
+          success: false,
+          error: error.message
+        });
+      } else {
+        reply.code(500).send({
+          success: false,
+          error: 'Internal server error'
+        });
+      }
+    }
+  });
+
+  /**
+   * List all chats in a project
+   * GET /api/projects/:projectId/chats
+   */
+  fastify.get('/api/projects/:projectId/chats', async (request, reply) => {
+    try {
+      const { projectId } = request.params;
+      const { status } = request.query;
+
+      const chats = await chatService.listChats(projectId, { status });
+
+      reply.send({
+        success: true,
+        data: chats
+      });
+    } catch (error) {
+      if (error.name === 'ValidationError') {
+        reply.code(400).send({
+          success: false,
+          error: error.message
+        });
+      } else if (error.name === 'NotFoundError') {
+        reply.code(404).send({
+          success: false,
+          error: error.message
+        });
+      } else {
+        reply.code(500).send({
+          success: false,
+          error: 'Internal server error'
+        });
+      }
+    }
+  });
+
+  /**
+   * Get a specific chat
+   * GET /api/projects/:projectId/chats/:chatId
+   */
+  fastify.get('/api/projects/:projectId/chats/:chatId', async (request, reply) => {
+    try {
+      const { projectId, chatId } = request.params;
+
+      const chat = await chatService.getChat(projectId, chatId);
+
+      reply.send({
+        success: true,
+        data: chat
+      });
+    } catch (error) {
+      if (error.name === 'ValidationError') {
+        reply.code(400).send({
+          success: false,
+          error: error.message
+        });
+      } else if (error.name === 'NotFoundError') {
+        reply.code(404).send({
+          success: false,
+          error: error.message
+        });
+      } else {
+        reply.code(500).send({
+          success: false,
+          error: 'Internal server error'
+        });
+      }
+    }
+  });
+
+  /**
+   * Update a chat
+   * PUT /api/projects/:projectId/chats/:chatId
+   */
+  fastify.put('/api/projects/:projectId/chats/:chatId', async (request, reply) => {
+    try {
+      const { projectId, chatId } = request.params;
+      const updates = request.body;
+
+      const chat = await chatService.updateChat(projectId, chatId, updates);
+
+      reply.send({
+        success: true,
+        data: chat
+      });
+    } catch (error) {
+      if (error.name === 'ValidationError') {
+        reply.code(400).send({
+          success: false,
+          error: error.message
+        });
+      } else if (error.name === 'NotFoundError') {
+        reply.code(404).send({
+          success: false,
+          error: error.message
+        });
+      } else {
+        reply.code(500).send({
+          success: false,
+          error: 'Internal server error'
+        });
+      }
+    }
+  });
+
+  /**
+   * Delete a chat
+   * DELETE /api/projects/:projectId/chats/:chatId
+   */
+  fastify.delete('/api/projects/:projectId/chats/:chatId', async (request, reply) => {
+    try {
+      const { projectId, chatId } = request.params;
+      const { hard } = request.query;
+
+      await chatService.deleteChat(projectId, chatId, { hard: hard === 'true' });
+
+      reply.code(204).send();
+    } catch (error) {
+      if (error.name === 'ValidationError') {
+        reply.code(400).send({
+          success: false,
+          error: error.message
+        });
+      } else if (error.name === 'NotFoundError') {
+        reply.code(404).send({
+          success: false,
+          error: error.message
+        });
+      } else {
+        reply.code(500).send({
+          success: false,
+          error: 'Internal server error'
+        });
+      }
+    }
+  });
+}
+
+module.exports = chatRoutes;

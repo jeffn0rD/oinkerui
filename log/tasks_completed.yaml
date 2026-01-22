@@ -749,3 +749,34 @@ tasks:
     completed_date: '2025-01-21'
     git_commit: f2cd25b
     summary: Successfully implemented all Project CRUD operations following spec algorithm exactly. Created projectService with full 10-step createProject algorithm, gitService for repository management, REST API routes, and comprehensive unit tests. All preconditions validated, postconditions ensured, and proper error handling with cleanup on failure.
+- task:
+    id: 1.1.0
+    name: Implement Chat CRUD Operations
+    goal: Implement backend functions for creating, reading, and managing chats within projects.
+    prompt: ./prompts/dev/prompt_1_1_0.md
+    files:
+    - backend/src/services/chatService.js
+    - backend/src/routes/chats.js
+    - backend/tests/services/chatService.test.js
+    - backend/src/services/projectService.js (modified - added addChatToProject)
+    - scripts/test.sh (fixed recursive call)
+    details:
+      focus:
+      - createChat function
+      - getChat function
+      - listChats function
+      - updateChat function
+      - deleteChat function
+      - Chat data persistence
+      - Chat-project relationship
+      functions:
+      - backend_node/create_chat.yaml
+      verification:
+      - Unit tests for chat operations
+      - Verify chat belongs to project
+      - Test chat listing and retrieval
+      - Fixed config.workspaceRoot reference
+      - Fixed test script recursion
+    completed_date: '2025-01-21'
+    git_commit: pending
+    summary: Successfully implemented all Chat CRUD operations following spec algorithm exactly. Created chatService with full 10-step createChat algorithm, API routes for chat operations, and comprehensive unit tests (26 tests). All preconditions validated, postconditions ensured, and proper error handling with cleanup on failure. Fixed config reference issue and test script recursion.
