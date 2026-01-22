@@ -94,27 +94,6 @@ python3 tools/doc_query.py --query "search term" --mode text --pretty
 python3 tools/doc_query.py --query "spec/spec.yaml" --mode related --pretty
 ```
 
-## Agent Delegation (If Needed)
-
-If this task requires specialized agents:
-
-1. **Create agent prompts** in `prompts/agents/task_1.1.5/`
-2. **Agent scope**: Each agent should have:
-   - Clear, narrow objective
-   - Specific input/output requirements
-   - Verification criteria
-   - Limited prompt guidance (only relevant to their scope)
-
-3. **Agent coordination**:
-   - Execute agents in sequence
-   - Pass outputs between agents
-   - Verify each agent's work before proceeding
-   - Aggregate results
-
-## Files Referenced
-
-{files_referenced}
-
 ## Next Steps After Completion
 
 1. Run task cleanup tool:
