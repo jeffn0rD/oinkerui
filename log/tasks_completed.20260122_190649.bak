@@ -889,26 +889,3 @@ tasks:
       - Verify streaming works
     completed_date: '2026-01-22'
     summary: Implemented OpenRouter LLM integration with callLLM and constructContext functions
-- task:
-    id: 1.4.0
-    name: Implement Logging and LLM Request Tracking
-    goal: Implement comprehensive logging system for LLM requests, chat logs, and system events.
-    prompt: ./prompts/dev/prompt_1_4_0.md
-    details:
-      focus:
-      - logLLMRequest function
-      - LLMRequestLogEntry creation
-      - Chat log persistence (JSONL)
-      - System log configuration
-      - Token usage tracking
-      - Performance metrics
-      functions:
-      - logging_and_metrics/log_llm_request.yaml
-      - logging_and_metrics/get_stats.yaml
-      verification:
-      - Unit tests for logging functions
-      - Verify log file creation
-      - Test metrics aggregation
-      - Verify token counting
-    completed_date: '2026-01-22'
-    summary: Implemented logging and LLM request tracking with logLLMRequest and getStats functions

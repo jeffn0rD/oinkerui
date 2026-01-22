@@ -15,6 +15,23 @@ You are the orchestrator for this task. Your responsibilities:
 5. Verify completion before finalizing
 
 ## Task Details
+'focus':
+  - "logLLMRequest function"
+  - "LLMRequestLogEntry creation"
+  - "Chat log persistence (JSONL)"
+  - "System log configuration"
+  - "Token usage tracking"
+  - "Performance metrics"
+'functions':
+  - logging_and_metrics/log_llm_request.yaml
+  - logging_and_metrics/get_stats.yaml
+'verification':
+  - "Unit tests for logging functions"
+  - "Verify log file creation"
+  - "Test metrics aggregation"
+  - "Verify token counting"
+
+## Task Additional Prompt 
 
 # Prompt 1.4.0: Implement Logging and LLM Request Tracking
 
@@ -211,39 +228,6 @@ python3 tools/doc_query.py --query "search term" --mode text --pretty
 # Find related files by topic
 python3 tools/doc_query.py --query "spec/spec.yaml" --mode related --pretty
 ```
-
-## Task Execution Steps
-
-{execution_steps}
-
-## Expected Outputs
-
-{expected_outputs}
-
-## Verification
-
-{verification_steps}
-
-## Agent Delegation (If Needed)
-
-If this task requires specialized agents:
-
-1. **Create agent prompts** in `prompts/agents/task_1.4.0/`
-2. **Agent scope**: Each agent should have:
-   - Clear, narrow objective
-   - Specific input/output requirements
-   - Verification criteria
-   - Limited prompt guidance (only relevant to their scope)
-
-3. **Agent coordination**:
-   - Execute agents in sequence
-   - Pass outputs between agents
-   - Verify each agent's work before proceeding
-   - Aggregate results
-
-## Files Referenced
-
-{files_referenced}
 
 ## Next Steps After Completion
 
