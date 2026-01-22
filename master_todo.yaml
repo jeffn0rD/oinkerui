@@ -2,110 +2,61 @@ title: oinkerui master todo list
 description: 'This is a master development todo list for human and machine interaction.
 
   '
-prompt_guidance: "Always follow these guidelines and update project documentation:\n**** ALWAYS PULL the repository before\
-  \ starting a task. ****\n**** When possible and practical use deterministic methods (python code) to accomplish tasks. ****\n\
-  \nYAML FILE OPERATIONS - MANDATORY WORKFLOW:\n* NEVER manually edit YAML files with string operations or text replacement\n\
-  * ALWAYS use the Python YAML tools in tools/ directory:\n  - tools/yaml_db.py - Core YAML database operations (load, save,\
-  \ get, set, append, remove)\n  - tools/task_manager.py - Task operations (move tasks, add tasks, list tasks, activate tasks)\n\
-  \  - tools/validate_schemas.py - Schema validation for YAML files\n* To move a task to completed: python3 tools/task_manager.py\
-  \ move <task_id> --date YYYY-MM-DD --commit <hash> --summary \"...\"\n* To add a new task: python3 tools/task_manager.py\
-  \ add <task_id> <name> <goal> --prompt <path> --section current|future\n* To activate a task (move from future to current):\
-  \ python3 tools/task_manager.py activate <task_id>\n* To list tasks: python3 tools/task_manager.py list --status all|current|future|completed\n\
-  * To validate YAML files: python3 tools/validate_schemas.py --file all|master_todo|tasks_completed\n* These tools ensure\
-  \ data integrity, create backups, and prevent corruption\n\nCODE GENERATION - USE THE SPEC AS SOURCE OF TRUTH:\n* The specification\
-  \ files (spec/modules/*.yaml, spec/functions/*/*.yaml) are AUTHORITATIVE\n* ALWAYS use the code generator to create scaffolding\
-  \ from specs:\n  - tools/code_generator.py - Generate code from module and function specs\n  - python3 tools/code_generator.py\
-  \ --module <module_id> --preview  # Preview generated code\n  - python3 tools/code_generator.py --module <module_id> --output\
-  \ <dir>  # Generate to files\n  - python3 tools/code_generator.py --function <module.function> --preview  # Single function\n\
-  * Generated code includes:\n  - Module headers with responsibilities\n  - Import statements from dependencies\n  - Function\
-  \ signatures with JSDoc/docstrings\n  - FOL algorithm comments\n  - Spec reference comments (doc_query commands)\n  - TODO\
-  \ markers for implementation\n* If the algorithm cannot be coded correctly, report the issue so we can regenerate the spec\n\
-  \nPROMPT GENERATION - FOR NEW TASKS:\n* When creating new tasks, generate detailed prompts:\n  - tools/prompt_generator.py\
-  \ - Generate LLM prompts from task definitions\n  - python3 tools/prompt_generator.py --task <task_id>  # Generate single\
-  \ prompt\n  - python3 tools/prompt_generator.py --all-phase <N>  # Generate all prompts for phase N\n* Generated prompts\
-  \ include:\n  - Context gathering commands (doc_query)\n  - Code generator commands\n  - Requirements from specs\n  - Verification\
-  \ steps\n\nTASK PROCESSING:\n* When processing tasks always create a brief summary of steps and actions in log/task_<id>_summary.yaml\n\
-  * When processing a task review the last task notes (log/task_<id>_notes.yaml). There may be information needed or remaining\n\
-  work that needs to be completed first.\n* In the task_<id>_summary.yaml file always provide 'justification:' for each step/action.\
-  \ It is important to track the\ndecisions made and reasoning behind them.\n* If there are errors, inconsistencies, or inadequate\
-  \ information to accomplish all goals of a task append questions to\n./open_questions.yaml\n* If the task is complete use\
-  \ tools/task_manager.py to move it from master_todo.yaml to log/tasks_completed.yaml\n* Tasks should be verified before\
-  \ considered complete, when possible use a small python script (save to ./verify/task_<id>_<descriptor>.py).\nThe script\
-  \ should be well commented as to what it does and why.\n\nDOCUMENTATION:\n* Always make sure system documentation is up\
-  \ to date with work just done! manuals go in ./man/*.yaml\n* NOTE: All spec files need to have consistent references to\
-  \ each other. This needs to be verified whenever spec files\nare changed.\n\nREPOSITORY HYGIENE:\n* You can create temporary\
-  \ files to assist with task completion but they should be removed when task is complete. Use\nthe files outlined here for\
-  \ project tracking.\n* It is important to keep the repository clean of unnecessary files.\n* Follow the task instructions\
-  \ closely and carefully. Constrain work and scope to the task. Return with questions if\nneeded and confirm any extra work\
+prompt_guidance: "Always follow these guidelines and update project documentation:\n\
+  **** ALWAYS PULL the repository before starting a task. ****\n**** When possible\
+  \ and practical use deterministic methods (python code) to accomplish tasks. ****\n\
+  \nYAML FILE OPERATIONS - MANDATORY WORKFLOW:\n* NEVER manually edit YAML files with\
+  \ string operations or text replacement\n* ALWAYS use the Python YAML tools in tools/\
+  \ directory:\n  - tools/yaml_db.py - Core YAML database operations (load, save,\
+  \ get, set, append, remove)\n  - tools/task_manager.py - Task operations (move tasks,\
+  \ add tasks, list tasks, activate tasks)\n  - tools/validate_schemas.py - Schema\
+  \ validation for YAML files\n* To move a task to completed: python3 tools/task_manager.py\
+  \ move <task_id> --date YYYY-MM-DD --commit <hash> --summary \"...\"\n* To add a\
+  \ new task: python3 tools/task_manager.py add <task_id> <name> <goal> --prompt <path>\
+  \ --section current|future\n* To activate a task (move from future to current):\
+  \ python3 tools/task_manager.py activate <task_id>\n* To list tasks: python3 tools/task_manager.py\
+  \ list --status all|current|future|completed\n* To validate YAML files: python3\
+  \ tools/validate_schemas.py --file all|master_todo|tasks_completed\n* These tools\
+  \ ensure data integrity, create backups, and prevent corruption\n\nCODE GENERATION\
+  \ - USE THE SPEC AS SOURCE OF TRUTH:\n* The specification files (spec/modules/*.yaml,\
+  \ spec/functions/*/*.yaml) are AUTHORITATIVE\n* ALWAYS use the code generator to\
+  \ create scaffolding from specs:\n  - tools/code_generator.py - Generate code from\
+  \ module and function specs\n  - python3 tools/code_generator.py --module <module_id>\
+  \ --preview  # Preview generated code\n  - python3 tools/code_generator.py --module\
+  \ <module_id> --output <dir>  # Generate to files\n  - python3 tools/code_generator.py\
+  \ --function <module.function> --preview  # Single function\n* Generated code includes:\n\
+  \  - Module headers with responsibilities\n  - Import statements from dependencies\n\
+  \  - Function signatures with JSDoc/docstrings\n  - FOL algorithm comments\n  -\
+  \ Spec reference comments (doc_query commands)\n  - TODO markers for implementation\n\
+  * If the algorithm cannot be coded correctly, report the issue so we can regenerate\
+  \ the spec\n\nPROMPT GENERATION - FOR NEW TASKS:\n* When creating new tasks, generate\
+  \ detailed prompts:\n  - tools/prompt_generator.py - Generate LLM prompts from task\
+  \ definitions\n  - python3 tools/prompt_generator.py --task <task_id>  # Generate\
+  \ single prompt\n  - python3 tools/prompt_generator.py --all-phase <N>  # Generate\
+  \ all prompts for phase N\n* Generated prompts include:\n  - Context gathering commands\
+  \ (doc_query)\n  - Code generator commands\n  - Requirements from specs\n  - Verification\
+  \ steps\n\nTASK PROCESSING:\n* When processing tasks always create a brief summary\
+  \ of steps and actions in log/task_<id>_summary.yaml\n* When processing a task review\
+  \ the last task notes (log/task_<id>_notes.yaml). There may be information needed\
+  \ or remaining\nwork that needs to be completed first.\n* In the task_<id>_summary.yaml\
+  \ file always provide 'justification:' for each step/action. It is important to\
+  \ track the\ndecisions made and reasoning behind them.\n* If there are errors, inconsistencies,\
+  \ or inadequate information to accomplish all goals of a task append questions to\n\
+  ./open_questions.yaml\n* If the task is complete use tools/task_manager.py to move\
+  \ it from master_todo.yaml to log/tasks_completed.yaml\n* Tasks should be verified\
+  \ before considered complete, when possible use a small python script (save to ./verify/task_<id>_<descriptor>.py).\n\
+  The script should be well commented as to what it does and why.\n\nDOCUMENTATION:\n\
+  * Always make sure system documentation is up to date with work just done! manuals\
+  \ go in ./man/*.yaml\n* NOTE: All spec files need to have consistent references\
+  \ to each other. This needs to be verified whenever spec files\nare changed.\n\n\
+  REPOSITORY HYGIENE:\n* You can create temporary files to assist with task completion\
+  \ but they should be removed when task is complete. Use\nthe files outlined here\
+  \ for project tracking.\n* It is important to keep the repository clean of unnecessary\
+  \ files.\n* Follow the task instructions closely and carefully. Constrain work and\
+  \ scope to the task. Return with questions if\nneeded and confirm any extra work\
   \ if it is outside the scope.\n* ALWAYS COMMIT AND PUSH the repository after a task.\n"
 current:
-
- 
-
-- task: 
-    id: 1.1.6
-    name: Test Issues
-    goal: Fix problems in the test module(s) and failed tests, see details
-    details: |
-      ** First Issue: workspace path/config in projectServer not the same as in test **
-      These lines in projectService.test.js:
-        const config = require('../../src/config');
-        config.workspaceRoot = testWorkspaceRoot;
-      Im not sure how this is supposed to change the config settings in the projectService.js (line 15):
-        const config = require('../config'); 
-      It is setting config in the module scope, and as a const
-      When running tests locally it created a lot of folders under oinkerui\backend\workspaces 
-      the .env file has:
-        WORKSPACE_ROOT=./workspaces
-      These lines in projectService.test.js dont work because of this issue (lines 46,47):
-        const projectPath = path.join(testWorkspaceRoot, 'projects', project.slug);
-        const stats = await fs.stat(projectPath);
-      Another issue is this (projectService.test.js:24):
-        afterEach(async () => {
-          // Cleanup test workspace
-          try {
-            await fs.rm(testWorkspaceRoot, { recursive: true, force: true });
-      The projects are not getting deleted, which throws off other tests.
-      
-      ** Second Issue: report from npm test output
-      npm test had this in its output:
-          Cannot log after tests are done. Did you forget to wait for something async in your test?
-          Attempted to log "Server listening on http://localhost:3000".
-          
-            22 |   try {
-            23 |     await fastify.listen({ port: 3000, host: '0.0.0.0' });
-          > 24 |     console.log('Server listening on http://localhost:3000');
-       
-      I suspect this is related to switching to jest?
-      
-      ** Third Issue: npm test output
-      This is also from the nmp test output:
-        Health Check API › GET /health › returns health status
-        TypeError: app.address is not a function
-        
-          12 |     it('returns health status', async () => {
-          13 |       const response = await request(app)
-        > 14 |         .get('/health')
-             |          ^
-          15 |         .expect(200);
-          16 |
-          17 |       expect(response.body).toHaveProperty('status');
-        
-          at Test.serverAddress (../node_modules/supertest/lib/test.js:46:22)
-          at new Test (../node_modules/supertest/lib/test.js:34:14)
-          at Object.obj.<computed> [as get] (../node_modules/supertest/index.js:43:18)
-          at Object.get (tests/integration/health.test.js:14:10)
-          
-      ** Fourth Issue: test execution hangs
-      The npm test hung on one run; had this as the last lines of output:
-        Jest did not exit one second after the test run has completed.
-        'This usually means that there are asynchronous operations that weren't stopped in your tests. Consider running Jest with `--detectOpenHandles` to troubleshoot this issue.
-
-    verification: |
-      Will have to be done on my remote repository. 
-      
-
-- task:      
+- task:
     id: 1.2.0
     name: Implement Message Operations
     goal: Implement backend functions for creating, storing, and retrieving messages.
@@ -128,7 +79,8 @@ current:
 - task:
     id: 1.3.0
     name: Implement OpenRouter LLM Integration
-    goal: Implement LLM request handling with OpenRouter API, including context construction and response processing.
+    goal: Implement LLM request handling with OpenRouter API, including context construction
+      and response processing.
     prompt: ./prompts/dev/prompt_1_3_0.md
     details:
       focus:
@@ -149,7 +101,8 @@ current:
 - task:
     id: 1.4.0
     name: Implement Logging and LLM Request Tracking
-    goal: Implement comprehensive logging system for LLM requests, chat logs, and system events.
+    goal: Implement comprehensive logging system for LLM requests, chat logs, and
+      system events.
     prompt: ./prompts/dev/prompt_1_4_0.md
     details:
       focus:
@@ -170,7 +123,8 @@ current:
 - task:
     id: 1.5.0
     name: Implement Data Entity Management
-    goal: Implement backend functions for creating and managing data entities (files and objects).
+    goal: Implement backend functions for creating and managing data entities (files
+      and objects).
     prompt: ./prompts/dev/prompt_1_5_0.md
     details:
       focus:
@@ -188,7 +142,8 @@ current:
 - task:
     id: 1.6.0
     name: Implement Git Operations
-    goal: Implement Git integration for project versioning, including auto-commit functionality.
+    goal: Implement Git integration for project versioning, including auto-commit
+      functionality.
     prompt: ./prompts/dev/prompt_1_6_0.md
     details:
       focus:
@@ -208,7 +163,8 @@ current:
 - task:
     id: 1.7.0
     name: Implement Core UI Components
-    goal: Implement Svelte components for project list, chat interface, and message display.
+    goal: Implement Svelte components for project list, chat interface, and message
+      display.
     prompt: ./prompts/dev/prompt_1_7_0.md
     details:
       focus:
@@ -229,7 +185,8 @@ current:
 - task:
     id: 1.8.0
     name: Implement Frontend State Management
-    goal: Implement Svelte stores for managing application state (projects, chats, messages, UI).
+    goal: Implement Svelte stores for managing application state (projects, chats,
+      messages, UI).
     prompt: ./prompts/dev/prompt_1_8_0.md
     details:
       focus:
@@ -249,7 +206,8 @@ current:
 - task:
     id: 1.9.0
     name: Phase 1 Integration and End-to-End Testing
-    goal: Integrate all Phase 1 components and implement comprehensive end-to-end tests.
+    goal: Integrate all Phase 1 components and implement comprehensive end-to-end
+      tests.
     prompt: ./prompts/dev/prompt_1_9_0.md
     details:
       focus:
@@ -267,6 +225,7 @@ current:
       - User acceptance testing
 future:
 - need a way to cancel a current executing llm prompt/workflow
-- add context re-ordering feature; prompt/responses in chat history can be re-ordered in the left side list, drag and drop
-  and/or buttons move up/down.  Need a reset button as well.
+- add context re-ordering feature; prompt/responses in chat history can be re-ordered
+  in the left side list, drag and drop and/or buttons move up/down.  Need a reset
+  button as well.
 open_questions: []
