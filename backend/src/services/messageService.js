@@ -19,34 +19,13 @@ const { v4: uuidv4 } = require('uuid');
 const readline = require('readline');
 const chatService = require('./chatService');
 
-// Custom error classes
-class ValidationError extends Error {
-  constructor(message) {
-    super(message);
-    this.name = 'ValidationError';
-  }
-}
-
-class NotFoundError extends Error {
-  constructor(message) {
-    super(message);
-    this.name = 'NotFoundError';
-  }
-}
-
-class FileSystemError extends Error {
-  constructor(message) {
-    super(message);
-    this.name = 'FileSystemError';
-  }
-}
-
-class LLMError extends Error {
-  constructor(message) {
-    super(message);
-    this.name = 'LLMError';
-  }
-}
+// Import shared error classes
+const {
+  ValidationError,
+  NotFoundError,
+  FileSystemError,
+  LLMError
+} = require('../errors');
 
 /**
  * Validate UUID format
