@@ -40,6 +40,26 @@ prompt_guidance: "Always follow these guidelines and update project documentatio
   \ if it is outside the scope.\n* ALWAYS COMMIT AND PUSH the repository after a task.\n"
 current:
 - task:
+    id: 1.8.0
+    name: Implement Frontend State Management
+    goal: Implement Svelte stores for managing application state (projects, chats, messages, UI).
+    prompt: ./prompts/dev/prompt_1_8_0.md
+    details:
+      focus:
+      - projectStore implementation
+      - chatStore implementation
+      - messageStore implementation
+      - uiStore implementation
+      - State synchronization with backend
+      - Local state persistence
+      functions:
+      - frontend_svelte/update_context_display.yaml
+      verification:
+      - Store unit tests
+      - Test state updates
+      - Test store subscriptions
+      - Verify persistence
+- task:
     id: 1.9.0
     name: Phase 1 Integration and End-to-End Testing
     goal: Integrate all Phase 1 components and implement comprehensive end-to-end tests.
