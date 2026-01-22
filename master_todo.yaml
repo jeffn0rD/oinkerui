@@ -40,8 +40,85 @@ prompt_guidance: "Always follow these guidelines and update project documentatio
   \ if it is outside the scope.\n* ALWAYS COMMIT AND PUSH the repository after a task.\n"
 current:
 
-
 - task:
+    id: 1.1.5
+    name: Fix deprecated dependencies
+    goal: No deprecated dependencies used in the project
+    details: |+
+      When I ran 'npm install' it reported deprecated module warnings:
+      npm warn deprecated inflight@1.0.6: This module is not supported, and leaks memory. Do not use it. Check out lru-cache if you want a good and tested way to coalesce async requests by a key value, which is much more comprehensive and powerful.
+      npm warn deprecated glob@7.2.3: Glob versions prior to v9 are no longer supported
+      npm warn deprecated supertest@6.3.4: Please upgrade to supertest v7.1.3+, see release notes at https://github.com/forwardemail/supertest/releases/tag/v7.1.3 - maintenance is supported by Forward Email @ https://forwardemail.net
+      npm warn deprecated superagent@8.1.2: Please upgrade to superagent v10.2.2+, see release notes at https://github.com/forwardemail/superagent/releases/tag/v10.2.2 - maintenance is supported by Forward Email @ https://forwardemail.net
+      
+      We need to upgrade (change version specifications) or use different modules so it will install clean.
+    verification: |
+      Will have to be done on my remote repository. 
+
+- task: 
+    id: 1.1.6
+    name: Test Issues
+    goal: Fix problems in the test module(s) and failed tests, see details
+    details: |
+      ** First Issue: workspace path/config in projectServer not the same as in test **
+      These lines in projectService.test.js:
+        const config = require('../../src/config');
+        config.workspaceRoot = testWorkspaceRoot;
+      Im not sure how this is supposed to change the config settings in the projectService.js (line 15):
+        const config = require('../config'); 
+      It is setting config in the module scope, and as a const
+      When running tests locally it created a lot of folders under oinkerui\backend\workspaces 
+      the .env file has:
+        WORKSPACE_ROOT=./workspaces
+      These lines in projectService.test.js dont work because of this issue (lines 46,47):
+        const projectPath = path.join(testWorkspaceRoot, 'projects', project.slug);
+        const stats = await fs.stat(projectPath);
+      Another issue is this (projectService.test.js:24):
+        afterEach(async () => {
+          // Cleanup test workspace
+          try {
+            await fs.rm(testWorkspaceRoot, { recursive: true, force: true });
+      The projects are not getting deleted, which throws off other tests.
+      
+      ** Second Issue: report from npm test output
+      npm test had this in its output:
+          Cannot log after tests are done. Did you forget to wait for something async in your test?
+          Attempted to log "Server listening on http://localhost:3000".
+          
+            22 |   try {
+            23 |     await fastify.listen({ port: 3000, host: '0.0.0.0' });
+          > 24 |     console.log('Server listening on http://localhost:3000');
+       
+      I suspect this is related to switching to jest?
+      
+      ** Third Issue: npm test output
+      This is also from the nmp test output:
+        Health Check API › GET /health › returns health status
+        TypeError: app.address is not a function
+        
+          12 |     it('returns health status', async () => {
+          13 |       const response = await request(app)
+        > 14 |         .get('/health')
+             |          ^
+          15 |         .expect(200);
+          16 |
+          17 |       expect(response.body).toHaveProperty('status');
+        
+          at Test.serverAddress (../node_modules/supertest/lib/test.js:46:22)
+          at new Test (../node_modules/supertest/lib/test.js:34:14)
+          at Object.obj.<computed> [as get] (../node_modules/supertest/index.js:43:18)
+          at Object.get (tests/integration/health.test.js:14:10)
+          
+      ** Fourth Issue: test execution hangs
+      The npm test hung on one run; had this as the last lines of output:
+        Jest did not exit one second after the test run has completed.
+        'This usually means that there are asynchronous operations that weren't stopped in your tests. Consider running Jest with `--detectOpenHandles` to troubleshoot this issue.
+
+    verification: |
+      Will have to be done on my remote repository. 
+      
+
+- task:      
     id: 1.2.0
     name: Implement Message Operations
     goal: Implement backend functions for creating, storing, and retrieving messages.
@@ -202,6 +279,7 @@ current:
       - Documentation review
       - User acceptance testing
 future:
+- need a way to cancel a current executing llm prompt/workflow
 - add context re-ordering feature; prompt/responses in chat history can be re-ordered in the left side list, drag and drop
   and/or buttons move up/down.  Need a reset button as well.
 open_questions: []

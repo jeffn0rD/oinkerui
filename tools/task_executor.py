@@ -29,6 +29,73 @@ import re
 sys.path.insert(0, str(Path(__file__).parent))
 from doc_query import EnhancedDocQuery
 
+def pretty_format(obj, indent=0, indent_step=2):
+    """
+    Recursively format Python objects (dict, list, tuple, set, etc.)
+    into a human-readable YAML-like string.
+    """
+    # Ensure indent is always an int
+    if not isinstance(indent, int):
+        raise TypeError(f"indent must be int, got {type(indent).__name__}")
+
+    space = ' ' * indent
+
+    # Scalars
+    if isinstance(obj, (int, float, bool)) or obj is None:
+        return space + repr(obj)
+    if isinstance(obj, str):
+            # If it has newlines, just return it as-is with indentation on the first line
+            if "\n" in obj:
+                # Indent first line, keep internal newlines
+                prefix = ' ' * indent
+                # Optionally indent subsequent lines too:
+                # return ("\n").join(prefix + line for line in obj.splitlines())
+                return prefix + obj
+    
+            # For single-line strings, keep your existing heuristic if you want
+            if any(c.isspace() for c in obj) or obj == "" or any(c in obj for c in ":{}[]-,#"):
+                # Use normal quotes, not repr(), so no escaping of newlines etc.
+                return ' ' * indent + '"' + obj.replace('"', '\\"') + '"'
+            else:
+                return ' ' * indent + obj
+                
+    # Dicts
+    if isinstance(obj, dict):
+        if not obj:
+            return space + "{}"
+        lines = []
+        for k, v in obj.items():
+            key_str = repr(k)
+            if isinstance(v, (dict, list, tuple, set)):
+                lines.append(f"{space}{key_str}:")
+                lines.append(pretty_format(v, indent + indent_step, indent_step))
+            else:
+                val_str = pretty_format(v, 0, indent_step).lstrip()
+                lines.append(f"{space}{key_str}: {val_str}")
+        return "\n".join(lines)
+
+    # Sequences
+    if isinstance(obj, (list, tuple, set)):
+        seq = list(obj)
+        if not seq:
+            return space + "[]"
+        lines = []
+        for item in seq:
+            if isinstance(item, (dict, list, tuple, set)):
+                lines.append(f"{space}-")
+                lines.append(pretty_format(item, indent + indent_step, indent_step))
+            else:
+                item_str = pretty_format(item, 0, indent_step).lstrip()
+                lines.append(f"{space}- {item_str}")
+        return "\n".join(lines)
+
+    # Fallback
+    return space + repr(obj)
+
+
+def format_object(obj):
+    """Public helper: call this with just your dict/list/etc."""
+    return pretty_format(obj, indent=0, indent_step=2)
 
 class TaskExecutor:
     """Automates task execution and coordination."""
@@ -150,7 +217,8 @@ class TaskExecutor:
                 return str(task_data.get('id'))
         
         return None
-    
+        
+
     def _generate_orchestrator_prompt(self, task_id: str) -> Optional[Path]:
         """Generate orchestrator prompt for the task."""
         print(f"Generating orchestrator prompt...")
@@ -178,6 +246,9 @@ class TaskExecutor:
         task_goal = task.get('goal', 'No goal specified')
         task_prompt_file = task.get('prompt', '')
         task_files = task.get('files', [])
+        task_details = task.get('details', 'No details specified')
+        task_steps = task.get('steps', 'No steps specified')
+        task_verify = task.get('verification', 'No verification specified')
         
         # Load task-specific prompt if it exists
         task_prompt_content = ""
@@ -194,7 +265,13 @@ class TaskExecutor:
         prompt = template.replace("{task_id}", str(task_id))
         prompt = prompt.replace("{task_name}", task_name)
         prompt = prompt.replace("{task_goal}", task_goal)
-        prompt = prompt.replace("{task_details}", task_prompt_content)
+
+        prompt = prompt.replace("{task_details}", format_object(task_details))
+        prompt = prompt.replace("{task_steps}", format_object(task_steps))
+        prompt = prompt.replace("{task_verify}", format_object(task_verify))
+
+
+        prompt = prompt.replace("{task_prompt_content}", task_prompt_content)
         prompt = prompt.replace("{context_commands}", context_commands)
         prompt = prompt.replace("{prompt_guidance}", self.prompt_guidance)
         prompt = prompt.replace("{timestamp}", datetime.now().isoformat())

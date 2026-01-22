@@ -15,8 +15,11 @@ You are the orchestrator for this task. Your responsibilities:
 5. Verify completion before finalizing
 
 ## Task Details
-
 {task_details}
+
+## Task Additional Prompt 
+
+{task_prompt_content}
 
 ## Prompt Guidance (Orchestrator Scope)
 
@@ -69,39 +72,6 @@ python3 tools/doc_query.py --query "search term" --mode text --pretty
 # Find related files by topic
 python3 tools/doc_query.py --query "spec/spec.yaml" --mode related --pretty
 ```
-
-## Task Execution Steps
-
-{execution_steps}
-
-## Expected Outputs
-
-{expected_outputs}
-
-## Verification
-
-{verification_steps}
-
-## Agent Delegation (If Needed)
-
-If this task requires specialized agents:
-
-1. **Create agent prompts** in `prompts/agents/task_{task_id}/`
-2. **Agent scope**: Each agent should have:
-   - Clear, narrow objective
-   - Specific input/output requirements
-   - Verification criteria
-   - Limited prompt guidance (only relevant to their scope)
-
-3. **Agent coordination**:
-   - Execute agents in sequence
-   - Pass outputs between agents
-   - Verify each agent's work before proceeding
-   - Aggregate results
-
-## Files Referenced
-
-{files_referenced}
 
 ## Next Steps After Completion
 

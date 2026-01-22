@@ -15,6 +15,22 @@ You are the orchestrator for this task. Your responsibilities:
 5. Verify completion before finalizing
 
 ## Task Details
+'focus':
+  - 'sendMessage function'
+  - 'saveMessage function'
+  - 'getMessage function'
+  - 'listMessages function'
+  - 'Message persistence (JSONL)'
+  - 'Message-chat relationship'
+'functions':
+  - backend_node/send_message.yaml
+  - backend_node/save_message.yaml
+'verification':
+  - 'Unit tests for message operations'
+  - 'Verify JSONL format'
+  - 'Test message ordering'
+
+## Task Additional Prompt 
 
 # Prompt 1.2.0: Implement Message Operations
 
@@ -216,18 +232,6 @@ python3 tools/doc_query.py --query "search term" --mode text --pretty
 # Find related files by topic
 python3 tools/doc_query.py --query "spec/spec.yaml" --mode related --pretty
 ```
-
-## Task Execution Steps
-
-{execution_steps}
-
-## Expected Outputs
-
-{expected_outputs}
-
-## Verification
-
-{verification_steps}
 
 ## Agent Delegation (If Needed)
 
