@@ -748,9 +748,7 @@ tasks:
       - Verify Git repo created for each project
     completed_date: '2025-01-21'
     git_commit: f2cd25b
-    summary: Successfully implemented all Project CRUD operations following spec algorithm exactly. Created projectService
-      with full 10-step createProject algorithm, gitService for repository management, REST API routes, and comprehensive
-      unit tests. All preconditions validated, postconditions ensured, and proper error handling with cleanup on failure.
+    summary: Successfully implemented all Project CRUD operations following spec algorithm exactly. Created projectService with full 10-step createProject algorithm, gitService for repository management, REST API routes, and comprehensive unit tests. All preconditions validated, postconditions ensured, and proper error handling with cleanup on failure.
 - task:
     id: 1.1.0
     name: Implement Chat CRUD Operations
@@ -781,10 +779,7 @@ tasks:
       - Fixed test script recursion
     completed_date: '2025-01-21'
     git_commit: pending
-    summary: Successfully implemented all Chat CRUD operations following spec algorithm exactly. Created chatService with
-      full 10-step createChat algorithm, API routes for chat operations, and comprehensive unit tests (26 tests). All preconditions
-      validated, postconditions ensured, and proper error handling with cleanup on failure. Fixed config reference issue and
-      test script recursion.
+    summary: Successfully implemented all Chat CRUD operations following spec algorithm exactly. Created chatService with full 10-step createChat algorithm, API routes for chat operations, and comprehensive unit tests (26 tests). All preconditions validated, postconditions ensured, and proper error handling with cleanup on failure. Fixed config reference issue and test script recursion.
 - task:
     id: 1.1.5
     name: Fix deprecated dependencies
@@ -808,9 +803,7 @@ tasks:
       - All deprecated packages removed from dependency tree
     completed_date: '2025-01-22'
     git_commit: 3d865e1
-    summary: Successfully upgraded all deprecated npm dependencies. Upgraded supertest to 7.2.2 which automatically upgraded
-      superagent to 10.3.0. Added npm overrides to force glob upgrade to 10.5.0 and remove deprecated inflight package. All
-      npm install deprecation warnings eliminated.
+    summary: Successfully upgraded all deprecated npm dependencies. Upgraded supertest to 7.2.2 which automatically upgraded superagent to 10.3.0. Added npm overrides to force glob upgrade to 10.5.0 and remove deprecated inflight package. All npm install deprecation warnings eliminated.
 - task:
     id: 1.1.6
     name: Test Issues
@@ -832,9 +825,7 @@ tasks:
       - User will run tests locally to verify all issues resolved
     completed_date: '2025-01-22'
     git_commit: 7a1ccc3
-    summary: Fixed multiple test-related issues. Added config.reset() function for test isolation, refactored index.js to
-      export buildApp() function preventing auto-start on import, updated health.test.js for Fastify+Supertest compatibility,
-      and added proper cleanup to prevent test hanging. All test files updated for proper isolation and resource cleanup.
+    summary: Fixed multiple test-related issues. Added config.reset() function for test isolation, refactored index.js to export buildApp() function preventing auto-start on import, updated health.test.js for Fastify+Supertest compatibility, and added proper cleanup to prevent test hanging. All test files updated for proper isolation and resource cleanup.
 - task:
     id: 1.2.0
     name: Implement Message Operations
@@ -862,30 +853,4 @@ tasks:
       - Message ordering tested
     completed_date: '2025-01-22'
     git_commit: 540323d
-    summary: Successfully implemented all message CRUD operations following spec algorithms. Created messageService with 7-step
-      saveMessage algorithm using JSONL persistence (append/update modes), getMessage for retrieval, listMessages with filtering,
-      and simplified sendMessage. Comprehensive unit tests verify JSONL format, message ordering, and all error cases. Full
-      LLM integration deferred to future task.
-- task:
-    id: 1.3.0
-    name: Implement OpenRouter LLM Integration
-    goal: Implement LLM request handling with OpenRouter API, including context construction and response processing.
-    prompt: ./prompts/dev/prompt_1_3_0.md
-    details:
-      focus:
-      - callLLM function
-      - constructContext function
-      - OpenRouter API integration
-      - Model selection from config
-      - Response streaming support
-      - Error handling and retries
-      functions:
-      - backend_node/call_llm.yaml
-      - backend_node/construct_context.yaml
-      verification:
-      - Unit tests with mocked API
-      - Integration test with real API
-      - Test context construction
-      - Verify streaming works
-    completed_date: '2026-01-22'
-    summary: Implemented OpenRouter LLM integration with callLLM and constructContext functions
+    summary: Successfully implemented all message CRUD operations following spec algorithms. Created messageService with 7-step saveMessage algorithm using JSONL persistence (append/update modes), getMessage for retrieval, listMessages with filtering, and simplified sendMessage. Comprehensive unit tests verify JSONL format, message ordering, and all error cases. Full LLM integration deferred to future task.

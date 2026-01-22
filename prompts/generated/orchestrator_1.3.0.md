@@ -15,6 +15,23 @@ You are the orchestrator for this task. Your responsibilities:
 5. Verify completion before finalizing
 
 ## Task Details
+'focus':
+  - "callLLM function"
+  - "constructContext function"
+  - "OpenRouter API integration"
+  - "Model selection from config"
+  - "Response streaming support"
+  - "Error handling and retries"
+'functions':
+  - backend_node/call_llm.yaml
+  - backend_node/construct_context.yaml
+'verification':
+  - "Unit tests with mocked API"
+  - "Integration test with real API"
+  - "Test context construction"
+  - "Verify streaming works"
+
+## Task Additional Prompt 
 
 # Prompt 1.3.0: Implement OpenRouter LLM Integration
 
@@ -217,39 +234,6 @@ python3 tools/doc_query.py --query "search term" --mode text --pretty
 # Find related files by topic
 python3 tools/doc_query.py --query "spec/spec.yaml" --mode related --pretty
 ```
-
-## Task Execution Steps
-
-{execution_steps}
-
-## Expected Outputs
-
-{expected_outputs}
-
-## Verification
-
-{verification_steps}
-
-## Agent Delegation (If Needed)
-
-If this task requires specialized agents:
-
-1. **Create agent prompts** in `prompts/agents/task_1.3.0/`
-2. **Agent scope**: Each agent should have:
-   - Clear, narrow objective
-   - Specific input/output requirements
-   - Verification criteria
-   - Limited prompt guidance (only relevant to their scope)
-
-3. **Agent coordination**:
-   - Execute agents in sequence
-   - Pass outputs between agents
-   - Verify each agent's work before proceeding
-   - Aggregate results
-
-## Files Referenced
-
-{files_referenced}
 
 ## Next Steps After Completion
 

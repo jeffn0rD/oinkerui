@@ -54,11 +54,47 @@ class LLMError extends Error {
   }
 }
 
+class ConfigError extends Error {
+  constructor(message, details = {}) {
+    super(message);
+    this.name = 'ConfigError';
+    this.details = details;
+  }
+}
+
+class TimeoutError extends Error {
+  constructor(message, details = {}) {
+    super(message);
+    this.name = 'TimeoutError';
+    this.details = details;
+  }
+}
+
+class RateLimitError extends Error {
+  constructor(message, details = {}) {
+    super(message);
+    this.name = 'RateLimitError';
+    this.details = details;
+  }
+}
+
+class AuthenticationError extends Error {
+  constructor(message, details = {}) {
+    super(message);
+    this.name = 'AuthenticationError';
+    this.details = details;
+  }
+}
+
 module.exports = {
   ValidationError,
   NotFoundError,
   ConflictError,
   FileSystemError,
   GitError,
-  LLMError
+  LLMError,
+  ConfigError,
+  TimeoutError,
+  RateLimitError,
+  AuthenticationError
 };
