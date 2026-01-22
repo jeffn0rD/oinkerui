@@ -39,26 +39,7 @@ prompt_guidance: "Always follow these guidelines and update project documentatio
   \ closely and carefully. Constrain work and scope to the task. Return with questions if\nneeded and confirm any extra work\
   \ if it is outside the scope.\n* ALWAYS COMMIT AND PUSH the repository after a task.\n"
 current:
-- task:
-    id: 1.0.0
-    name: Implement Project CRUD Operations
-    goal: Implement backend functions for creating, reading, updating, and deleting projects.
-    prompt: ./prompts/dev/prompt_1_0_0.md
-    details:
-      focus:
-      - createProject function
-      - getProject function
-      - listProjects function
-      - deleteProject function
-      - Project data persistence
-      - Git repository initialization per project
-      functions:
-      - backend_node/create_project.yaml
-      - git_integration/init_repository.yaml
-      verification:
-      - Unit tests for each CRUD operation
-      - Integration test for project lifecycle
-      - Verify Git repo created for each project
+
 - task:
     id: 1.1.0
     name: Implement Chat CRUD Operations

@@ -721,3 +721,31 @@ tasks:
     git_commit: 7327f88
     summary: Successfully initialized the Svelte frontend with Vite, configured Tailwind CSS with custom theme, created component
       structure, set up Svelte stores for state management, and verified dev server and build process working correctly.
+  - task:
+    id: 1.0.0
+    name: Implement Project CRUD Operations
+    goal: Implement backend functions for creating, reading, updating, and deleting projects.
+    prompt: ./prompts/dev/prompt_1_0_0.md
+    files:
+    - backend/src/services/projectService.js
+    - backend/src/services/gitService.js
+    - backend/src/routes/projects.js
+    - backend/tests/services/projectService.test.js
+    details:
+      focus:
+      - createProject function
+      - getProject function
+      - listProjects function
+      - deleteProject function
+      - Project data persistence
+      - Git repository initialization per project
+      functions:
+      - backend_node/create_project.yaml
+      - git_integration/init_repository.yaml
+      verification:
+      - Unit tests for each CRUD operation
+      - Integration test for project lifecycle
+      - Verify Git repo created for each project
+    completed_date: '2025-01-21'
+    git_commit: f2cd25b
+    summary: Successfully implemented all Project CRUD operations following spec algorithm exactly. Created projectService with full 10-step createProject algorithm, gitService for repository management, REST API routes, and comprehensive unit tests. All preconditions validated, postconditions ensured, and proper error handling with cleanup on failure.
