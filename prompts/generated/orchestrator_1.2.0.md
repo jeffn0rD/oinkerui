@@ -16,19 +16,19 @@ You are the orchestrator for this task. Your responsibilities:
 
 ## Task Details
 'focus':
-  - 'sendMessage function'
-  - 'saveMessage function'
-  - 'getMessage function'
-  - 'listMessages function'
-  - 'Message persistence (JSONL)'
-  - 'Message-chat relationship'
+  - "sendMessage function"
+  - "saveMessage function"
+  - "getMessage function"
+  - "listMessages function"
+  - "Message persistence (JSONL)"
+  - "Message-chat relationship"
 'functions':
   - backend_node/send_message.yaml
   - backend_node/save_message.yaml
 'verification':
-  - 'Unit tests for message operations'
-  - 'Verify JSONL format'
-  - 'Test message ordering'
+  - "Unit tests for message operations"
+  - "Verify JSONL format"
+  - "Test message ordering"
 
 ## Task Additional Prompt 
 
@@ -232,27 +232,6 @@ python3 tools/doc_query.py --query "search term" --mode text --pretty
 # Find related files by topic
 python3 tools/doc_query.py --query "spec/spec.yaml" --mode related --pretty
 ```
-
-## Agent Delegation (If Needed)
-
-If this task requires specialized agents:
-
-1. **Create agent prompts** in `prompts/agents/task_1.2.0/`
-2. **Agent scope**: Each agent should have:
-   - Clear, narrow objective
-   - Specific input/output requirements
-   - Verification criteria
-   - Limited prompt guidance (only relevant to their scope)
-
-3. **Agent coordination**:
-   - Execute agents in sequence
-   - Pass outputs between agents
-   - Verify each agent's work before proceeding
-   - Aggregate results
-
-## Files Referenced
-
-{files_referenced}
 
 ## Next Steps After Completion
 
