@@ -40,24 +40,56 @@ prompt_guidance: "Always follow these guidelines and update project documentatio
   \ if it is outside the scope.\n* ALWAYS COMMIT AND PUSH the repository after a task.\n"
 current:
 - task:
-    id: 1.9.0
-    name: Phase 1 Integration and End-to-End Testing
-    goal: Integrate all Phase 1 components and implement comprehensive end-to-end tests.
-    prompt: ./prompts/dev/prompt_1_9_0.md
-    details:
-      focus:
-      - Full application integration
-      - End-to-end test scenarios
-      - Performance testing
-      - Error handling verification
-      - Documentation updates
-      - Deployment preparation
-      verification:
-      - E2E test suite
-      - Load testing
-      - Security audit
-      - Documentation review
-      - User acceptance testing
+    id: 2.0.0
+    name: Implement Message Context Flags
+    goal: Implement message context control flags (include_in_context, is_aside, pure_aside, is_pinned, is_discarded) in the
+      backend and update the context construction algorithm.
+    prompt: ./prompts/dev/prompt_2_0_0.md
+- task:
+    id: 2.1.0
+    name: Implement Slash Command Parser
+    goal: Implement the slash command parsing system in the Node.js backend for commands defined in spec/commands.yaml.
+    prompt: ./prompts/dev/prompt_2_1_0.md
+- task:
+    id: 2.2.0
+    name: Implement Chat Forking
+    goal: Implement chat forking functionality with optional message point and pruning support.
+    prompt: ./prompts/dev/prompt_2_2_0.md
+- task:
+    id: 2.3.0
+    name: Implement Live Context Size Display
+    goal: Implement real-time context size estimation and display showing tokens vs model maximum.
+    prompt: ./prompts/dev/prompt_2_3_0.md
+- task:
+    id: 2.4.0
+    name: Implement Requery Functionality
+    goal: Implement the requery feature to regenerate LLM responses with response branching support.
+    prompt: ./prompts/dev/prompt_2_4_0.md
+- task:
+    id: 2.5.0
+    name: Implement Python Tools Backend
+    goal: Set up the Python FastAPI tools backend for Jinja2 template rendering and code execution.
+    prompt: ./prompts/dev/prompt_2_5_0.md
+- task:
+    id: 2.6.0
+    name: Implement Prompt Templates System
+    goal: Implement prompt templates with Jinja2 rendering, variable substitution, and template management UI.
+    prompt: ./prompts/dev/prompt_2_6_0.md
+- task:
+    id: 2.7.0
+    name: Implement Message Flag UI Controls
+    goal: Implement frontend UI controls for managing message context flags with visual indicators.
+    prompt: ./prompts/dev/prompt_2_7_0.md
+- task:
+    id: 2.8.0
+    name: Implement Aside and Pure Aside Functionality
+    goal: Implement complete aside and pure aside message functionality with context handling and UI feedback.
+    prompt: ./prompts/dev/prompt_2_8_0.md
+- task:
+    id: 2.9.0
+    name: Phase 2 Integration and Testing
+    goal: Integrate all Phase 2 components and implement comprehensive end-to-end tests.
+    prompt: ./prompts/dev/prompt_2_9_0.md
 future:
 - need a way to cancel a current executing llm prompt/workflow
 - add context re-ordering feature; prompt/responses in chat history can be re-ordered in the left side list, drag and drop

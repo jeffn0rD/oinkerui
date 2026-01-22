@@ -807,7 +807,11 @@ class EnhancedDocQuery:
         def extract_recursive(obj: Any):
             if isinstance(obj, dict):
                 for key, value in obj.items():
-                    keywords.add(key.lower())
+                    # Handle non-string keys (e.g., integers)
+                    if isinstance(key, str):
+                        keywords.add(key.lower())
+                    else:
+                        keywords.add(str(key).lower())
                     extract_recursive(value)
             elif isinstance(obj, list):
                 for item in obj:
