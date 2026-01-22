@@ -90,6 +90,26 @@ current:
     name: Phase 2 Integration and Testing
     goal: Integrate all Phase 2 components and implement comprehensive end-to-end tests.
     prompt: ./prompts/dev/prompt_2_9_0.md
+- task:
+    id: 2.1.5
+    name: Implement LLM Response Streaming
+    goal: Implement full LLM response streaming from OpenRouter to the frontend UI with SSE.
+    prompt: ./prompts/dev/prompt_2_1_5.md
+- task:
+    id: 2.3.5
+    name: Implement Cancel LLM Request
+    goal: Implement ability to cancel in-progress LLM requests with timeout configuration and UI feedback.
+    prompt: ./prompts/dev/prompt_2_3_5.md
+- task:
+    id: 2.4.5
+    name: Implement Core Frontend Application
+    goal: Implement the core frontend application with functional UI, dark theme, and modern power-user styling.
+    prompt: ./prompts/dev/prompt_2_4_5.md
+- task:
+    id: 2.6.5
+    name: Implement Frontend-Backend Integration
+    goal: Complete frontend-backend integration with API calls, real-time updates, and smooth UX.
+    prompt: ./prompts/dev/prompt_2_6_5.md
 future:
 - need a way to cancel a current executing llm prompt/workflow
 - add context re-ordering feature; prompt/responses in chat history can be re-ordered in the left side list, drag and drop

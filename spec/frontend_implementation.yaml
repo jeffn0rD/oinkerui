@@ -1,0 +1,317 @@
+# =============================================================================
+# Frontend Implementation Specification
+# =============================================================================
+# This file specifies the frontend implementation requirements for Phase 2
+# to ensure a usable, testable UI is available.
+
+version: "1.0.0"
+title: Frontend Implementation Specification
+description: |
+  Detailed frontend implementation requirements for creating a functional,
+  modern, dark-themed UI suitable for power users and developers.
+
+# =============================================================================
+# DESIGN PHILOSOPHY
+# =============================================================================
+
+design_philosophy:
+  style: "Modern coder/power-user aesthetic"
+  theme: "Dark-first design"
+  principles:
+    - Clean and minimal interface
+    - High information density without clutter
+    - Keyboard-first interaction model
+    - Fast and responsive feedback
+    - Consistent visual language
+    - Accessible to screen readers
+
+  inspiration:
+    - VS Code (layout, dark theme)
+    - Discord (chat interface)
+    - Linear (modern SaaS aesthetic)
+    - GitHub (code display)
+
+# =============================================================================
+# LOGO PLACEHOLDER
+# =============================================================================
+
+logo:
+  placeholder:
+    description: "Placeholder for custom logo"
+    location: "frontend/public/logo.png"
+    recommended_size: "40x40 pixels"
+    format: "PNG with transparent background"
+    fallback: "Text 'OinkerUI' or pig emoji 🐷"
+  
+  replacement_instructions: |
+    To replace the logo:
+    1. Create a 40x40 PNG image with transparent background
+    2. Save as frontend/public/logo.png
+    3. For best results, use a simple icon that works at small sizes
+    4. Recommended: A cute pig/piglet icon matching the "Oinker" theme
+    
+    The logo appears in:
+    - Header (left side)
+    - Browser tab favicon
+    - Loading screen (if implemented)
+
+# =============================================================================
+# LAYOUT SPECIFICATION
+# =============================================================================
+
+layout:
+  structure: "Three-column with collapsible panels"
+  
+  header:
+    height: "48px"
+    position: "fixed top"
+    contents:
+      - logo_placeholder:
+          position: "left"
+          size: "32x32"
+      - project_name:
+          position: "center-left"
+          style: "truncate with tooltip"
+      - spacer: true
+      - context_indicator:
+          position: "center-right"
+          shows: "tokens used / max"
+      - settings_button:
+          position: "right"
+          icon: "cog"
+      - theme_toggle:
+          position: "right"
+          icon: "sun/moon"
+
+  left_sidebar:
+    width: "280px"
+    min_width: "200px"
+    max_width: "400px"
+    resizable: true
+    collapsible: true
+    default_state: "expanded"
+    contents:
+      - project_section:
+          header: "Projects"
+          actions: ["create", "search"]
+          list: "ProjectList component"
+      - chat_section:
+          header: "Chats"
+          actions: ["create"]
+          list: "ChatList component"
+          context: "Shows chats for selected project"
+
+  main_area:
+    flex: "1 1 auto"
+    min_width: "400px"
+    contents:
+      - message_list:
+          scroll: "virtual"
+          anchor: "bottom"
+      - message_input:
+          position: "bottom"
+          multiline: true
+          max_height: "200px"
+
+  right_panel:
+    width: "300px"
+    collapsible: true
+    default_state: "collapsed"
+    contents:
+      - context_display:
+          shows: "Current context messages"
+      - stats_display:
+          shows: "Token usage, request count"
+      - entity_browser:
+          shows: "Project data entities"
+
+  status_bar:
+    height: "24px"
+    position: "fixed bottom"
+    contents:
+      - connection_status:
+          position: "left"
+          indicator: "dot (green/yellow/red)"
+      - active_request:
+          position: "center"
+          shows: "Streaming... / Thinking..."
+      - context_size:
+          position: "right"
+          format: "1,234 / 32,000 tokens"
+
+# =============================================================================
+# COMPONENT SPECIFICATIONS
+# =============================================================================
+
+components:
+  
+  # ---------------------------------------------------------------------------
+  # Message Component
+  # ---------------------------------------------------------------------------
+  Message:
+    description: "Displays a single chat message"
+    variants:
+      - user: "Right-aligned, blue accent"
+      - assistant: "Left-aligned, violet accent"
+      - system: "Centered, muted, smaller"
+      - tool: "Left-aligned, amber accent, monospace"
+    
+    features:
+      - markdown_rendering: true
+      - code_highlighting: true
+      - copy_code_button: true
+      - timestamp_display: "hover to show"
+      - flag_indicators:
+          pinned: "📌 icon"
+          aside: "dimmed with indicator"
+          discarded: "strikethrough, collapsed"
+    
+    actions:
+      - copy: "Copy message content"
+      - pin: "Toggle pinned state"
+      - aside: "Toggle aside state"
+      - discard: "Toggle discarded state"
+      - requery: "Regenerate response (assistant only)"
+
+  # ---------------------------------------------------------------------------
+  # Message Input Component
+  # ---------------------------------------------------------------------------
+  MessageInput:
+    description: "Input area for composing messages"
+    features:
+      - multiline: true
+      - auto_resize: "up to max height"
+      - markdown_preview: "toggle with button"
+      - slash_command_autocomplete: true
+      - template_insertion: "button to open template selector"
+    
+    buttons:
+      - send:
+          icon: "arrow-up"
+          shortcut: "Ctrl+Enter"
+          disabled_when: "empty or sending"
+      - cancel:
+          icon: "x"
+          visible_when: "request in progress"
+          shortcut: "Escape"
+      - template:
+          icon: "template"
+          action: "open template selector"
+      - attach:
+          icon: "paperclip"
+          action: "attach file (future)"
+
+  # ---------------------------------------------------------------------------
+  # Streaming Message Component
+  # ---------------------------------------------------------------------------
+  StreamingMessage:
+    description: "Displays message while streaming"
+    features:
+      - cursor_animation: "blinking cursor at end"
+      - token_by_token: "append tokens as received"
+      - cancel_button: "visible during streaming"
+      - progress_indicator: "optional token count"
+
+  # ---------------------------------------------------------------------------
+  # Cancel Button Component
+  # ---------------------------------------------------------------------------
+  CancelButton:
+    description: "Button to cancel in-progress operations"
+    states:
+      - hidden: "No active request"
+      - visible: "Request in progress"
+      - cancelling: "Cancel requested, waiting"
+    
+    styling:
+      color: "red/error accent"
+      icon: "x or stop"
+      position: "next to send button or in message"
+
+  # ---------------------------------------------------------------------------
+  # Context Size Indicator
+  # ---------------------------------------------------------------------------
+  ContextSizeIndicator:
+    description: "Shows current context token usage"
+    display:
+      format: "current / max tokens"
+      progress_bar: true
+      color_coding:
+        green: "< 50%"
+        yellow: "50-80%"
+        red: "> 80%"
+    
+    tooltip:
+      shows:
+        - "Exact token count"
+        - "Model context limit"
+        - "Messages in context"
+        - "Pinned message count"
+
+# =============================================================================
+# ASYNC OPERATION FEEDBACK
+# =============================================================================
+
+async_feedback:
+  description: |
+    Visual feedback for asynchronous operations to keep users informed
+    of system state and progress.
+
+  indicators:
+    sending_message:
+      type: "inline"
+      location: "message input area"
+      display: "Sending... with spinner"
+      
+    waiting_response:
+      type: "inline"
+      location: "message list (new message placeholder)"
+      display: "Thinking... with animated dots"
+      
+    streaming:
+      type: "inline"
+      location: "message being streamed"
+      display: "Blinking cursor, token count"
+      
+    loading_data:
+      type: "skeleton"
+      location: "component being loaded"
+      display: "Skeleton placeholder"
+      
+    background_operation:
+      type: "toast"
+      location: "bottom-right"
+      display: "Operation name with progress"
+
+  cancel_affordances:
+    - escape_key: "Cancel current operation"
+    - cancel_button: "Visible during operations"
+    - click_away: "Cancel modal operations"
+
+# =============================================================================
+# PHASE 2 FRONTEND REQUIREMENTS
+# =============================================================================
+
+phase_2_requirements:
+  must_have:
+    - "Functional project CRUD UI"
+    - "Functional chat CRUD UI"
+    - "Message sending and display"
+    - "LLM response streaming display"
+    - "Cancel button for LLM requests"
+    - "Dark theme implementation"
+    - "Basic keyboard shortcuts"
+    - "Error notifications"
+    - "Loading states"
+    
+  should_have:
+    - "Context size indicator"
+    - "Message flag toggles (pin, aside)"
+    - "Slash command autocomplete"
+    - "Template selector"
+    - "Responsive layout"
+    
+  nice_to_have:
+    - "Theme toggle (dark/light)"
+    - "Resizable panels"
+    - "Virtual scrolling for messages"
+    - "Markdown preview in input"

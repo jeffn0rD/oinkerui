@@ -1,0 +1,361 @@
+# =============================================================================
+# Cancel and Timeout Specification
+# =============================================================================
+# This file specifies the cancel and timeout functionality for LLM requests,
+# tool executions, and workflows.
+
+version: "1.0.0"
+title: Cancel and Timeout Specification
+description: |
+  Specification for cancelling in-progress operations and configuring
+  timeouts for various async processes in OinkerUI.
+
+# =============================================================================
+# OVERVIEW
+# =============================================================================
+
+overview:
+  purpose: |
+    Users need the ability to cancel long-running operations such as LLM
+    requests, tool executions, and workflows. Additionally, automatic
+    timeouts prevent the system from hanging indefinitely.
+  
+  scope:
+    - LLM API requests (OpenRouter)
+    - Tool executions (Python backend)
+    - Workflows (DAG execution)
+    - File operations (large uploads/downloads)
+
+# =============================================================================
+# CANCELLABLE OPERATIONS
+# =============================================================================
+
+cancellable_operations:
+
+  llm_request:
+    description: "Cancel an in-progress LLM API call"
+    trigger:
+      - user_action: "Click cancel button"
+      - keyboard: "Escape key"
+      - timeout: "Automatic after configured duration"
+    
+    behavior:
+      - abort_http_request: "Using AbortController"
+      - cleanup_partial_response: "Discard or save partial"
+      - update_message_state: "Mark as cancelled"
+      - log_cancellation: "Record in LLM request log"
+    
+    states:
+      pending: "Request initiated, waiting for response"
+      streaming: "Receiving tokens"
+      cancelled: "User or timeout cancelled"
+      completed: "Successfully finished"
+      error: "Failed with error"
+
+  tool_execution:
+    description: "Cancel an in-progress tool/code execution"
+    trigger:
+      - user_action: "Click cancel button"
+      - keyboard: "Escape key"
+      - timeout: "Automatic after configured duration"
+    
+    behavior:
+      - terminate_process: "Send SIGTERM, then SIGKILL"
+      - cleanup_temp_files: "Remove any temp artifacts"
+      - rollback_changes: "If possible, undo partial changes"
+      - log_cancellation: "Record in tool execution log"
+
+  workflow:
+    description: "Cancel an in-progress workflow"
+    trigger:
+      - user_action: "Click cancel button"
+      - timeout: "Per-step or total workflow timeout"
+    
+    behavior:
+      - stop_current_step: "Cancel active step"
+      - skip_remaining_steps: "Don't execute pending steps"
+      - cleanup: "Run cleanup handlers if defined"
+      - log_state: "Record partial completion state"
+
+# =============================================================================
+# TIMEOUT CONFIGURATION
+# =============================================================================
+
+timeout_configuration:
+
+  defaults:
+    llm_request:
+      value: 120
+      unit: "seconds"
+      description: "Default timeout for LLM API calls"
+      
+    llm_streaming:
+      value: 300
+      unit: "seconds"
+      description: "Timeout for streaming responses (longer)"
+      
+    tool_execution:
+      value: 60
+      unit: "seconds"
+      description: "Default timeout for tool/code execution"
+      
+    workflow_step:
+      value: 300
+      unit: "seconds"
+      description: "Default timeout per workflow step"
+      
+    workflow_total:
+      value: 1800
+      unit: "seconds"
+      description: "Maximum total workflow duration (30 min)"
+
+  configuration_levels:
+    global:
+      location: "config.yaml or environment variables"
+      applies_to: "All projects"
+      
+    project:
+      location: "project.json settings"
+      applies_to: "Single project"
+      overrides: "global"
+      
+    request:
+      location: "API request parameter"
+      applies_to: "Single request"
+      overrides: "project"
+
+  config_schema:
+    timeouts:
+      type: object
+      properties:
+        llm_request_timeout:
+          type: integer
+          minimum: 10
+          maximum: 600
+          default: 120
+        llm_streaming_timeout:
+          type: integer
+          minimum: 30
+          maximum: 900
+          default: 300
+        tool_execution_timeout:
+          type: integer
+          minimum: 5
+          maximum: 300
+          default: 60
+        workflow_step_timeout:
+          type: integer
+          minimum: 10
+          maximum: 600
+          default: 300
+        workflow_total_timeout:
+          type: integer
+          minimum: 60
+          maximum: 7200
+          default: 1800
+
+# =============================================================================
+# BACKEND IMPLEMENTATION
+# =============================================================================
+
+backend_implementation:
+
+  request_tracker:
+    description: "Service to track active requests"
+    file: "backend/src/services/requestTracker.js"
+    
+    data_structure:
+      active_requests:
+        type: "Map<chatId, RequestInfo>"
+        RequestInfo:
+          id: "uuid"
+          type: "llm | tool | workflow"
+          startedAt: "timestamp"
+          abortController: "AbortController instance"
+          timeoutId: "setTimeout reference"
+          status: "pending | streaming | cancelling"
+    
+    methods:
+      - name: "startRequest"
+        params: ["chatId", "type", "options"]
+        returns: "RequestInfo"
+        
+      - name: "cancelRequest"
+        params: ["chatId"]
+        returns: "boolean"
+        
+      - name: "getActiveRequest"
+        params: ["chatId"]
+        returns: "RequestInfo | null"
+        
+      - name: "cleanupRequest"
+        params: ["chatId"]
+        returns: "void"
+
+  llm_service_updates:
+    description: "Updates to LLM service for cancellation"
+    
+    callLLM_changes:
+      - accept_abort_signal: "AbortSignal parameter"
+      - handle_abort: "Catch AbortError, cleanup"
+      - timeout_wrapper: "Wrap with timeout promise"
+    
+    streaming_changes:
+      - check_abort_between_chunks: "Check signal periodically"
+      - cleanup_on_abort: "Close stream, cleanup state"
+
+  api_endpoints:
+    cancel_request:
+      method: "POST"
+      path: "/api/projects/:projectId/chats/:chatId/cancel"
+      description: "Cancel active request for a chat"
+      request:
+        body: {}
+      response:
+        success:
+          status: 200
+          body:
+            cancelled: boolean
+            requestId: "string | null"
+            message: "string"
+        no_active_request:
+          status: 404
+          body:
+            error: "NO_ACTIVE_REQUEST"
+            message: "No active request to cancel"
+
+# =============================================================================
+# FRONTEND IMPLEMENTATION
+# =============================================================================
+
+frontend_implementation:
+
+  cancel_button:
+    component: "CancelButton.svelte"
+    location: "Message input area, next to send button"
+    
+    visibility:
+      show_when:
+        - "LLM request in progress"
+        - "Tool execution in progress"
+        - "Streaming response"
+      hide_when:
+        - "No active request"
+        - "Request completed"
+    
+    states:
+      idle: "Hidden"
+      active: "Red button with X icon"
+      cancelling: "Disabled, showing spinner"
+    
+    behavior:
+      on_click:
+        - "Call cancel API endpoint"
+        - "Update UI to cancelling state"
+        - "Show toast on success/failure"
+
+  keyboard_shortcut:
+    key: "Escape"
+    context: "Chat view with active request"
+    action: "Cancel current request"
+    
+    behavior:
+      - "Check if request is active"
+      - "If active, trigger cancel"
+      - "If not active, close any open modal"
+
+  visual_feedback:
+    during_request:
+      - "Spinner in message area"
+      - "Cancel button visible"
+      - "Status bar shows 'Processing...'"
+      
+    during_streaming:
+      - "Blinking cursor in message"
+      - "Cancel button visible"
+      - "Token count updating"
+      
+    on_cancel:
+      - "Message marked as cancelled"
+      - "Toast notification"
+      - "Status bar cleared"
+      
+    on_timeout:
+      - "Message marked as timed out"
+      - "Error toast with timeout info"
+      - "Retry option offered"
+
+  request_state_store:
+    file: "frontend/src/lib/stores/requestStore.js"
+    
+    state:
+      activeRequest:
+        chatId: "string | null"
+        type: "llm | tool | workflow | null"
+        startedAt: "timestamp | null"
+        status: "pending | streaming | cancelling | null"
+    
+    actions:
+      - "startRequest(chatId, type)"
+      - "updateStatus(status)"
+      - "cancelRequest()"
+      - "clearRequest()"
+
+# =============================================================================
+# LOGGING AND METRICS
+# =============================================================================
+
+logging:
+
+  cancellation_events:
+    - event: "request_cancelled"
+      fields:
+        - request_id
+        - chat_id
+        - project_id
+        - request_type
+        - duration_ms
+        - cancelled_by: "user | timeout"
+        - partial_response_length
+    
+    - event: "request_timeout"
+      fields:
+        - request_id
+        - chat_id
+        - project_id
+        - request_type
+        - timeout_value
+        - duration_ms
+
+  metrics:
+    - name: "cancellation_rate"
+      description: "Percentage of requests cancelled"
+      
+    - name: "timeout_rate"
+      description: "Percentage of requests that timed out"
+      
+    - name: "average_cancel_time"
+      description: "Average time before user cancels"
+
+# =============================================================================
+# PHASE 2 REQUIREMENTS
+# =============================================================================
+
+phase_2_requirements:
+  must_have:
+    - "Cancel button for LLM requests"
+    - "Escape key to cancel"
+    - "Basic timeout for LLM requests"
+    - "Visual feedback during requests"
+    - "Cancellation logging"
+    
+  should_have:
+    - "Configurable timeouts"
+    - "Cancel for streaming responses"
+    - "Timeout notifications"
+    
+  future_phases:
+    - "Cancel tool executions"
+    - "Cancel workflows"
+    - "Per-project timeout settings"
+    - "Retry on timeout option"
