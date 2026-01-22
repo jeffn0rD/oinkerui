@@ -16,9 +16,14 @@ describe('ProjectService', () => {
     // Create temporary workspace for testing
     testWorkspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'oinkerui-test-'));
     
-    // Mock config
+    // Reset config with test workspace
     const config = require('../../src/config');
-    config.workspaceRoot = testWorkspaceRoot;
+    config.reset({
+      workspace: {
+        root: testWorkspaceRoot,
+        dataDir: testWorkspaceRoot
+      }
+    });
   });
 
   afterEach(async () => {

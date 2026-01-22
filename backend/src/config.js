@@ -1,41 +1,46 @@
 require('dotenv').config();
 
-const config = {
-  env: process.env.NODE_ENV || 'development',
-  server: {
-    port: parseInt(process.env.NODE_PORT || '3000', 10),
-    host: process.env.HOST || '0.0.0.0',
-  },
-  api: {
-    openrouter: {
-      apiKey: process.env.OPENROUTER_API_KEY,
-      baseUrl: process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1',
-      timeout: parseInt(process.env.API_TIMEOUT || '60000', 10),
+// Create a function to build config so it can be reset for tests
+function buildConfig() {
+  return {
+    env: process.env.NODE_ENV || 'development',
+    server: {
+      port: parseInt(process.env.NODE_PORT || '3000', 10),
+      host: process.env.HOST || '0.0.0.0',
     },
-  },
-  workspace: {
-    root: process.env.WORKSPACE_ROOT || './workspaces',
-    dataDir: process.env.DATA_DIR || './data',
-  },
-  git: {
-    userName: process.env.GIT_USER_NAME || 'OinkerUI',
-    userEmail: process.env.GIT_USER_EMAIL || 'oinkerui@example.com',
-    autoCommitEnabled: process.env.AUTO_COMMIT_ENABLED === 'true',
-  },
-  security: {
-    secretKey: process.env.SECRET_KEY,
-    corsOrigins: (process.env.CORS_ORIGINS || 'http://localhost:5173').split(','),
-  },
-  logging: {
-    level: process.env.LOG_LEVEL || 'info',
-    format: process.env.LOG_FORMAT || 'json',
-    debug: process.env.DEBUG === 'true',
-  },
-  python: {
-    port: parseInt(process.env.PYTHON_PORT || '8000', 10),
-    baseUrl: `http://localhost:${process.env.PYTHON_PORT || '8000'}`,
-  },
-};
+    api: {
+      openrouter: {
+        apiKey: process.env.OPENROUTER_API_KEY,
+        baseUrl: process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1',
+        timeout: parseInt(process.env.API_TIMEOUT || '60000', 10),
+      },
+    },
+    workspace: {
+      root: process.env.WORKSPACE_ROOT || './workspaces',
+      dataDir: process.env.DATA_DIR || './data',
+    },
+    git: {
+      userName: process.env.GIT_USER_NAME || 'OinkerUI',
+      userEmail: process.env.GIT_USER_EMAIL || 'oinkerui@example.com',
+      autoCommitEnabled: process.env.AUTO_COMMIT_ENABLED === 'true',
+    },
+    security: {
+      secretKey: process.env.SECRET_KEY,
+      corsOrigins: (process.env.CORS_ORIGINS || 'http://localhost:5173').split(','),
+    },
+    logging: {
+      level: process.env.LOG_LEVEL || 'info',
+      format: process.env.LOG_FORMAT || 'json',
+      debug: process.env.DEBUG === 'true',
+    },
+    python: {
+      port: parseInt(process.env.PYTHON_PORT || '8000', 10),
+      baseUrl: `http://localhost:${process.env.PYTHON_PORT || '8000'}`,
+    },
+  };
+}
+
+const config = buildConfig();
 
 // Validate required configuration
 function validateConfig() {
@@ -56,4 +61,11 @@ function validateConfig() {
 
 validateConfig();
 
+// Export config with a reset function for tests
 module.exports = config;
+module.exports.reset = function(overrides = {}) {
+  const newConfig = buildConfig();
+  Object.keys(config).forEach(key => delete config[key]);
+  Object.assign(config, newConfig, overrides);
+  return config;
+};

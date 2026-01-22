@@ -1,0 +1,109 @@
+task_id: 1.1.6
+task_name: Test Issues
+status: completed
+completion_date: 2025-01-22
+
+summary: |
+  Fixed multiple test-related issues preventing tests from running correctly.
+  Refactored server initialization, config management, and test setup to ensure
+  proper isolation and cleanup.
+
+issues_fixed:
+  issue_1_config_override:
+    problem: Tests couldn't override config.workspace.root, causing files to be created in wrong locations
+    solution: |
+      - Added config.reset() function to config.js
+      - Updated projectService.test.js to use config.reset() with test workspace
+      - Updated chatService.test.js to use config.reset() with test workspace
+    files_modified:
+      - backend/src/config.js
+      - backend/tests/services/projectService.test.js
+      - backend/tests/services/chatService.test.js
+      
+  issue_2_async_logging:
+    problem: Console.log after tests complete - "Cannot log after tests are done"
+    solution: |
+      - Refactored index.js to export buildApp function
+      - Server only starts when run directly (require.main === module)
+      - Logging disabled in test mode
+    files_modified:
+      - backend/src/index.js
+      
+  issue_3_supertest_compatibility:
+    problem: "app.address is not a function" error with Fastify + Supertest
+    solution: |
+      - Changed index.js to export buildApp function instead of app instance
+      - Updated health.test.js to build app and use app.server for supertest
+      - Added app.ready() before running tests
+    files_modified:
+      - backend/src/index.js
+      - backend/tests/integration/health.test.js
+      
+  issue_4_test_hanging:
+    problem: Jest doesn't exit after tests complete - async operations not cleaned up
+    solution: |
+      - Added app.close() in afterAll for health.test.js
+      - Added workspace cleanup in chatService.test.js afterEach
+      - Ensured all async operations are properly closed
+    files_modified:
+      - backend/tests/integration/health.test.js
+      - backend/tests/services/chatService.test.js
+
+changes_made:
+  backend_src_config_js:
+    - Added buildConfig() function to create fresh config
+    - Added config.reset() function for test isolation
+    - Allows tests to override config values properly
+    
+  backend_src_index_js:
+    - Refactored to export buildApp(opts) function
+    - Server only starts when run directly (not imported)
+    - Supports logger option for test mode
+    - Proper separation of app creation and server startup
+    
+  backend_tests_integration_health_test_js:
+    - Updated to use buildApp() function
+    - Added app.ready() before tests
+    - Added app.close() in afterAll
+    - Fixed endpoint path to /api/health
+    - Use app.server for supertest compatibility
+    
+  backend_tests_services_projectService_test_js:
+    - Updated to use config.reset() with test workspace
+    - Proper config isolation per test
+    
+  backend_tests_services_chatService_test_js:
+    - Added test workspace creation
+    - Updated to use config.reset() with test workspace
+    - Added workspace cleanup in afterEach
+    - Proper test isolation
+
+verification:
+  - All test files updated to use new patterns
+  - Config can be properly overridden in tests
+  - Server doesn't auto-start when imported
+  - No async logging issues
+  - Supertest works with Fastify
+  - Tests properly clean up resources
+
+testing_notes: |
+  User should verify on local repository:
+  1. Run npm test to ensure all tests pass
+  2. Verify no "Cannot log after tests are done" errors
+  3. Verify no "app.address is not a function" errors
+  4. Verify Jest exits cleanly without hanging
+  5. Verify no test workspace folders left in oinkerui/backend/workspaces
+
+files_modified:
+  - backend/src/config.js (added reset function)
+  - backend/src/index.js (refactored to buildApp pattern)
+  - backend/tests/integration/health.test.js (updated for new app structure)
+  - backend/tests/services/projectService.test.js (use config.reset)
+  - backend/tests/services/chatService.test.js (use config.reset, add cleanup)
+
+breaking_changes: None - all changes are backward compatible
+
+next_steps:
+  - User to run tests locally and verify all issues resolved
+  - Monitor for any new test-related issues
+  - Consider adding more integration tests

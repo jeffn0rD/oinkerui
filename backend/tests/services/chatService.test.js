@@ -13,9 +13,23 @@ const projectService = require('../../src/services/projectService');
 // Mock project for testing
 let testProject;
 let testProjectId;
+let testWorkspaceRoot;
 
 describe('Chat Service', () => {
   beforeEach(async () => {
+    // Create temporary workspace for testing
+    const os = require('os');
+    testWorkspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'oinkerui-chat-test-'));
+    
+    // Reset config with test workspace
+    const config = require('../../src/config');
+    config.reset({
+      workspace: {
+        root: testWorkspaceRoot,
+        dataDir: testWorkspaceRoot
+      }
+    });
+    
     // Create a test project
     testProject = await projectService.createProject('Test Project for Chats', {
       description: 'Project for testing chat operations'
@@ -27,6 +41,13 @@ describe('Chat Service', () => {
     // Clean up test project
     try {
       await projectService.deleteProject(testProjectId, { hard: true });
+    } catch (error) {
+      // Ignore cleanup errors
+    }
+    
+    // Clean up test workspace
+    try {
+      await fs.rm(testWorkspaceRoot, { recursive: true, force: true });
     } catch (error) {
       // Ignore cleanup errors
     }
