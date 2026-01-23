@@ -40,6 +40,12 @@ prompt_guidance: "Always follow these guidelines and update project documentatio
   \ if it is outside the scope.\n* ALWAYS COMMIT AND PUSH the repository after a task.\n"
 current:
 - task:
+    id: 2.1.7
+    name: Fix Backend Test Errors
+    goal: Backend tests execute with no errors (npx jest)
+    details: |
+      There is a file log/backend_tests_012326.txt of errors I received running backend tests on my local repository (windows 11).  Fix all the errors.
+- task:
     id: 2.2.0
     name: Implement Chat Forking
     goal: Implement chat forking functionality with optional message point and pruning support.

@@ -1,0 +1,59 @@
+# Task 2.1.7 Summary: Fix Backend Test Errors
+# Completed: 2025-01-23
+
+task_id: "2.1.7"
+task_name: "Fix Backend Test Errors"
+status: completed
+completion_date: "2025-01-23"
+
+goal: |
+  Backend tests execute with no errors (npx jest)
+
+problem_analysis: |
+  The test errors were caused by Task 2.3.5 which refactored request tracking
+  from llmService to a new cancelService. This caused two issues:
+  
+  1. streamingService.test.js was calling functions that no longer exist in llmService:
+     - registerActiveRequest
+     - unregisterActiveRequest
+     - getActiveRequest
+     - cancelActiveRequest
+  
+  2. streaming.js had a duplicate cancel route that conflicted with chats.js:
+     - Both files declared POST /api/projects/:projectId/chats/:chatId/cancel
+
+fixes_applied:
+  - file: backend/src/routes/streaming.js
+    changes:
+      - Removed duplicate cancel endpoint (now only in chats.js)
+      - Updated to use cancelService instead of removed llmService functions
+      - Updated active-request endpoint to use cancelService
+      - Updated file header comments to reflect route changes
+  
+  - file: backend/tests/services/streamingService.test.js
+    changes:
+      - Updated to import and use cancelService instead of llmService
+      - Updated test cases to use new cancelService API
+      - Added new tests for partial response tracking
+      - Added new tests for hasActiveRequest function
+      - Updated export verification tests
+
+test_results:
+  before:
+    failed_suites: 2
+    failed_tests: 9
+    passed_tests: 263
+    total_tests: 272
+  
+  after:
+    failed_suites: 0
+    failed_tests: 0
+    passed_tests: 276
+    total_tests: 276
+
+notes: |
+  - Python backend tests have an unrelated import error (ModuleNotFoundError)
+    that is outside the scope of this task
+  - All JavaScript/Node.js tests now pass
+  - The cancelService provides a cleaner separation of concerns for request
+    lifecycle management

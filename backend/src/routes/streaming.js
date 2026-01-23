@@ -5,7 +5,8 @@
  * 
  * Routes:
  * - POST /api/projects/:projectId/chats/:chatId/messages/stream - Stream a message response
- * - POST /api/projects/:projectId/chats/:chatId/cancel - Cancel active request
+ * 
+ * Note: Cancel endpoint is now in chats.js to avoid duplication
  */
 
 const { v4: uuidv4 } = require('uuid');
@@ -13,6 +14,7 @@ const llmService = require('../services/llmService');
 const messageService = require('../services/messageService');
 const chatService = require('../services/chatService');
 const projectService = require('../services/projectService');
+const cancelService = require('../services/cancelService');
 
 async function streamingRoutes(fastify, options) {
   /**
@@ -253,57 +255,24 @@ async function streamingRoutes(fastify, options) {
   });
 
   /**
-   * Cancel active LLM request
-   * POST /api/projects/:projectId/chats/:chatId/cancel
-   * 
-   * Response:
-   * {
-   *   success: boolean,
-   *   cancelled: boolean,
-   *   requestId?: string
-   * }
-   */
-  fastify.post('/api/projects/:projectId/chats/:chatId/cancel', async (request, reply) => {
-    const { projectId, chatId } = request.params;
-
-    try {
-      // Get active request info before cancelling
-      const activeRequest = llmService.getActiveRequest(chatId);
-      
-      // Cancel the request
-      const cancelled = llmService.cancelActiveRequest(chatId);
-
-      reply.send({
-        success: true,
-        cancelled,
-        requestId: activeRequest?.requestId || null,
-        message: cancelled ? 'Request cancelled' : 'No active request to cancel'
-      });
-    } catch (error) {
-      console.error('Cancel request error:', error);
-      reply.code(500).send({
-        success: false,
-        error: error.message || 'Failed to cancel request'
-      });
-    }
-  });
-
-  /**
    * Get active request status
    * GET /api/projects/:projectId/chats/:chatId/active-request
+   * 
+   * Uses cancelService for request tracking
    */
   fastify.get('/api/projects/:projectId/chats/:chatId/active-request', async (request, reply) => {
     const { chatId } = request.params;
 
-    const activeRequest = llmService.getActiveRequest(chatId);
+    const activeRequest = cancelService.getActiveRequest(chatId);
 
     reply.send({
       success: true,
       hasActiveRequest: !!activeRequest,
       data: activeRequest ? {
         requestId: activeRequest.requestId,
-        startTime: activeRequest.startTime,
-        duration_ms: Date.now() - activeRequest.startTime
+        startedAt: activeRequest.startedAt,
+        elapsed: activeRequest.elapsed,
+        type: activeRequest.type
       } : null
     });
   });

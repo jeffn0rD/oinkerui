@@ -1089,13 +1089,3 @@ tasks:
     prompt: ./prompts/dev/prompt_2_3_5.md
     completed_date: '2026-01-23'
     summary: Implemented cancel LLM request with timeout support and UI feedback
-- task:
-    id: 2.1.7
-    name: Fix Backend Test Errors
-    goal: Backend tests execute with no errors (npx jest)
-    details: 'There is a file log/backend_tests_012326.txt of errors I received running backend tests on my local repository
-      (windows 11).  Fix all the errors.
-
-      '
-    completed_date: '2026-01-23'
-    summary: Fixed backend test errors - updated streaming routes and tests to use cancelService
