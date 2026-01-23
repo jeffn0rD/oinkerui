@@ -1,102 +1,128 @@
 # Prompt 2.6.5: Implement Frontend-Backend Integration
 
 ## Task Description
-Complete the frontend-backend integration to create a fully functional application for testing. Wire up all API calls, implement real-time updates, and ensure smooth user experience.
+Complete frontend-backend integration with API calls, real-time updates, and smooth UX.
 
 ## Context Gathering
+Before starting, gather context using the doc_query tool:
+
 ```bash
-# Get API endpoints
-python3 tools/doc_query.py --query "spec/apis.yaml" --mode file --pretty | head -200
+# Get API spec
+python3 tools/doc_query.py --query "spec/apis.yaml" --mode file --pretty
 
-# Get current stores
-cat frontend/src/lib/stores/syncStore.js
+# Get API client spec
+python3 tools/doc_query.py --query "spec/functions/frontend_svelte/api_client.yaml" --mode file --pretty
 
-# Get backend routes
-ls -la backend/src/routes/
+# Get frontend module spec
+python3 tools/doc_query.py --query "spec/modules/frontend_svelte.yaml" --mode file --pretty
+
+# Check current frontend API client
+cat frontend/src/lib/api/client.js 2>/dev/null || echo "File not found"
+
+# Check backend routes
+ls backend/src/routes/
 ```
+
+## Spec References
+- **API Spec**: spec/apis.yaml
+- **Function Specs**:
+  - spec/functions/frontend_svelte/api_client.yaml
+  - spec/functions/frontend_svelte/handle_send_message.yaml
+- **Module Specs**:
+  - spec/modules/frontend_svelte.yaml
+  - spec/modules/backend_node.yaml
 
 ## Requirements
 
-### API Integration
-1. All CRUD operations connected
-2. Error handling with user feedback
-3. Loading states for all operations
-4. Optimistic updates where appropriate
+### API Client Completion
+
+1. **Complete API Client Methods**
+   - All project CRUD operations
+   - All chat CRUD operations
+   - Message operations (list, send, update flags)
+   - Streaming message support
+   - Context preview
+   - Cancel request
+   - Template operations
+
+2. **Error Handling**
+   - Typed error classes (ApiError, NetworkError, ValidationError)
+   - Consistent error format
+   - User-friendly error messages
+   - Retry logic for transient errors
+
+3. **Request/Response Handling**
+   - Request interceptors (auth headers if needed)
+   - Response interceptors (error transformation)
+   - Loading state management
+   - Request cancellation support
+
+### State Management Integration
+
+4. **Svelte Stores**
+   - projectsStore: { list, selected, loading, error }
+   - chatsStore: { list, selected, loading, error }
+   - messagesStore: { list, streaming, loading, error }
+   - uiStore: { sidebarOpen, theme, etc. }
+
+5. **Store Actions**
+   - loadProjects(), selectProject(id)
+   - loadChats(projectId), selectChat(id)
+   - loadMessages(chatId), sendMessage(content)
+   - updateMessageFlags(messageId, flags)
 
 ### Real-time Features
-1. SSE for streaming responses
-2. Polling for updates (fallback)
-3. Connection status indicator
-4. Auto-reconnect on disconnect
 
-### User Experience
-1. Loading spinners/skeletons
-2. Error toasts/notifications
-3. Success confirmations
-4. Keyboard shortcuts
+6. **Streaming Integration**
+   - Connect streaming endpoint to UI
+   - Update messagesStore during stream
+   - Handle stream completion
+   - Handle stream errors/cancellation
 
-### Implementation Steps
+7. **Optimistic Updates**
+   - Show user message immediately
+   - Show loading state for response
+   - Rollback on error
 
-1. **API Client Setup**
-   - frontend/src/lib/api/client.js
-   - Base URL configuration
-   - Error interceptor
-   - Auth headers (future)
+### UX Polish
 
-2. **Project API Integration**
-   - Create project → API call
-   - List projects on load
-   - Delete project with confirmation
-   - Update project settings
+8. **Loading States**
+   - Skeleton loaders for lists
+   - Spinner for actions
+   - Disabled states during loading
 
-3. **Chat API Integration**
-   - Create chat → API call
-   - List chats for project
-   - Delete/archive chat
-   - Update chat settings
+9. **Error Display**
+   - Toast notifications for errors
+   - Inline error messages
+   - Retry buttons
 
-4. **Message API Integration**
-   - Send message → API call
-   - Load message history
-   - Streaming response handling
-   - Cancel request support
+10. **Keyboard Navigation**
+    - Tab navigation
+    - Enter to send
+    - Escape to cancel
+    - Arrow keys for lists
 
-5. **Real-time Updates**
-   - SSE connection manager
-   - Handle streaming tokens
-   - Update UI in real-time
-   - Reconnection logic
+### Testing
 
-6. **Error Handling**
-   - Toast notification system
-   - Error boundary component
-   - Retry mechanisms
-   - Offline detection
-
-7. **Loading States**
-   - Skeleton loaders
-   - Button loading states
-   - Progress indicators
-   - Disable during operations
-
-8. **Keyboard Shortcuts**
-   - Enter to send (Ctrl+Enter for newline)
-   - Escape to cancel
-   - Ctrl+N new chat
-   - Ctrl+P new project
+11. **Add Tests**
+    - API client tests (mocked)
+    - Store tests
+    - Integration tests
+    - E2E tests (basic flow)
 
 ## Verification
-- [ ] Projects load on app start
-- [ ] Can create new project
-- [ ] Can create new chat
-- [ ] Can send messages
-- [ ] Responses stream in real-time
-- [ ] Errors show notifications
-- [ ] Loading states visible
-- [ ] Keyboard shortcuts work
-- [ ] App works after refresh
+- [ ] All API endpoints connected
+- [ ] Projects load and display
+- [ ] Chats load and display
+- [ ] Messages load and display
+- [ ] Send message works (non-streaming)
+- [ ] Streaming works end-to-end
+- [ ] Message flags update correctly
+- [ ] Error handling works
+- [ ] Loading states display
+- [ ] All tests passing
 
 ## Task Cleanup
 ```bash
-python3 tools/task_cleanup.py --task-id 2.6.5
+python3 tools/task_manager.py move 2.6.5 --date $(date +%Y-%m-%d) --commit $(git rev-parse HEAD) --summary "Completed frontend-backend integration"
 ```

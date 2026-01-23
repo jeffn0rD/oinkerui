@@ -1,0 +1,100 @@
+# =============================================================================
+# Function Specification: getProject
+# =============================================================================
+
+function:
+  id: backend_node.get_project
+  name: getProject
+  module: backend_node
+  purpose: |
+    Retrieve a project by its ID or slug. Returns the full project object
+    including metadata, settings, and paths. Used by all operations that
+    need project context.
+
+  signature:
+    parameters:
+      - name: projectId
+        type: string
+        required: true
+        description: "UUID or slug of the project"
+        constraints:
+          - "Must be valid UUID or existing slug"
+    returns:
+      type: Project
+      description: "Full project object"
+      schema:
+        properties:
+          id:
+            type: string
+            description: "UUID of the project"
+          name:
+            type: string
+            description: "Human-readable name"
+          slug:
+            type: string
+            description: "URL-safe identifier"
+          status:
+            type: string
+            enum: [active, archived, deleted]
+          settings:
+            type: object
+            description: "Project settings"
+          paths:
+            type: object
+            description: "Project directory paths"
+          created_at:
+            type: string
+            format: datetime
+          updated_at:
+            type: string
+            format: datetime
+
+  algorithm:
+    steps:
+      - step: 1
+        action: "Validate projectId format"
+        details: "Check if UUID or valid slug format"
+      - step: 2
+        action: "Check project cache"
+        details: "Return cached project if available and not expired"
+      - step: 3
+        action: "Load project index"
+        details: "Read workspace_root/projects/index.json"
+      - step: 4
+        action: "Find project entry"
+        details: "Search by ID or slug in index"
+      - step: 5
+        action: "Load project.json"
+        details: "Read full project data from project directory"
+      - step: 6
+        action: "Update cache"
+        details: "Store in memory cache with TTL"
+      - step: 7
+        action: "Return project"
+        details: "Return full project object"
+
+  errors:
+    - code: VALIDATION_ERROR
+      condition: "Invalid projectId format"
+      message: "Invalid project ID format"
+    - code: PROJECT_NOT_FOUND
+      condition: "Project does not exist"
+      message: "Project not found"
+    - code: FILE_SYSTEM_ERROR
+      condition: "Cannot read project files"
+      message: "Failed to load project"
+
+  preconditions:
+    - "projectId is non-empty string"
+  
+  postconditions:
+    - "Returns valid Project object"
+    - "Project exists in storage"
+
+  references:
+    - type: entity
+      id: project
+      file: "spec/domain.yaml#Project"
+    - type: module
+      id: backend_node
+      file: "spec/modules/backend_node.yaml"

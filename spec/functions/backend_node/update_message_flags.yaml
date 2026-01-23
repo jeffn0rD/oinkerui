@@ -1,0 +1,143 @@
+# Update Message Flags Function Specification
+# Spec Reference: python3 tools/doc_query.py --query "spec/functions/backend_node/update_message_flags.yaml" --mode file --pretty
+
+version: "1.0.0"
+module: backend_node
+function_id: update_message_flags
+
+signature:
+  name: updateMessageFlags
+  async: true
+  params:
+    - name: projectId
+      type: string
+      required: true
+      description: "UUID of the project"
+    - name: chatId
+      type: string
+      required: true
+      description: "UUID of the chat"
+    - name: messageId
+      type: string
+      required: true
+      description: "UUID of the message to update"
+    - name: flags
+      type: object
+      required: true
+      description: "Flags to update"
+      properties:
+        include_in_context:
+          type: boolean
+          description: "Whether message is included in LLM context"
+        is_aside:
+          type: boolean
+          description: "Message is an aside (excluded from future context)"
+        pure_aside:
+          type: boolean
+          description: "Message ignores all prior history"
+        is_pinned:
+          type: boolean
+          description: "Message is pinned (always included, survives truncation)"
+        is_discarded:
+          type: boolean
+          description: "Message is discarded (never included)"
+  returns:
+    type: object
+    description: "Updated message object"
+    properties:
+      id: { type: string }
+      include_in_context: { type: boolean }
+      is_aside: { type: boolean }
+      pure_aside: { type: boolean }
+      is_pinned: { type: boolean }
+      is_discarded: { type: boolean }
+      updated_at: { type: string }
+  throws:
+    - ValidationError: "Invalid IDs or flag values"
+    - NotFoundError: "Project, chat, or message not found"
+    - FileSystemError: "Failed to update message file"
+
+contract:
+  preconditions:
+    - "Project exists and is active"
+    - "Chat exists and belongs to project"
+    - "Message exists in chat"
+    - "At least one flag provided"
+  postconditions:
+    - "Message flags updated in storage"
+    - "updated_at timestamp set"
+    - "Other message properties unchanged"
+  invariants:
+    - "is_discarded=true implies include_in_context=false"
+    - "pure_aside=true implies is_aside=true"
+    - "Message ID unchanged"
+
+algorithm:
+  fol_specification: |
+    ∀ update_request(projectId, chatId, messageId, flags):
+      LET message = getMessage(projectId, chatId, messageId)
+      FOR EACH flag IN flags:
+        SET message[flag] = flags[flag]
+      IF flags.is_discarded = true:
+        SET message.include_in_context = false
+      IF flags.pure_aside = true:
+        SET message.is_aside = true
+      SET message.updated_at = NOW()
+      SAVE message
+      RETURN message
+
+  steps:
+    - step: 1
+      action: "Validate inputs"
+      details: "Check all IDs are valid UUIDs, at least one flag provided"
+      
+    - step: 2
+      action: "Load message"
+      details: "Read message from JSONL storage"
+      
+    - step: 3
+      action: "Apply flag updates"
+      details: "Update each provided flag"
+      
+    - step: 4
+      action: "Enforce invariants"
+      details: "If is_discarded, set include_in_context=false; if pure_aside, set is_aside=true"
+      
+    - step: 5
+      action: "Update timestamp"
+      details: "Set updated_at to current time"
+      
+    - step: 6
+      action: "Save message"
+      details: "Write updated message back to JSONL (update mode)"
+      
+    - step: 7
+      action: "Return updated message"
+      details: "Return message with all current flags"
+
+complexity:
+  time: "O(n) where n is number of messages in chat (for JSONL update)"
+  space: "O(n) for loading messages"
+
+error_handling:
+  - error: "Message not found"
+    action: "Throw NotFoundError"
+  - error: "Invalid flag value"
+    action: "Throw ValidationError"
+  - error: "File write error"
+    action: "Throw FileSystemError"
+
+testing:
+  scenarios:
+    - name: "Toggle pinned flag"
+      input: { flags: { is_pinned: true } }
+      expected: "Message with is_pinned=true"
+    - name: "Set aside flag"
+      input: { flags: { is_aside: true } }
+      expected: "Message with is_aside=true"
+    - name: "Discard message"
+      input: { flags: { is_discarded: true } }
+      expected: "Message with is_discarded=true, include_in_context=false"
+    - name: "Set pure aside"
+      input: { flags: { pure_aside: true } }
+      expected: "Message with pure_aside=true, is_aside=true"

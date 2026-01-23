@@ -1,0 +1,112 @@
+# =============================================================================
+# Function Specification: resolveTemplate
+# =============================================================================
+
+function:
+  id: backend_node.resolve_template
+  name: resolveTemplate
+  module: backend_node
+  purpose: |
+    Resolve a prompt template by substituting variables and rendering
+    Jinja2 syntax. Delegates complex rendering to Python tools backend.
+    Supports both simple substitution and full Jinja2 features.
+
+  signature:
+    parameters:
+      - name: templateId
+        type: string
+        required: true
+        description: "ID or path of the template"
+        constraints:
+          - "Must be valid template ID or relative path"
+      - name: variables
+        type: object
+        required: false
+        default: {}
+        description: "Variables to substitute"
+      - name: options
+        type: ResolveOptions
+        required: false
+        default: {}
+        description: "Resolution options"
+        constraints:
+          - "projectId: project context for project templates"
+          - "useJinja: boolean - use full Jinja2 rendering"
+          - "strict: boolean - fail on missing variables"
+    returns:
+      type: ResolvedTemplate
+      description: "Resolved template content"
+      schema:
+        properties:
+          content:
+            type: string
+            description: "Rendered template content"
+          template_id:
+            type: string
+          variables_used:
+            type: array
+            items:
+              type: string
+          missing_variables:
+            type: array
+            items:
+              type: string
+          render_time_ms:
+            type: number
+
+  algorithm:
+    steps:
+      - step: 1
+        action: "Load template"
+        details: "Find template by ID or path"
+      - step: 2
+        action: "Parse template"
+        details: "Extract variable placeholders"
+      - step: 3
+        action: "Check for Jinja2 syntax"
+        details: "Detect if full Jinja2 rendering needed"
+      - step: 4
+        action: "Simple substitution path"
+        condition: "No Jinja2 syntax or useJinja=false"
+        details: "Replace {{var}} with values"
+      - step: 5
+        action: "Jinja2 rendering path"
+        condition: "Has Jinja2 syntax and useJinja=true"
+        details: "Call Python tools backend for rendering"
+      - step: 6
+        action: "Handle missing variables"
+        details: "Report or fail based on strict mode"
+      - step: 7
+        action: "Return resolved template"
+
+  errors:
+    - code: TEMPLATE_NOT_FOUND
+      condition: "Template does not exist"
+      message: "Template not found: {templateId}"
+    - code: MISSING_VARIABLE
+      condition: "Required variable not provided (strict mode)"
+      message: "Missing required variable: {variable}"
+    - code: RENDER_ERROR
+      condition: "Template rendering failed"
+      message: "Failed to render template: {error}"
+    - code: PYTHON_TOOLS_ERROR
+      condition: "Python tools backend unavailable"
+      message: "Template rendering service unavailable"
+
+  preconditions:
+    - "templateId is non-empty string"
+  
+  postconditions:
+    - "Returns ResolvedTemplate"
+    - "All found variables are substituted"
+
+  references:
+    - type: module
+      id: backend_python_tools
+      file: "spec/modules/backend_python_tools.yaml"
+    - type: function
+      id: render_template
+      file: "spec/functions/backend_python_tools/render_template.yaml"
+    - type: module
+      id: backend_node
+      file: "spec/modules/backend_node.yaml"

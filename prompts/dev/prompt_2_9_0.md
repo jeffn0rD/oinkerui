@@ -1,84 +1,152 @@
 # Prompt 2.9.0: Phase 2 Integration and Testing
 
 ## Task Description
-Integrate all Phase 2 components and implement comprehensive end-to-end tests for the advanced chat context management features.
+Integrate all Phase 2 components and implement comprehensive end-to-end tests.
 
 ## Context Gathering
+Before starting, gather context using the doc_query tool:
+
 ```bash
-# Get Phase 2 spec
+# Get Phase 2 spec requirements
 python3 tools/doc_query.py --query "spec/spec.yaml" --mode file --pretty | grep -A 100 "phase_2"
 
-# Get all Phase 2 tasks completed
-python3 tools/doc_query.py --query "log/tasks_completed.yaml" --mode file --pretty | grep -A 10 "2\."
+# Get all Phase 2 function specs
+ls spec/functions/backend_node/
+ls spec/functions/frontend_svelte/
 
-# Get current E2E tests
-cat backend/tests/e2e/fullWorkflow.test.js
+# Get test configuration
+cat backend/jest.config.js
+cat frontend/vite.config.js
+
+# Check current test coverage
+npm test -- --coverage 2>/dev/null || echo "Run from backend directory"
 ```
+
+## Spec References
+- **Phase 2 Spec**: spec/spec.yaml#phase_2
+- **All Module Specs**: spec/modules/*.yaml
+- **All Function Specs**: spec/functions/**/*.yaml
+- **Context Spec**: spec/context.yaml
+- **Commands Spec**: spec/commands.yaml
 
 ## Requirements
 
-### Integration Points
-1. Message flags with context construction
-2. Slash commands with message flow
-3. Chat forking with message copying
-4. Templates with Python backend
-5. Requery with response branching
-6. Context size display with flag changes
+### Integration Verification
 
-### E2E Test Scenarios
-1. Complete aside workflow
-2. Pure aside context isolation
-3. Chat fork with pruning
-4. Template rendering and sending
-5. Requery and response selection
-6. Context size updates
-7. Slash command execution
+1. **Feature Checklist**
+   Verify all Phase 2 features work together:
+   - [ ] Message context flags (include, aside, pure_aside, pinned, discarded)
+   - [ ] Context construction algorithm (7 steps)
+   - [ ] Slash command parsing and execution
+   - [ ] LLM response streaming
+   - [ ] Chat forking with pruning
+   - [ ] Live context size display
+   - [ ] Cancel LLM request
+   - [ ] Requery functionality
+   - [ ] Prompt templates with Jinja2
+   - [ ] Message flag UI controls
+   - [ ] Aside and pure aside
 
-### Implementation Steps
+2. **Cross-Feature Testing**
+   - Aside + streaming
+   - Fork + context flags
+   - Requery + streaming
+   - Templates + slash commands
+   - Cancel during streaming
 
-1. **Create Phase 2 E2E Test Suite**
-   - backend/tests/e2e/phase2Workflow.test.js
-   - Test all Phase 2 features end-to-end
-   - Mock LLM calls appropriately
+### End-to-End Tests
 
-2. **Integration Testing**
-   - Test flag changes affect context
-   - Test commands modify state correctly
-   - Test fork preserves data integrity
-   - Test template variables resolve
+3. **E2E Test Scenarios**
 
-3. **Performance Testing**
-   - Context construction performance
-   - Token estimation speed
-   - Fork operation speed
-   - Template rendering speed
+   a. **Basic Chat Flow**
+   ```
+   1. Create project
+   2. Create chat
+   3. Send message
+   4. Receive streaming response
+   5. Verify message saved
+   ```
 
-4. **Error Handling Verification**
-   - Invalid flag combinations
-   - Fork from non-existent message
-   - Template syntax errors
-   - Python backend unavailable
+   b. **Context Management Flow**
+   ```
+   1. Send multiple messages
+   2. Pin a message
+   3. Mark message as aside
+   4. Verify context preview
+   5. Send new message
+   6. Verify pinned included, aside excluded
+   ```
 
-5. **Documentation Updates**
-   - Update API documentation
-   - Update user manual
-   - Add Phase 2 feature guide
+   c. **Fork and Requery Flow**
+   ```
+   1. Create chat with messages
+   2. Fork chat from specific message
+   3. Verify forked chat has correct messages
+   4. Requery last response
+   5. Verify new response, old discarded
+   ```
 
-6. **Final Verification**
-   - All Phase 2 features working
-   - All tests passing
-   - Documentation complete
-   - Ready for Phase 3
+   d. **Template Flow**
+   ```
+   1. Create template
+   2. List templates
+   3. Resolve template with variables
+   4. Send resolved template as message
+   ```
+
+   e. **Cancel Flow**
+   ```
+   1. Send message (streaming)
+   2. Cancel during stream
+   3. Verify partial content saved
+   4. Verify clean state
+   ```
+
+### Test Infrastructure
+
+4. **Backend Tests**
+   - Unit tests for all services
+   - Integration tests for API endpoints
+   - E2E tests for full flows
+   - Target: 85% coverage
+
+5. **Frontend Tests**
+   - Component tests
+   - Store tests
+   - Integration tests
+   - E2E tests with Playwright/Cypress
+
+6. **Test Utilities**
+   - Test fixtures for projects, chats, messages
+   - Mock OpenRouter responses
+   - Test helpers for common operations
+
+### Documentation
+
+7. **Update Documentation**
+   - API documentation
+   - Component documentation
+   - User guide for Phase 2 features
+   - Developer setup guide
+
+### Performance
+
+8. **Performance Checks**
+   - Context construction < 100ms
+   - Token estimation < 50ms
+   - UI responsive during streaming
+   - No memory leaks
 
 ## Verification
-- [ ] All Phase 2 features integrated
-- [ ] E2E tests cover all scenarios
-- [ ] Performance acceptable
-- [ ] Error handling robust
+- [ ] All Phase 2 features working
+- [ ] E2E tests passing
+- [ ] Backend test coverage >= 85%
+- [ ] Frontend tests passing
+- [ ] No critical bugs
 - [ ] Documentation updated
-- [ ] All tests passing
+- [ ] Performance acceptable
 
 ## Task Cleanup
 ```bash
-python3 tools/task_cleanup.py --task-id 2.9.0
+python3 tools/task_manager.py move 2.9.0 --date $(date +%Y-%m-%d) --commit $(git rev-parse HEAD) --summary "Completed Phase 2 integration and testing"
 ```

@@ -1,75 +1,107 @@
 # Prompt 2.8.0: Implement Aside and Pure Aside Functionality
 
 ## Task Description
-Implement the complete aside and pure aside message functionality, including context handling and UI feedback.
+Implement complete aside and pure aside message functionality with context handling and UI feedback.
 
 ## Context Gathering
+Before starting, gather context using the doc_query tool:
+
 ```bash
-# Get aside behavior from context spec
+# Get context construction algorithm (aside handling)
 python3 tools/doc_query.py --query "spec/context.yaml" --mode file --pretty
 
-# Get aside command definitions
-python3 tools/doc_query.py --query "spec/commands.yaml" --mode file --pretty | grep -A 15 "aside"
+# Get Message entity (aside flags)
+python3 tools/doc_query.py --query "spec/domain.yaml" --mode file --pretty | grep -A 60 "Message:"
+
+# Get slash commands for aside
+python3 tools/doc_query.py --query "spec/commands.yaml" --mode file --pretty | grep -A 20 "aside"
+
+# Get handle_send_message spec (aside options)
+python3 tools/doc_query.py --query "spec/functions/frontend_svelte/handle_send_message.yaml" --mode file --pretty
 
 # Get current context construction
 cat backend/src/services/llmService.js | grep -A 50 "constructContext"
 ```
 
+## Spec References
+- **Context Spec**: spec/context.yaml (steps 2-3 for aside handling)
+- **Command Spec**: spec/commands.yaml (/aside, /aside-pure)
+- **Function Specs**:
+  - spec/functions/backend_node/construct_context.yaml
+  - spec/functions/frontend_svelte/handle_send_message.yaml
+- **Entity Specs**:
+  - spec/domain.yaml#Message (is_aside, pure_aside)
+
 ## Requirements
 
-### Aside Behavior
-1. Normal aside (is_aside=true):
-   - Excluded from future context
-   - Current turn context includes history
-   - Visual indicator in UI
+### Aside Behavior (is_aside=true)
 
-2. Pure aside (pure_aside=true):
-   - Context for that turn = system prelude + current prompt only
-   - No prior messages included
-   - Clear visual distinction
+1. **Context Behavior**
+   - Aside message IS included in context for THAT turn
+   - Aside message is EXCLUDED from future context
+   - History before aside IS included in that turn's context
 
-### Implementation Steps
+2. **Use Cases**
+   - One-off questions that shouldn't pollute history
+   - Temporary clarifications
+   - Side conversations
 
-1. **Update Context Construction**
-   - Handle is_aside flag in filtering
-   - Handle pure_aside special case (step 2 in spec)
-   - Ensure aside messages excluded from future context
+### Pure Aside Behavior (pure_aside=true)
 
-2. **Implement /aside Command**
-   - Set is_aside=true on current message
-   - Process normally with history
-   - Mark response as aside too
+3. **Context Behavior**
+   - Context for pure aside = system prelude + current message ONLY
+   - ALL prior messages ignored
+   - Response also marked as aside
 
-3. **Implement /aside-pure Command**
-   - Set pure_aside=true on current message
-   - Construct context with only system + prompt
-   - Mark response appropriately
+4. **Use Cases**
+   - Fresh start without history
+   - Testing prompts in isolation
+   - Avoiding context pollution
 
-4. **Update UI**
-   - Aside indicator on messages
-   - Pure aside indicator (different style)
-   - Quick toggle buttons
-   - Confirmation for pure aside
+### Implementation
 
-5. **Add Logging**
-   - Log aside usage in LLM request logs
-   - Track context size difference
+5. **Backend Updates**
+   - Update constructContext to handle pure_aside (step 2 in spec)
+   - Update constructContext to filter aside messages (step 3 in spec)
+   - Ensure aside responses are also marked as aside
 
-6. **Add Tests**
-   - Aside excludes from future context
-   - Pure aside ignores history
-   - Commands work correctly
-   - UI indicators display correctly
+6. **Slash Commands**
+   - /aside - Send message as aside
+   - /aside-pure - Send message as pure aside
+   - Parse and set flags before LLM call
+
+7. **Frontend Updates**
+   - Add aside options to send message
+   - Keyboard shortcut: Ctrl+Shift+Enter for aside
+   - Visual indicator in prompt input
+   - Show aside status in message
+
+8. **UI Indicators**
+   - Aside messages: purple left border
+   - Pure aside messages: pink left border
+   - Tooltip explaining aside status
+   - "Aside" badge on message
+
+### Testing
+
+9. **Add Tests**
+   - Test aside excluded from future context
+   - Test pure aside ignores all history
+   - Test aside response also marked aside
+   - Test slash commands
+   - Integration tests
 
 ## Verification
+- [ ] Aside messages included in current turn context
 - [ ] Aside messages excluded from future context
-- [ ] Pure aside only includes system + prompt
-- [ ] Commands set flags correctly
-- [ ] UI clearly indicates aside status
-- [ ] Responses inherit aside status
+- [ ] Pure aside context = system + current only
+- [ ] /aside command works
+- [ ] /aside-pure command works
+- [ ] UI shows aside indicators
+- [ ] Keyboard shortcuts work
 - [ ] All tests passing
 
 ## Task Cleanup
 ```bash
-python3 tools/task_cleanup.py --task-id 2.8.0
+python3 tools/task_manager.py move 2.8.0 --date $(date +%Y-%m-%d) --commit $(git rev-parse HEAD) --summary "Implemented aside and pure aside functionality"
 ```

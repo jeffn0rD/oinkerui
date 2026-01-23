@@ -1,0 +1,95 @@
+# =============================================================================
+# Component Specification: MessageItem
+# =============================================================================
+
+component:
+  id: frontend_svelte.message_item
+  name: MessageItem
+  module: frontend_svelte
+  type: svelte_component
+  file: frontend/src/lib/components/MessageItem.svelte
+  purpose: |
+    Renders a single chat message with proper formatting, markdown parsing,
+    syntax highlighting, and visual indicators for message flags. Shows
+    hover controls for flag management.
+
+  props:
+    - name: message
+      type: Message
+      required: true
+      description: "Message object to render"
+    - name: isSelected
+      type: boolean
+      default: false
+      description: "Whether message is selected"
+    - name: isInContext
+      type: boolean
+      default: true
+      description: "Whether message is included in current context"
+    - name: showControls
+      type: boolean
+      default: true
+      description: "Whether to show flag controls on hover"
+    - name: compact
+      type: boolean
+      default: false
+      description: "Use compact layout"
+
+  events:
+    - name: select
+      payload:
+        messageId: string
+      description: "Fired when message is clicked"
+    - name: flagChange
+      payload:
+        messageId: string
+        flag: string
+        value: boolean
+      description: "Fired when a flag is toggled"
+    - name: copy
+      payload:
+        content: string
+      description: "Fired when content is copied"
+
+  computed:
+    - name: roleIcon
+      description: "Icon based on message role"
+    - name: roleColor
+      description: "Color based on message role"
+    - name: flagIndicators
+      description: "Visual indicators for active flags"
+
+  styling:
+    theme: dark
+    framework: tailwind
+    classes:
+      container: "rounded-lg p-4 transition-colors"
+      userMessage: "bg-gray-700 ml-8"
+      assistantMessage: "bg-gray-800 mr-8"
+      systemMessage: "bg-gray-900 border border-gray-700 text-sm"
+      pinned: "ring-2 ring-yellow-500"
+      aside: "border-l-4 border-purple-500"
+      pureAside: "border-l-4 border-pink-500"
+      discarded: "opacity-40 line-through"
+      header: "flex items-center gap-2 mb-2 text-sm text-gray-400"
+      content: "prose prose-invert max-w-none"
+      controls: "absolute top-2 right-2 opacity-0 group-hover:opacity-100"
+
+  accessibility:
+    - "Role announcement for screen readers"
+    - "Keyboard accessible controls"
+    - "Copy button with feedback"
+
+  references:
+    - type: component
+      id: markdown_renderer
+      file: "spec/functions/frontend_svelte/markdown_renderer.yaml"
+    - type: component
+      id: message_flag_controls
+      file: "spec/functions/frontend_svelte/message_flag_controls.yaml"
+    - type: entity
+      id: message
+      file: "spec/domain.yaml#Message"
+    - type: module
+      id: frontend_svelte
+      file: "spec/modules/frontend_svelte.yaml"

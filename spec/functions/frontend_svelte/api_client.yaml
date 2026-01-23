@@ -1,0 +1,244 @@
+# =============================================================================
+# Function Specification: apiClient
+# =============================================================================
+
+function:
+  id: frontend_svelte.api_client
+  name: apiClient
+  module: frontend_svelte
+  type: utility
+  file: frontend/src/lib/api/client.js
+  purpose: |
+    HTTP client for communicating with the Node.js backend API.
+    Handles request/response formatting, error handling, and
+    provides typed methods for all API endpoints.
+
+  methods:
+    # Project methods
+    - name: listProjects
+      async: true
+      params:
+        - name: options
+          type: object
+          required: false
+      returns: ProjectSummary[]
+      endpoint: "GET /api/projects"
+
+    - name: getProject
+      async: true
+      params:
+        - name: projectId
+          type: string
+          required: true
+      returns: Project
+      endpoint: "GET /api/projects/:id"
+
+    - name: createProject
+      async: true
+      params:
+        - name: data
+          type: object
+          required: true
+          properties:
+            name: string
+            description: string
+      returns: Project
+      endpoint: "POST /api/projects"
+
+    - name: updateProject
+      async: true
+      params:
+        - name: projectId
+          type: string
+          required: true
+        - name: updates
+          type: object
+          required: true
+      returns: Project
+      endpoint: "PUT /api/projects/:id"
+
+    - name: deleteProject
+      async: true
+      params:
+        - name: projectId
+          type: string
+          required: true
+        - name: options
+          type: object
+          required: false
+      returns: DeleteResult
+      endpoint: "DELETE /api/projects/:id"
+
+    # Chat methods
+    - name: listChats
+      async: true
+      params:
+        - name: projectId
+          type: string
+          required: true
+      returns: ChatSummary[]
+      endpoint: "GET /api/projects/:id/chats"
+
+    - name: getChat
+      async: true
+      params:
+        - name: projectId
+          type: string
+          required: true
+        - name: chatId
+          type: string
+          required: true
+      returns: Chat
+      endpoint: "GET /api/projects/:id/chats/:chatId"
+
+    - name: createChat
+      async: true
+      params:
+        - name: projectId
+          type: string
+          required: true
+        - name: data
+          type: object
+          required: false
+      returns: Chat
+      endpoint: "POST /api/projects/:id/chats"
+
+    - name: forkChat
+      async: true
+      params:
+        - name: projectId
+          type: string
+          required: true
+        - name: chatId
+          type: string
+          required: true
+        - name: options
+          type: object
+          required: false
+      returns: Chat
+      endpoint: "POST /api/projects/:id/chats/:chatId/fork"
+
+    # Message methods
+    - name: listMessages
+      async: true
+      params:
+        - name: projectId
+          type: string
+          required: true
+        - name: chatId
+          type: string
+          required: true
+      returns: Message[]
+      endpoint: "GET /api/projects/:id/chats/:chatId/messages"
+
+    - name: sendMessage
+      async: true
+      params:
+        - name: projectId
+          type: string
+          required: true
+        - name: chatId
+          type: string
+          required: true
+        - name: data
+          type: object
+          required: true
+          properties:
+            raw_text: string
+            model_id: string
+            is_aside: boolean
+            pure_aside: boolean
+      returns: SendMessageResult
+      endpoint: "POST /api/projects/:id/chats/:chatId/messages"
+
+    - name: sendMessageStream
+      async: true
+      generator: true
+      params:
+        - name: projectId
+          type: string
+          required: true
+        - name: chatId
+          type: string
+          required: true
+        - name: data
+          type: object
+          required: true
+      yields: StreamChunk
+      endpoint: "POST /api/projects/:id/chats/:chatId/messages/stream"
+
+    - name: updateMessageFlags
+      async: true
+      params:
+        - name: projectId
+          type: string
+          required: true
+        - name: chatId
+          type: string
+          required: true
+        - name: messageId
+          type: string
+          required: true
+        - name: flags
+          type: object
+          required: true
+      returns: Message
+      endpoint: "PATCH /api/projects/:id/chats/:chatId/messages/:messageId/flags"
+
+    # Context methods
+    - name: getContextPreview
+      async: true
+      params:
+        - name: projectId
+          type: string
+          required: true
+        - name: chatId
+          type: string
+          required: true
+        - name: draftMessage
+          type: string
+          required: false
+      returns: ContextPreview
+      endpoint: "POST /api/projects/:id/chats/:chatId/context-preview"
+
+    # Cancel method
+    - name: cancelRequest
+      async: true
+      params:
+        - name: projectId
+          type: string
+          required: true
+        - name: chatId
+          type: string
+          required: true
+      returns: CancelResult
+      endpoint: "POST /api/projects/:id/chats/:chatId/cancel"
+
+  error_handling:
+    strategy: "Throw typed errors"
+    error_types:
+      - name: ApiError
+        properties:
+          status: number
+          code: string
+          message: string
+      - name: NetworkError
+        properties:
+          message: string
+      - name: ValidationError
+        properties:
+          fields: object
+
+  configuration:
+    baseUrl: "http://localhost:3000"
+    timeout: 30000
+    headers:
+      Content-Type: "application/json"
+
+  references:
+    - type: spec
+      id: apis_spec
+      file: "spec/apis.yaml"
+    - type: module
+      id: frontend_svelte
+      file: "spec/modules/frontend_svelte.yaml"

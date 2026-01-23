@@ -1,0 +1,142 @@
+# =============================================================================
+# Function Specification: executeSlashCommand
+# =============================================================================
+
+function:
+  id: backend_node.execute_slash_command
+  name: executeSlashCommand
+  module: backend_node
+  purpose: |
+    Execute a parsed slash command and return the result. Dispatches to the
+    appropriate command handler based on command name. Handles command-specific
+    logic, validation, and side effects.
+
+  signature:
+    parameters:
+      - name: parsedCommand
+        type: ParsedCommand
+        required: true
+        description: "Parsed command from parseSlashCommand"
+        constraints:
+          - "command: valid command name"
+          - "args: command arguments"
+          - "flags: command flags"
+      - name: context
+        type: CommandContext
+        required: true
+        description: "Execution context"
+        constraints:
+          - "project: valid Project object"
+          - "chat: valid Chat object"
+          - "message: current message (if any)"
+    returns:
+      type: CommandResult
+      description: "Result of command execution"
+      schema:
+        properties:
+          success:
+            type: boolean
+          command:
+            type: string
+          output:
+            type: string
+            description: "Command output for display"
+          data:
+            type: object
+            description: "Command-specific result data"
+          sideEffects:
+            type: array
+            description: "List of side effects performed"
+            items:
+              type: string
+          error:
+            type: string
+            description: "Error message if failed"
+
+  algorithm:
+    steps:
+      - step: 1
+        action: "Validate parsed command"
+        details: "Ensure command is recognized"
+      - step: 2
+        action: "Check command permissions"
+        details: "Verify command is allowed in context"
+      - step: 3
+        action: "Dispatch to handler"
+        details: "Route to appropriate command handler"
+      - step: 4
+        action: "Execute command logic"
+        details: "Run command-specific implementation"
+      - step: 5
+        action: "Handle side effects"
+        details: "Process any side effects (file changes, etc.)"
+      - step: 6
+        action: "Log command execution"
+        details: "Record in command log"
+      - step: 7
+        action: "Return result"
+
+  command_handlers:
+    - command: aside
+      handler: handleAside
+      description: "Mark message as aside"
+    - command: aside-pure
+      handler: handlePureAside
+      description: "Mark message as pure aside"
+    - command: pin
+      handler: handlePin
+      description: "Pin/unpin message"
+    - command: discard
+      handler: handleDiscard
+      description: "Discard message from context"
+    - command: fork
+      handler: handleFork
+      description: "Fork chat"
+    - command: requery
+      handler: handleRequery
+      description: "Requery last response"
+    - command: save
+      handler: handleSave
+      description: "Save entity"
+    - command: execute
+      handler: handleExecute
+      description: "Execute code (delegates to Python tools)"
+    - command: commit
+      handler: handleCommit
+      description: "Git commit"
+    - command: template
+      handler: handleTemplate
+      description: "Apply template"
+
+  errors:
+    - code: UNKNOWN_COMMAND
+      condition: "Command not recognized"
+      message: "Unknown command: {command}"
+    - code: INVALID_ARGS
+      condition: "Invalid command arguments"
+      message: "Invalid arguments for {command}"
+    - code: PERMISSION_DENIED
+      condition: "Command not allowed"
+      message: "Command not allowed in this context"
+    - code: EXECUTION_ERROR
+      condition: "Command execution failed"
+      message: "Command failed: {error}"
+
+  preconditions:
+    - "parsedCommand is valid"
+    - "context contains required objects"
+  
+  postconditions:
+    - "Returns CommandResult"
+    - "Side effects are logged"
+
+  references:
+    - type: spec
+      id: commands_spec
+      file: "spec/commands.yaml"
+    - type: function
+      id: parse_slash_command
+      file: "spec/functions/backend_node/parse_slash_command.yaml"
+    - type: module
+      id: backend_node
+      file: "spec/modules/backend_node.yaml"

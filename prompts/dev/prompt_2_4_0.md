@@ -1,71 +1,108 @@
 # Prompt 2.4.0: Implement Requery Functionality
 
 ## Task Description
-Implement the requery feature that allows users to regenerate the last LLM response, excluding the previous response from context.
+Implement the requery feature to regenerate LLM responses with response branching support.
 
 ## Context Gathering
-```bash
-# Get requery command definition
-python3 tools/doc_query.py --query "spec/commands.yaml" --mode file --pretty | grep -A 10 "requery"
+Before starting, gather context using the doc_query tool:
 
-# Get message flags for discarded
-python3 tools/doc_query.py --query "spec/domain.yaml" --mode file --pretty | grep -A 20 "is_discarded"
+```bash
+# Get requery function spec
+python3 tools/doc_query.py --query "spec/functions/backend_node/requery.yaml" --mode file --pretty
+
+# Get Message entity (parent_message_id for branching)
+python3 tools/doc_query.py --query "spec/domain.yaml" --mode file --pretty | grep -A 80 "Message:"
+
+# Get context construction (requery excludes previous response)
+python3 tools/doc_query.py --query "spec/context.yaml" --mode file --pretty
+
+# Get slash command spec for /requery
+python3 tools/doc_query.py --query "spec/commands.yaml" --mode file --pretty | grep -A 15 "requery"
 
 # Get current message service
 cat backend/src/services/messageService.js
 ```
 
+## Code Generation
+Use the code generator to create scaffolding:
+
+```bash
+# Preview requery function
+python3 tools/code_generator.py --function backend_node.requery --preview
+```
+
+## Spec References
+- **Function Specs**:
+  - spec/functions/backend_node/requery.yaml
+  - spec/functions/backend_node/call_llm.yaml
+  - spec/functions/backend_node/construct_context.yaml
+- **Entity Specs**:
+  - spec/domain.yaml#Message (parent_message_id field)
+- **Command Spec**: spec/commands.yaml (requery command)
+
 ## Requirements
 
-### Requery Behavior
-1. Identify last prompt/response pair
-2. Mark previous response as is_discarded=true
-3. Resend the prompt to LLM
-4. Store new response
-5. Allow user to choose which response(s) to keep
-6. Support multiple requeries (branching responses)
+### Requery Logic
 
-### Implementation Steps
-
-1. **Add Requery Function to Message Service**
-   - requeryLastTurn(projectId, chatId)
+1. **Basic Requery**
    - Find last user message and assistant response
-   - Mark old response as discarded
-   - Trigger new LLM call
+   - Mark previous response as discarded (is_discarded=true)
+   - Construct context WITHOUT the previous response
+   - Make new LLM call with same prompt
+   - Save new response
 
-2. **Implement /requery Command Handler**
-   - Call requery service
-   - Return new response
+2. **Response Branching**
+   - Support keeping previous response as branch
+   - Set parent_message_id on new response
+   - Allow user to choose which response to keep
+   - Track response alternatives
 
-3. **Add API Endpoint**
-   - POST /api/projects/:projectId/chats/:chatId/requery
-   - Returns: new message
+3. **Implementation Steps**
 
-4. **Update Frontend**
-   - Add requery button to last response
-   - Show discarded responses (collapsed)
-   - Allow restoring discarded responses
+   a. **Create Requery Service Function**
+      - Add requery function to messageService.js or new requeryService.js
+      - Accept projectId, chatId, options
+      - Options: { keepPrevious: boolean, modelId?, temperature? }
 
-5. **Add Response Branching Support**
-   - Track alternative responses
-   - parent_message_id for response variants
-   - UI to switch between variants
+   b. **Add API Endpoint**
+      - POST /api/projects/:id/chats/:chatId/requery
+      - Request: { keepPrevious?, modelId?, temperature? }
+      - Return: { original_response, new_response, branch_created }
 
-6. **Add Tests**
-   - Basic requery flow
-   - Multiple requeries
-   - Response restoration
-   - Context excludes discarded
+   c. **Integrate with Slash Command**
+      - Handle /requery command
+      - Parse options (--keep, --model, --temp)
+      - Call requery service
+
+   d. **Update Context Construction**
+      - Ensure discarded responses excluded
+      - Handle branching in context
+
+### Frontend Support
+
+4. **Requery UI**
+   - Add requery button to assistant messages
+   - Show branching indicator if multiple responses
+   - Allow switching between response branches
+
+### Testing
+
+5. **Add Tests**
+   - Unit tests for requery logic
+   - Test branching behavior
+   - Test context excludes previous response
+   - Integration tests for endpoint
 
 ## Verification
 - [ ] Requery generates new response
-- [ ] Old response marked discarded
-- [ ] Discarded not in context
-- [ ] Can restore discarded responses
-- [ ] Multiple requeries work
+- [ ] Previous response marked as discarded
+- [ ] Context excludes discarded response
+- [ ] Branching preserves both responses
+- [ ] /requery command works
+- [ ] UI shows requery option
 - [ ] All tests passing
 
 ## Task Cleanup
 ```bash
-python3 tools/task_cleanup.py --task-id 2.4.0
+python3 tools/task_manager.py move 2.4.0 --date $(date +%Y-%m-%d) --commit $(git rev-parse HEAD) --summary "Implemented requery functionality with response branching"
 ```

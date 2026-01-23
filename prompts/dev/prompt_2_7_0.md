@@ -1,78 +1,121 @@
 # Prompt 2.7.0: Implement Message Flag UI Controls
 
 ## Task Description
-Implement the frontend UI controls for managing message context flags (aside, pure aside, pinned, discard).
+Implement frontend UI controls for managing message context flags with visual indicators.
 
 ## Context Gathering
+Before starting, gather context using the doc_query tool:
+
 ```bash
-# Get UI spec for message controls
-python3 tools/doc_query.py --query "spec/ui.yaml" --mode file --pretty | grep -A 50 "message"
+# Get message_flag_controls component spec
+python3 tools/doc_query.py --query "spec/functions/frontend_svelte/message_flag_controls.yaml" --mode file --pretty
 
-# Get message component
-cat frontend/src/lib/components/Message.svelte
+# Get message_item component spec
+python3 tools/doc_query.py --query "spec/functions/frontend_svelte/message_item.yaml" --mode file --pretty
 
-# Get message flags API
-cat backend/src/routes/messages.js
+# Get update_message_flags function spec
+python3 tools/doc_query.py --query "spec/functions/backend_node/update_message_flags.yaml" --mode file --pretty
+
+# Get Message entity with flags
+python3 tools/doc_query.py --query "spec/domain.yaml" --mode file --pretty | grep -A 60 "Message:"
+
+# Get UI spec for flag indicators
+python3 tools/doc_query.py --query "spec/ui.yaml" --mode file --pretty | grep -A 30 "flag"
 ```
+
+## Spec References
+- **Component Specs**:
+  - spec/functions/frontend_svelte/message_flag_controls.yaml
+  - spec/functions/frontend_svelte/message_item.yaml
+- **Function Specs**:
+  - spec/functions/backend_node/update_message_flags.yaml
+- **Entity Specs**:
+  - spec/domain.yaml#Message
 
 ## Requirements
 
-### UI Controls
-1. Toggle buttons for each flag on messages
-2. Visual indicators for flagged messages
-3. Keyboard shortcuts for common actions
-4. Bulk flag operations (select multiple)
+### Flag Controls Component
 
-### Flag Visual Indicators
-- Aside: Dimmed/italic text, side indicator
-- Pure Aside: Special icon, different background
-- Pinned: Pin icon, highlighted border
-- Discarded: Strikethrough, collapsed by default
+1. **MessageFlagControls.svelte**
+   - Toggle buttons for each flag:
+     - include_in_context (eye icon)
+     - is_pinned (pin icon)
+     - is_aside (arrow-right icon)
+     - is_discarded (trash icon)
+   - Compact mode (icons only)
+   - Full mode (icons + labels)
+   - Disabled state
 
-### Implementation Steps
+2. **Visual States**
+   - Active: highlighted icon
+   - Inactive: muted icon
+   - Hover: tooltip with description
+   - Disabled: grayed out
 
-1. **Update Message Component**
-   - Add flag toggle buttons
-   - Add visual indicators for each flag
-   - Handle flag state changes
-   - Call API to update flags
+3. **Interactions**
+   - Click to toggle
+   - Keyboard accessible (Tab, Enter)
+   - Immediate visual feedback
+   - API call on change
 
-2. **Create Flag Controls Component**
-   - MessageFlagControls.svelte
-   - Dropdown or button group
-   - Tooltips explaining each flag
+### Message Item Integration
 
-3. **Add Keyboard Shortcuts**
-   - Ctrl+A: Toggle aside
-   - Ctrl+Shift+A: Toggle pure aside
-   - Ctrl+P: Toggle pinned
-   - Ctrl+D: Toggle discarded
+4. **Update MessageItem.svelte**
+   - Show flag controls on hover
+   - Position: top-right corner
+   - Show flag indicators always visible:
+     - Pinned: yellow pin icon
+     - Aside: purple border
+     - Pure aside: pink border
+     - Discarded: strikethrough + dimmed
 
-4. **Update Message Store**
-   - Track flag states
-   - Optimistic updates
-   - Sync with backend
+5. **Context Highlighting**
+   - Messages in context: normal
+   - Messages excluded: dimmed (opacity)
+   - Visual distinction for why excluded
 
-5. **Add Bulk Operations**
-   - Select multiple messages
-   - Apply flag to selection
-   - Clear all flags option
+### API Integration
 
-6. **Add Tests**
-   - Flag toggle tests
-   - Visual indicator tests
-   - Keyboard shortcut tests
-   - Bulk operation tests
+6. **Flag Update Flow**
+   - User clicks flag toggle
+   - Optimistic UI update
+   - API call to update flag
+   - Rollback on error
+   - Toast notification on error
+
+7. **Context Recalculation**
+   - After flag change, recalculate context preview
+   - Update context size display
+   - Highlight affected messages
+
+### Accessibility
+
+8. **A11y Requirements**
+   - ARIA labels for all buttons
+   - Keyboard navigation
+   - Screen reader announcements
+   - Focus indicators
+
+### Testing
+
+9. **Add Tests**
+   - Component tests for flag controls
+   - Test all flag states
+   - Test API integration
+   - Test accessibility
 
 ## Verification
-- [ ] All flags toggleable via UI
-- [ ] Visual indicators clear
-- [ ] Keyboard shortcuts work
-- [ ] Bulk operations work
-- [ ] Changes persist to backend
+- [ ] All flag toggles work
+- [ ] Visual indicators display correctly
+- [ ] Hover controls appear/disappear
+- [ ] API updates flags correctly
+- [ ] Optimistic updates work
+- [ ] Error handling works
+- [ ] Context preview updates
+- [ ] Keyboard accessible
 - [ ] All tests passing
 
 ## Task Cleanup
 ```bash
-python3 tools/task_cleanup.py --task-id 2.7.0
+python3 tools/task_manager.py move 2.7.0 --date $(date +%Y-%m-%d) --commit $(git rev-parse HEAD) --summary "Implemented message flag UI controls"
 ```

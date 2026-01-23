@@ -1,0 +1,99 @@
+# =============================================================================
+# Component Specification: LeftSidebar
+# =============================================================================
+
+component:
+  id: frontend_svelte.left_sidebar
+  name: LeftSidebar
+  module: frontend_svelte
+  type: svelte_component
+  file: frontend/src/lib/components/LeftSidebar.svelte
+  purpose: |
+    Left sidebar showing project list and chat list. Allows navigation
+    between projects and chats, creating new items, and basic management.
+
+  props:
+    - name: projects
+      type: ProjectSummary[]
+      required: true
+      description: "List of projects"
+    - name: selectedProjectId
+      type: string
+      required: false
+      description: "Currently selected project ID"
+    - name: chats
+      type: ChatSummary[]
+      required: false
+      description: "List of chats in selected project"
+    - name: selectedChatId
+      type: string
+      required: false
+      description: "Currently selected chat ID"
+
+  events:
+    - name: projectSelect
+      payload:
+        projectId: string
+      description: "Fired when a project is selected"
+    - name: chatSelect
+      payload:
+        chatId: string
+      description: "Fired when a chat is selected"
+    - name: projectCreate
+      description: "Fired when new project button clicked"
+    - name: chatCreate
+      description: "Fired when new chat button clicked"
+    - name: projectDelete
+      payload:
+        projectId: string
+      description: "Fired when project delete requested"
+    - name: chatDelete
+      payload:
+        chatId: string
+      description: "Fired when chat delete requested"
+
+  sections:
+    - name: header
+      description: "App logo and settings button"
+    - name: projectList
+      description: "Collapsible list of projects"
+    - name: chatList
+      description: "List of chats in selected project"
+    - name: footer
+      description: "User info and global actions"
+
+  state:
+    - name: projectsExpanded
+      type: boolean
+      default: true
+    - name: searchQuery
+      type: string
+      default: ""
+
+  styling:
+    theme: dark
+    framework: tailwind
+    classes:
+      container: "flex flex-col h-full"
+      header: "p-4 border-b border-gray-700"
+      section: "flex-1 overflow-y-auto"
+      sectionHeader: "px-4 py-2 text-sm font-semibold text-gray-400 uppercase"
+      listItem: "px-4 py-2 hover:bg-gray-700 cursor-pointer"
+      listItemSelected: "bg-gray-700 border-l-2 border-blue-500"
+      newButton: "mx-4 my-2 px-3 py-1 text-sm bg-gray-700 hover:bg-gray-600 rounded"
+
+  accessibility:
+    - "Keyboard navigation"
+    - "ARIA tree pattern for nested lists"
+    - "Focus indicators"
+
+  references:
+    - type: entity
+      id: project
+      file: "spec/domain.yaml#Project"
+    - type: entity
+      id: chat
+      file: "spec/domain.yaml#Chat"
+    - type: module
+      id: frontend_svelte
+      file: "spec/modules/frontend_svelte.yaml"

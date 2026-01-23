@@ -1,0 +1,115 @@
+# =============================================================================
+# Function Specification: getChat
+# =============================================================================
+
+function:
+  id: backend_node.get_chat
+  name: getChat
+  module: backend_node
+  purpose: |
+    Retrieve a chat by ID within a project. Returns the chat metadata
+    and optionally loads messages. Used for displaying chat history
+    and preparing context for LLM calls.
+
+  signature:
+    parameters:
+      - name: projectId
+        type: string
+        required: true
+        description: "UUID of the parent project"
+        constraints:
+          - "Must be valid UUID"
+          - "Project must exist"
+      - name: chatId
+        type: string
+        required: true
+        description: "UUID of the chat"
+        constraints:
+          - "Must be valid UUID"
+      - name: options
+        type: GetChatOptions
+        required: false
+        default: {}
+        description: "Options for loading chat"
+        constraints:
+          - "includeMessages: boolean - load messages"
+          - "messageLimit: number - max messages to load"
+    returns:
+      type: Chat
+      description: "Chat object with optional messages"
+      schema:
+        properties:
+          id:
+            type: string
+          project_id:
+            type: string
+          name:
+            type: string
+          status:
+            type: string
+            enum: [active, archived]
+          system_prelude:
+            type: object
+          storage_path:
+            type: string
+          message_count:
+            type: integer
+          messages:
+            type: array
+            description: "Only if includeMessages=true"
+          created_at:
+            type: string
+          updated_at:
+            type: string
+
+  algorithm:
+    steps:
+      - step: 1
+        action: "Validate IDs"
+        details: "Check projectId and chatId are valid UUIDs"
+      - step: 2
+        action: "Load project"
+        details: "Verify project exists"
+      - step: 3
+        action: "Load chat index"
+        details: "Read project_root/chats/index.json"
+      - step: 4
+        action: "Find chat entry"
+        details: "Search by chatId in index"
+      - step: 5
+        action: "Load messages if requested"
+        details: "Read from JSONL storage file"
+      - step: 6
+        action: "Return chat"
+        details: "Return chat object with optional messages"
+
+  errors:
+    - code: VALIDATION_ERROR
+      condition: "Invalid ID format"
+      message: "Invalid project or chat ID"
+    - code: PROJECT_NOT_FOUND
+      condition: "Project does not exist"
+      message: "Project not found"
+    - code: CHAT_NOT_FOUND
+      condition: "Chat does not exist"
+      message: "Chat not found"
+    - code: FILE_SYSTEM_ERROR
+      condition: "Cannot read chat files"
+      message: "Failed to load chat"
+
+  preconditions:
+    - "projectId is valid UUID"
+    - "chatId is valid UUID"
+    - "Project exists"
+  
+  postconditions:
+    - "Returns valid Chat object"
+    - "Chat belongs to specified project"
+
+  references:
+    - type: entity
+      id: chat
+      file: "spec/domain.yaml#Chat"
+    - type: module
+      id: backend_node
+      file: "spec/modules/backend_node.yaml"

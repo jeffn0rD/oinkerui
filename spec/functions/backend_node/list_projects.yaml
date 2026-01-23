@@ -1,0 +1,81 @@
+# =============================================================================
+# Function Specification: listProjects
+# =============================================================================
+
+function:
+  id: backend_node.list_projects
+  name: listProjects
+  module: backend_node
+  purpose: |
+    List all projects with optional filtering by status. Returns an array
+    of project summaries for display in the UI sidebar.
+
+  signature:
+    parameters:
+      - name: options
+        type: ListProjectsOptions
+        required: false
+        default: {}
+        description: "Filtering and pagination options"
+        constraints:
+          - "status: 'active' | 'archived' | 'all'"
+          - "limit: positive integer"
+          - "offset: non-negative integer"
+    returns:
+      type: ProjectSummary[]
+      description: "Array of project summaries"
+      schema:
+        items:
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+            slug:
+              type: string
+            status:
+              type: string
+            chat_count:
+              type: integer
+            created_at:
+              type: string
+            updated_at:
+              type: string
+
+  algorithm:
+    steps:
+      - step: 1
+        action: "Load project index"
+        details: "Read workspace_root/projects/index.json"
+      - step: 2
+        action: "Apply status filter"
+        details: "Filter by status if specified (default: active)"
+      - step: 3
+        action: "Sort by updated_at"
+        details: "Most recently updated first"
+      - step: 4
+        action: "Apply pagination"
+        details: "Apply offset and limit if specified"
+      - step: 5
+        action: "Return summaries"
+        details: "Return array of project summaries"
+
+  errors:
+    - code: FILE_SYSTEM_ERROR
+      condition: "Cannot read project index"
+      message: "Failed to load projects"
+
+  preconditions:
+    - "Workspace root exists"
+  
+  postconditions:
+    - "Returns array (may be empty)"
+    - "All returned projects match filter criteria"
+
+  references:
+    - type: entity
+      id: project
+      file: "spec/domain.yaml#Project"
+    - type: module
+      id: backend_node
+      file: "spec/modules/backend_node.yaml"

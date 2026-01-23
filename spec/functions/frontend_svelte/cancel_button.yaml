@@ -1,0 +1,110 @@
+# Cancel Button Component Specification
+# Spec Reference: python3 tools/doc_query.py --query "spec/functions/frontend_svelte/cancel_button.yaml" --mode file --pretty
+
+version: "1.0.0"
+module: frontend_svelte
+function_id: cancel_button
+
+component:
+  name: CancelButton
+  type: svelte_component
+  file: frontend/src/lib/components/CancelButton.svelte
+  description: "Button to cancel in-progress LLM requests"
+
+props:
+  - name: isActive
+    type: boolean
+    required: true
+    description: "Whether there is an active request to cancel"
+  - name: requestType
+    type: string
+    enum: ["llm", "tool", "workflow"]
+    default: "llm"
+    description: "Type of request being cancelled"
+  - name: onCancel
+    type: function
+    required: true
+    description: "Callback when cancel is clicked"
+  - name: size
+    type: string
+    enum: ["sm", "md", "lg"]
+    default: "md"
+    description: "Button size"
+
+state:
+  - name: isCancelling
+    type: boolean
+    description: "True while cancel request is in progress"
+
+events:
+  - name: cancelled
+    payload: { requestId: string, partialResponse: string }
+    description: "Emitted when cancellation succeeds"
+  - name: cancelFailed
+    payload: { error: string }
+    description: "Emitted when cancellation fails"
+
+ui_elements:
+  button:
+    icon: "✕"
+    text: "Cancel"
+    variants:
+      idle: "hidden"
+      active: "visible, red background"
+      cancelling: "visible, disabled, spinner"
+      
+styling:
+  base: "flex items-center gap-1 px-3 py-1 rounded font-medium transition-all"
+  active: "bg-red-600 hover:bg-red-700 text-white"
+  cancelling: "bg-red-400 text-white cursor-wait"
+  hidden: "hidden"
+  
+  sizes:
+    sm: "text-xs px-2 py-0.5"
+    md: "text-sm px-3 py-1"
+    lg: "text-base px-4 py-2"
+
+keyboard_shortcut:
+  key: "Escape"
+  scope: "when request is active"
+  action: "trigger cancel"
+
+animation:
+  show: "fade-in 150ms"
+  hide: "fade-out 100ms"
+  cancelling: "pulse animation on spinner"
+
+accessibility:
+  aria_label: "Cancel current request"
+  role: "button"
+  aria_busy: "{isCancelling}"
+
+behavior:
+  show_conditions:
+    - "isActive is true"
+  hide_conditions:
+    - "isActive is false"
+    - "cancellation complete"
+  prevent_double_click: true
+
+algorithm:
+  steps:
+    - step: 1
+      action: "Check visibility"
+      details: "Show only when isActive is true"
+      
+    - step: 2
+      action: "Handle click"
+      details: "Set isCancelling, call onCancel"
+      
+    - step: 3
+      action: "Wait for response"
+      details: "Show spinner while waiting"
+      
+    - step: 4
+      action: "Handle result"
+      details: "Emit cancelled or cancelFailed event"
+      
+    - step: 5
+      action: "Reset state"
+      details: "Clear isCancelling, hide button"

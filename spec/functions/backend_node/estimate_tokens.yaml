@@ -1,0 +1,127 @@
+# Estimate Tokens Function Specification
+# Spec Reference: python3 tools/doc_query.py --query "spec/functions/backend_node/estimate_tokens.yaml" --mode file --pretty
+
+version: "1.0.0"
+module: backend_node
+function_id: estimate_tokens
+
+signature:
+  name: estimateTokens
+  async: true
+  params:
+    - name: messages
+      type: array
+      required: true
+      description: "Array of messages to estimate tokens for"
+      items:
+        type: object
+        properties:
+          role: { type: string }
+          content: { type: string }
+    - name: model
+      type: string
+      required: false
+      default: "openai/gpt-4"
+      description: "Model ID for tokenization rules"
+  returns:
+    type: object
+    description: "Token estimation result"
+    properties:
+      estimated_tokens:
+        type: integer
+        description: "Estimated total token count"
+      model_limit:
+        type: integer
+        description: "Context limit for the specified model"
+      percentage_used:
+        type: number
+        description: "Percentage of context limit used (0-100)"
+      breakdown:
+        type: array
+        description: "Per-message token counts"
+        items:
+          type: object
+          properties:
+            index: { type: integer }
+            role: { type: string }
+            tokens: { type: integer }
+  throws:
+    - ValidationError: "Invalid messages array or model"
+
+contract:
+  preconditions:
+    - "Messages array is non-empty"
+    - "Each message has role and content"
+  postconditions:
+    - "Token count is non-negative integer"
+    - "Percentage is between 0 and 100+"
+  invariants:
+    - "Estimation is deterministic for same input"
+
+algorithm:
+  fol_specification: |
+    ∀ estimate_request(messages, model):
+      LET tokenizer = get_tokenizer(model)
+      LET total = 0
+      LET breakdown = []
+      FOR EACH message IN messages:
+        LET tokens = tokenizer.count(message.content) + OVERHEAD
+        total += tokens
+        breakdown.append({ index, role, tokens })
+      LET limit = get_model_limit(model)
+      RETURN { estimated_tokens: total, model_limit: limit, percentage_used: (total/limit)*100, breakdown }
+
+  steps:
+    - step: 1
+      action: "Validate inputs"
+      details: "Check messages array is valid"
+      
+    - step: 2
+      action: "Get model context limit"
+      details: "Look up context window size for model"
+      
+    - step: 3
+      action: "Estimate tokens per message"
+      details: "Use approximation: ~4 chars per token + overhead for role/formatting"
+      
+    - step: 4
+      action: "Sum total tokens"
+      details: "Add all message tokens plus system overhead"
+      
+    - step: 5
+      action: "Calculate percentage"
+      details: "Compute percentage of context limit used"
+      
+    - step: 6
+      action: "Return estimation"
+      details: "Return total, limit, percentage, and breakdown"
+
+complexity:
+  time: "O(n) where n is total characters in messages"
+  space: "O(m) where m is number of messages"
+
+notes: |
+  Token estimation uses approximation since exact tokenization requires
+  model-specific tokenizers. The approximation is:
+  - ~4 characters per token for English text
+  - +4 tokens overhead per message for role/formatting
+  - +3 tokens for assistant response priming
+  
+  Model context limits (examples):
+  - gpt-4: 8,192 tokens
+  - gpt-4-turbo: 128,000 tokens
+  - gpt-3.5-turbo: 16,385 tokens
+  - claude-3-opus: 200,000 tokens
+  - claude-3-sonnet: 200,000 tokens
+
+testing:
+  scenarios:
+    - name: "Simple message"
+      input: { messages: [{ role: "user", content: "Hello" }], model: "openai/gpt-4" }
+      expected: "Small token count, low percentage"
+    - name: "Long conversation"
+      input: { messages: "20 messages with 500 chars each" }
+      expected: "Higher token count, moderate percentage"
+    - name: "Near limit"
+      input: { messages: "Messages totaling ~8000 tokens" }
+      expected: "percentage_used near 100%"

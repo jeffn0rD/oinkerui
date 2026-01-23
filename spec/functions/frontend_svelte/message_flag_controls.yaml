@@ -1,0 +1,111 @@
+# Message Flag Controls Component Specification
+# Spec Reference: python3 tools/doc_query.py --query "spec/functions/frontend_svelte/message_flag_controls.yaml" --mode file --pretty
+
+version: "1.0.0"
+module: frontend_svelte
+function_id: message_flag_controls
+
+component:
+  name: MessageFlagControls
+  type: svelte_component
+  file: frontend/src/lib/components/MessageFlagControls.svelte
+  description: "UI controls for toggling message context flags"
+
+props:
+  - name: message
+    type: object
+    required: true
+    description: "The message object with current flag states"
+  - name: onFlagChange
+    type: function
+    required: true
+    description: "Callback when a flag is toggled: (messageId, flagName, newValue) => void"
+  - name: disabled
+    type: boolean
+    default: false
+    description: "Disable all controls"
+  - name: compact
+    type: boolean
+    default: false
+    description: "Use compact layout (icons only)"
+
+state:
+  - name: isUpdating
+    type: boolean
+    description: "True while API call is in progress"
+  - name: pendingFlags
+    type: object
+    description: "Optimistic flag values before API confirms"
+
+events:
+  - name: flagChanged
+    payload: { messageId: string, flag: string, value: boolean }
+    description: "Emitted when a flag is successfully changed"
+
+ui_elements:
+  pin_button:
+    icon: "📌"
+    tooltip: "Pin message (always include in context)"
+    active_class: "bg-blue-500"
+    keyboard_shortcut: "Ctrl+P"
+    
+  aside_button:
+    icon: "💬"
+    tooltip: "Mark as aside (exclude from future context)"
+    active_class: "bg-yellow-500"
+    keyboard_shortcut: "Ctrl+A"
+    
+  pure_aside_button:
+    icon: "🔇"
+    tooltip: "Pure aside (ignore all history for this message)"
+    active_class: "bg-orange-500"
+    keyboard_shortcut: "Ctrl+Shift+A"
+    
+  discard_button:
+    icon: "🗑️"
+    tooltip: "Discard message (never include in context)"
+    active_class: "bg-red-500"
+    keyboard_shortcut: "Ctrl+D"
+    
+  include_toggle:
+    icon: "👁️"
+    tooltip: "Include in context"
+    active_class: "bg-green-500"
+
+behavior:
+  optimistic_updates: true
+  revert_on_error: true
+  debounce_ms: 300
+
+styling:
+  container: "flex items-center gap-1"
+  button_base: "p-1 rounded hover:bg-gray-700 transition-colors"
+  button_active: "ring-2 ring-offset-1"
+  button_disabled: "opacity-50 cursor-not-allowed"
+
+accessibility:
+  aria_label: "Message context controls"
+  role: "toolbar"
+  keyboard_navigation: true
+
+algorithm:
+  steps:
+    - step: 1
+      action: "Render flag buttons"
+      details: "Show buttons for each flag with current state"
+      
+    - step: 2
+      action: "Handle click"
+      details: "Toggle flag value, apply optimistic update"
+      
+    - step: 3
+      action: "Call API"
+      details: "Send updateMessageFlags request"
+      
+    - step: 4
+      action: "Handle response"
+      details: "Confirm update or revert on error"
+      
+    - step: 5
+      action: "Emit event"
+      details: "Notify parent of successful change"

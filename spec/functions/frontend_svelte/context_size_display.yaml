@@ -1,0 +1,120 @@
+# Context Size Display Component Specification
+# Spec Reference: python3 tools/doc_query.py --query "spec/functions/frontend_svelte/context_size_display.yaml" --mode file --pretty
+
+version: "1.0.0"
+module: frontend_svelte
+function_id: context_size_display
+
+component:
+  name: ContextSizeDisplay
+  type: svelte_component
+  file: frontend/src/lib/components/ContextSizeDisplay.svelte
+  description: "Displays current context token usage with progress bar"
+
+props:
+  - name: currentTokens
+    type: number
+    required: true
+    description: "Current estimated token count"
+  - name: maxTokens
+    type: number
+    required: true
+    description: "Maximum tokens for current model"
+  - name: model
+    type: string
+    required: false
+    description: "Current model name for display"
+  - name: breakdown
+    type: array
+    required: false
+    description: "Per-message token breakdown"
+  - name: showDetails
+    type: boolean
+    default: false
+    description: "Show detailed breakdown"
+
+computed:
+  - name: percentage
+    formula: "(currentTokens / maxTokens) * 100"
+  - name: colorClass
+    formula: |
+      percentage < 50 ? 'bg-green-500' :
+      percentage < 80 ? 'bg-yellow-500' :
+      'bg-red-500'
+  - name: formattedCurrent
+    formula: "currentTokens.toLocaleString()"
+  - name: formattedMax
+    formula: "maxTokens.toLocaleString()"
+
+state:
+  - name: isExpanded
+    type: boolean
+    description: "Whether details panel is expanded"
+
+ui_elements:
+  progress_bar:
+    height: "4px"
+    background: "bg-gray-700"
+    fill: "dynamic based on percentage"
+    animation: "transition-all duration-300"
+    
+  token_count:
+    format: "{current} / {max}"
+    font: "font-mono text-sm"
+    
+  percentage_badge:
+    format: "{percentage}%"
+    position: "right side"
+    
+  details_panel:
+    trigger: "click on component"
+    content: "breakdown by message"
+    
+  warning_icon:
+    show_when: "percentage > 80"
+    icon: "⚠️"
+    tooltip: "Context is nearly full"
+
+styling:
+  container: "flex items-center gap-2 px-2 py-1 bg-gray-800 rounded"
+  progress_container: "flex-1 h-1 bg-gray-700 rounded-full overflow-hidden"
+  progress_fill: "h-full transition-all duration-300"
+  text: "text-xs text-gray-400"
+  
+color_thresholds:
+  - range: [0, 50]
+    color: "green-500"
+    label: "Comfortable"
+  - range: [50, 80]
+    color: "yellow-500"
+    label: "Moderate"
+  - range: [80, 100]
+    color: "red-500"
+    label: "Near limit"
+  - range: [100, Infinity]
+    color: "red-600"
+    label: "Over limit"
+
+tooltip:
+  content: |
+    Context Usage: {percentage}%
+    {current} / {max} tokens
+    Model: {model}
+    
+    Messages in context: {messageCount}
+    Pinned messages: {pinnedCount}
+
+accessibility:
+  aria_label: "Context size indicator"
+  aria_valuenow: "{currentTokens}"
+  aria_valuemin: "0"
+  aria_valuemax: "{maxTokens}"
+  role: "progressbar"
+
+updates:
+  triggers:
+    - "Message added"
+    - "Message flag changed"
+    - "Model changed"
+    - "Message edited"
+  debounce_ms: 500

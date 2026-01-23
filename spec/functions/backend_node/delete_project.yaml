@@ -1,0 +1,100 @@
+# =============================================================================
+# Function Specification: deleteProject
+# =============================================================================
+
+function:
+  id: backend_node.delete_project
+  name: deleteProject
+  module: backend_node
+  purpose: |
+    Delete a project. Supports soft delete (mark as deleted) or hard delete
+    (remove files). Requires confirmation for hard delete. Updates project
+    index and cleans up resources.
+
+  signature:
+    parameters:
+      - name: projectId
+        type: string
+        required: true
+        description: "UUID of the project to delete"
+        constraints:
+          - "Must be valid UUID"
+          - "Project must exist"
+      - name: options
+        type: DeleteOptions
+        required: false
+        default: { hard: false }
+        description: "Delete options"
+        constraints:
+          - "hard: boolean - if true, remove files"
+          - "confirm: boolean - required for hard delete"
+    returns:
+      type: DeleteResult
+      description: "Result of delete operation"
+      schema:
+        properties:
+          success:
+            type: boolean
+          projectId:
+            type: string
+          deleteType:
+            type: string
+            enum: [soft, hard]
+          deletedAt:
+            type: string
+            format: datetime
+
+  algorithm:
+    steps:
+      - step: 1
+        action: "Validate projectId"
+        details: "Check UUID format"
+      - step: 2
+        action: "Load project"
+        details: "Verify project exists"
+      - step: 3
+        action: "Check confirmation for hard delete"
+        details: "Require confirm=true for hard delete"
+      - step: 4
+        action: "Soft delete path"
+        condition: "hard === false"
+        details: "Set status to 'deleted', update index"
+      - step: 5
+        action: "Hard delete path"
+        condition: "hard === true && confirm === true"
+        details: "Remove project directory and index entry"
+      - step: 6
+        action: "Invalidate cache"
+        details: "Remove from memory cache"
+      - step: 7
+        action: "Return result"
+
+  errors:
+    - code: VALIDATION_ERROR
+      condition: "Invalid projectId or missing confirmation"
+      message: "Invalid delete request"
+    - code: PROJECT_NOT_FOUND
+      condition: "Project does not exist"
+      message: "Project not found"
+    - code: FILE_SYSTEM_ERROR
+      condition: "Cannot delete project files"
+      message: "Failed to delete project"
+
+  preconditions:
+    - "projectId is valid UUID"
+    - "Project exists"
+    - "For hard delete: confirm === true"
+  
+  postconditions:
+    - "Soft: Project status is 'deleted'"
+    - "Hard: Project directory is removed"
+    - "Index is updated"
+    - "Cache is invalidated"
+
+  references:
+    - type: entity
+      id: project
+      file: "spec/domain.yaml#Project"
+    - type: module
+      id: backend_node
+      file: "spec/modules/backend_node.yaml"

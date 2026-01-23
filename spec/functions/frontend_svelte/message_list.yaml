@@ -1,0 +1,93 @@
+# =============================================================================
+# Component Specification: MessageList
+# =============================================================================
+
+component:
+  id: frontend_svelte.message_list
+  name: MessageList
+  module: frontend_svelte
+  type: svelte_component
+  file: frontend/src/lib/components/MessageList.svelte
+  purpose: |
+    Displays the list of messages in a chat. Handles scrolling, lazy loading,
+    and visual indicators for message flags. Supports streaming messages
+    and context preview highlighting.
+
+  props:
+    - name: messages
+      type: Message[]
+      required: true
+      description: "Array of messages to display"
+    - name: streamingMessage
+      type: object
+      required: false
+      description: "Currently streaming message (if any)"
+      properties:
+        content:
+          type: string
+        isStreaming:
+          type: boolean
+    - name: contextPreview
+      type: object
+      required: false
+      description: "Context preview data for highlighting"
+    - name: selectedMessageId
+      type: string
+      required: false
+      description: "ID of selected message (for details view)"
+
+  events:
+    - name: messageSelect
+      payload:
+        messageId: string
+      description: "Fired when a message is selected"
+    - name: flagChange
+      payload:
+        messageId: string
+        flag: string
+        value: boolean
+      description: "Fired when a message flag is toggled"
+    - name: scrollToBottom
+      description: "Fired when user scrolls to bottom"
+
+  state:
+    - name: isAtBottom
+      type: boolean
+      default: true
+      description: "Whether scroll is at bottom"
+    - name: expandedMessages
+      type: Set<string>
+      description: "IDs of expanded messages"
+
+  behavior:
+    - "Auto-scroll to bottom on new messages (if already at bottom)"
+    - "Show 'new messages' indicator when not at bottom"
+    - "Highlight messages included in context"
+    - "Dim discarded/excluded messages"
+    - "Show streaming indicator for in-progress responses"
+
+  styling:
+    theme: dark
+    framework: tailwind
+    classes:
+      container: "flex-1 overflow-y-auto p-4 space-y-4"
+      messageWrapper: "group relative"
+      contextIncluded: "border-l-2 border-blue-500"
+      contextExcluded: "opacity-50"
+      streaming: "animate-pulse"
+
+  accessibility:
+    - "Keyboard navigation between messages"
+    - "ARIA live region for new messages"
+    - "Screen reader announcements for streaming"
+
+  references:
+    - type: component
+      id: message_item
+      file: "spec/functions/frontend_svelte/message_item.yaml"
+    - type: component
+      id: streaming_message
+      file: "spec/functions/frontend_svelte/streaming_message.yaml"
+    - type: module
+      id: frontend_svelte
+      file: "spec/modules/frontend_svelte.yaml"

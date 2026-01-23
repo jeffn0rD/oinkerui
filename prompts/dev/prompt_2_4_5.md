@@ -1,151 +1,138 @@
 # Prompt 2.4.5: Implement Core Frontend Application
 
 ## Task Description
-Implement the core frontend application with functional UI for testing Phase 2 features. This creates a usable browser-based interface with dark theme and modern "power user" styling.
+Implement the core frontend application with functional UI, dark theme, and modern power-user styling.
 
 ## Context Gathering
+Before starting, gather context using the doc_query tool:
+
 ```bash
+# Get frontend module spec
+python3 tools/doc_query.py --query "spec/modules/frontend_svelte.yaml" --mode file --pretty
+
 # Get UI spec
 python3 tools/doc_query.py --query "spec/ui.yaml" --mode file --pretty
 
-# Get current frontend structure
-ls -la frontend/src/lib/components/
-ls -la frontend/src/lib/stores/
+# Get frontend implementation spec
+python3 tools/doc_query.py --query "spec/frontend_implementation.yaml" --mode file --pretty
 
-# Get App.svelte
-cat frontend/src/App.svelte
+# Get component specs
+python3 tools/doc_query.py --query "spec/functions/frontend_svelte/app_layout.yaml" --mode file --pretty
+python3 tools/doc_query.py --query "spec/functions/frontend_svelte/left_sidebar.yaml" --mode file --pretty
+python3 tools/doc_query.py --query "spec/functions/frontend_svelte/message_list.yaml" --mode file --pretty
+python3 tools/doc_query.py --query "spec/functions/frontend_svelte/message_item.yaml" --mode file --pretty
+python3 tools/doc_query.py --query "spec/functions/frontend_svelte/prompt_input.yaml" --mode file --pretty
+
+# Get API client spec
+python3 tools/doc_query.py --query "spec/functions/frontend_svelte/api_client.yaml" --mode file --pretty
+
+# Check current frontend structure
+ls -la frontend/src/
 ```
+
+## Spec References
+- **Module Spec**: spec/modules/frontend_svelte.yaml
+- **UI Spec**: spec/ui.yaml
+- **Frontend Spec**: spec/frontend_implementation.yaml
+- **Component Specs**:
+  - spec/functions/frontend_svelte/app_layout.yaml
+  - spec/functions/frontend_svelte/left_sidebar.yaml
+  - spec/functions/frontend_svelte/message_list.yaml
+  - spec/functions/frontend_svelte/message_item.yaml
+  - spec/functions/frontend_svelte/prompt_input.yaml
+  - spec/functions/frontend_svelte/api_client.yaml
 
 ## Requirements
 
-### Design Principles
-- Dark theme (primary)
-- Modern, clean "coder style"
-- Power user focused
-- Responsive layout
-- Keyboard-friendly
+### Application Structure
 
-### Layout Structure
-```
-+------------------------------------------+
-|  Header (logo placeholder, settings)      |
-+----------+-------------------+-----------+
-|          |                   |           |
-| Sidebar  |   Main Chat       | Context   |
-| (Projects|   Interface       | Panel     |
-|  & Chats)|                   | (optional)|
-|          |                   |           |
-+----------+-------------------+-----------+
-|  Status Bar (connection, context size)   |
-+------------------------------------------+
-```
+1. **Project Setup**
+   - Svelte + Vite configuration
+   - Tailwind CSS with dark theme
+   - Directory structure:
+     ```
+     frontend/src/
+       lib/
+         components/    # UI components
+         api/          # API client
+         stores/       # Svelte stores
+         utils/        # Utilities
+       routes/         # Page routes
+       app.html
+       app.css
+     ```
 
-### Core Components to Implement
+2. **Core Components**
 
-1. **App Shell**
-   - Three-column layout
-   - Collapsible sidebar
-   - Collapsible context panel
-   - Responsive breakpoints
+   a. **AppLayout.svelte**
+      - Three-column layout (left sidebar, main, right sidebar)
+      - Resizable panels
+      - Responsive behavior
 
-2. **Header**
-   - Logo placeholder (with replacement instructions)
-   - Project name display
-   - Settings button
-   - Theme toggle (dark/light)
+   b. **LeftSidebar.svelte**
+      - Project list with selection
+      - Chat list for selected project
+      - New project/chat buttons
+      - Search/filter
 
-3. **Sidebar**
-   - Project list with create button
-   - Chat list per project
-   - Active indicators
-   - Drag-to-reorder (future)
+   c. **MessageList.svelte**
+      - Scrollable message container
+      - Auto-scroll to bottom
+      - Context highlighting
+      - Streaming message support
 
-4. **Chat Interface**
-   - Message list with virtual scrolling
-   - Message input with markdown preview
-   - Send button and keyboard shortcut
-   - Streaming indicator
+   d. **MessageItem.svelte**
+      - Role-based styling (user/assistant/system)
+      - Markdown rendering
+      - Code syntax highlighting
+      - Flag indicators (pinned, aside, etc.)
+      - Hover controls
 
-5. **Message Display**
-   - User/Assistant differentiation
-   - Markdown rendering
-   - Code syntax highlighting
-   - Copy code button
-   - Timestamp display
+   e. **PromptInput.svelte**
+      - Multi-line textarea
+      - Slash command autocomplete
+      - Send button
+      - Context size indicator
+      - Keyboard shortcuts
 
-6. **Status Bar**
-   - Connection status
-   - Context size indicator
-   - Active request indicator
-
-### Styling
-- Tailwind CSS dark theme
-- CSS variables for theming
-- Consistent spacing scale
-- Monospace font for code
-- Sans-serif for UI text
-
-### Implementation Steps
-
-1. **Set Up Theme System**
-   - CSS variables for colors
-   - Dark/light theme classes
-   - Tailwind config updates
-
-2. **Create App Shell**
-   - Update App.svelte with layout
-   - Add responsive breakpoints
-   - Implement panel toggles
-
-3. **Implement Header**
-   - Logo placeholder with instructions
-   - Settings dropdown
-   - Theme toggle
-
-4. **Enhance Sidebar**
-   - Project CRUD UI
-   - Chat list with actions
-   - Active state styling
-
-5. **Build Chat Interface**
-   - Message list component
-   - Input with preview
-   - Send functionality
-
-6. **Style Messages**
-   - Role-based styling
-   - Markdown rendering
-   - Code highlighting
-
-7. **Add Status Bar**
-   - Connection indicator
-   - Context size display
-
-8. **Connect to Backend**
-   - API integration
-   - Real-time updates
+3. **API Client**
+   - Create frontend/src/lib/api/client.js
+   - Implement all API methods from spec
    - Error handling
+   - Request/response typing
 
-## Logo Placeholder Instructions
-```html
-<!-- Replace src with your logo image -->
-<!-- Recommended: 32x32 or 40x40 PNG with transparent background -->
-<!-- File location: frontend/public/logo.png -->
-<img src="/logo.png" alt="OinkerUI" class="h-8 w-8" />
-```
+4. **State Management**
+   - Svelte stores for:
+     - projects (list, selected)
+     - chats (list, selected)
+     - messages (current chat)
+     - ui (sidebar state, loading)
+
+5. **Styling**
+   - Dark theme (gray-900 background)
+   - Tailwind utility classes
+   - Consistent spacing and typography
+   - Hover and focus states
+
+### Testing
+
+6. **Add Tests**
+   - Component tests with Testing Library
+   - Store tests
+   - API client tests (mocked)
 
 ## Verification
-- [ ] App loads in browser
-- [ ] Dark theme applied
-- [ ] Layout responsive
-- [ ] Projects can be created/selected
-- [ ] Chats can be created/selected
-- [ ] Messages can be sent
-- [ ] Markdown renders correctly
-- [ ] Code highlighting works
-- [ ] All components styled consistently
+- [ ] App loads and displays correctly
+- [ ] Projects list and selection works
+- [ ] Chats list and selection works
+- [ ] Messages display with proper formatting
+- [ ] Markdown and code highlighting works
+- [ ] Send message works (non-streaming)
+- [ ] Dark theme applied consistently
+- [ ] Responsive layout works
+- [ ] All tests passing
 
 ## Task Cleanup
 ```bash
-python3 tools/task_cleanup.py --task-id 2.4.5
+python3 tools/task_manager.py move 2.4.5 --date $(date +%Y-%m-%d) --commit $(git rev-parse HEAD) --summary "Implemented core frontend application with dark theme"
 ```

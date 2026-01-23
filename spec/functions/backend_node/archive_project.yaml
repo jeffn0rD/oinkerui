@@ -1,0 +1,79 @@
+# =============================================================================
+# Function Specification: archiveProject
+# =============================================================================
+
+function:
+  id: backend_node.archive_project
+  name: archiveProject
+  module: backend_node
+  purpose: |
+    Archive a project, marking it as inactive but preserving all data.
+    Archived projects are hidden from default views but can be restored.
+
+  signature:
+    parameters:
+      - name: projectId
+        type: string
+        required: true
+        description: "UUID of the project to archive"
+        constraints:
+          - "Must be valid UUID"
+          - "Project must exist and be active"
+    returns:
+      type: Project
+      description: "Archived project object"
+
+  algorithm:
+    steps:
+      - step: 1
+        action: "Validate projectId"
+        details: "Check UUID format"
+      - step: 2
+        action: "Load project"
+        details: "Verify project exists and is active"
+      - step: 3
+        action: "Set status to archived"
+        details: "Update project status"
+      - step: 4
+        action: "Set archived_at timestamp"
+        details: "Record archive time"
+      - step: 5
+        action: "Save project.json"
+        details: "Persist changes"
+      - step: 6
+        action: "Update index"
+        details: "Update status in index.json"
+      - step: 7
+        action: "Invalidate cache"
+        details: "Remove from memory cache"
+      - step: 8
+        action: "Return archived project"
+
+  errors:
+    - code: VALIDATION_ERROR
+      condition: "Project is not active"
+      message: "Only active projects can be archived"
+    - code: PROJECT_NOT_FOUND
+      condition: "Project does not exist"
+      message: "Project not found"
+    - code: FILE_SYSTEM_ERROR
+      condition: "Cannot update project files"
+      message: "Failed to archive project"
+
+  preconditions:
+    - "projectId is valid UUID"
+    - "Project exists"
+    - "Project status is 'active'"
+  
+  postconditions:
+    - "Project status is 'archived'"
+    - "archived_at is set"
+    - "Project data is preserved"
+
+  references:
+    - type: entity
+      id: project
+      file: "spec/domain.yaml#Project"
+    - type: module
+      id: backend_node
+      file: "spec/modules/backend_node.yaml"

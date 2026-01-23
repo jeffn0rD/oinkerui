@@ -1,0 +1,150 @@
+# Streaming Message Component Specification
+# Spec Reference: python3 tools/doc_query.py --query "spec/functions/frontend_svelte/streaming_message.yaml" --mode file --pretty
+
+version: "1.0.0"
+module: frontend_svelte
+function_id: streaming_message
+
+component:
+  name: StreamingMessage
+  type: svelte_component
+  file: frontend/src/lib/components/StreamingMessage.svelte
+  description: "Displays a message while it's being streamed from the LLM"
+
+props:
+  - name: content
+    type: string
+    required: true
+    description: "Current accumulated content"
+  - name: isStreaming
+    type: boolean
+    required: true
+    description: "Whether streaming is in progress"
+  - name: role
+    type: string
+    default: "assistant"
+    description: "Message role for styling"
+  - name: tokenCount
+    type: number
+    required: false
+    description: "Current token count"
+  - name: onCancel
+    type: function
+    required: false
+    description: "Callback to cancel streaming"
+
+state:
+  - name: displayContent
+    type: string
+    description: "Content being displayed (may lag slightly for smooth rendering)"
+  - name: cursorVisible
+    type: boolean
+    description: "Cursor blink state"
+
+ui_elements:
+  message_container:
+    class: "message assistant streaming"
+    animation: "fade-in"
+    
+  content_area:
+    class: "prose prose-invert"
+    markdown: true
+    code_highlighting: true
+    
+  cursor:
+    character: "▊"
+    animation: "blink 1s infinite"
+    position: "end of content"
+    show_when: "isStreaming"
+    
+  token_counter:
+    format: "{tokenCount} tokens"
+    position: "bottom right"
+    class: "text-xs text-gray-500"
+    
+  cancel_hint:
+    text: "Press Esc to cancel"
+    position: "bottom"
+    show_when: "isStreaming"
+    class: "text-xs text-gray-600"
+
+styling:
+  container: |
+    relative p-4 rounded-lg bg-gray-800 border-l-4 border-violet-500
+    animate-pulse-subtle
+  content: "prose prose-invert max-w-none"
+  cursor: "inline-block w-2 h-5 bg-violet-400 animate-blink ml-0.5"
+  streaming_indicator: "absolute top-2 right-2 flex items-center gap-1 text-xs text-violet-400"
+
+animations:
+  cursor_blink:
+    keyframes: |
+      @keyframes blink {
+        0%, 50% { opacity: 1; }
+        51%, 100% { opacity: 0; }
+      }
+    duration: "1s"
+    iteration: "infinite"
+    
+  content_fade:
+    keyframes: "fade-in"
+    duration: "150ms"
+    
+  pulse_subtle:
+    keyframes: |
+      @keyframes pulse-subtle {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.95; }
+      }
+    duration: "2s"
+    iteration: "infinite"
+
+markdown_rendering:
+  enabled: true
+  options:
+    - code_blocks: true
+    - syntax_highlighting: true
+    - tables: true
+    - links: true
+    - images: false
+  incremental: true
+  debounce_ms: 50
+
+accessibility:
+  aria_live: "polite"
+  aria_busy: "{isStreaming}"
+  aria_label: "Assistant is typing"
+  role: "status"
+
+behavior:
+  smooth_rendering:
+    description: "Buffer tokens slightly for smoother display"
+    buffer_size: 3
+    flush_interval_ms: 50
+  auto_scroll:
+    description: "Keep streaming content in view"
+    scroll_behavior: "smooth"
+  keyboard:
+    escape: "Cancel streaming"
+
+algorithm:
+  steps:
+    - step: 1
+      action: "Receive token"
+      details: "Add to content buffer"
+      
+    - step: 2
+      action: "Render content"
+      details: "Parse markdown, highlight code"
+      
+    - step: 3
+      action: "Show cursor"
+      details: "Display blinking cursor at end"
+      
+    - step: 4
+      action: "Auto-scroll"
+      details: "Scroll to keep new content visible"
+      
+    - step: 5
+      action: "Handle completion"
+      details: "Hide cursor, finalize message"

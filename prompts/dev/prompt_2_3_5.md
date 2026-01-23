@@ -1,92 +1,103 @@
 # Prompt 2.3.5: Implement Cancel LLM Request
 
 ## Task Description
-Implement the ability to cancel in-progress LLM requests, tool executions, and workflows with proper cleanup and UI feedback.
+Implement ability to cancel in-progress LLM requests with timeout configuration and UI feedback.
 
 ## Context Gathering
+Before starting, gather context using the doc_query tool:
+
 ```bash
+# Get cancel_request function spec
+python3 tools/doc_query.py --query "spec/functions/backend_node/cancel_request.yaml" --mode file --pretty
+
+# Get cancel_button component spec
+python3 tools/doc_query.py --query "spec/functions/frontend_svelte/cancel_button.yaml" --mode file --pretty
+
+# Get cancel and timeout spec
+python3 tools/doc_query.py --query "spec/cancel_and_timeout.yaml" --mode file --pretty
+
 # Get current LLM service
 cat backend/src/services/llmService.js
-
-# Get message service for request tracking
-cat backend/src/services/messageService.js
 ```
+
+## Code Generation
+Use the code generator to create scaffolding:
+
+```bash
+# Preview cancel_request function
+python3 tools/code_generator.py --function backend_node.cancel_request --preview
+```
+
+## Spec References
+- **Function Specs**:
+  - spec/functions/backend_node/cancel_request.yaml
+  - spec/functions/backend_node/stream_llm_response.yaml
+- **Component Specs**:
+  - spec/functions/frontend_svelte/cancel_button.yaml
+- **Cancel Spec**: spec/cancel_and_timeout.yaml
 
 ## Requirements
 
-### Cancel Functionality
-1. Cancel in-progress LLM API calls
-2. Cancel tool executions (Python backend)
-3. Cancel workflows (future-proofing)
-4. Proper cleanup on cancellation
+### Backend Cancel Implementation
 
-### Timeout Configuration
-1. LLM request timeout (default: 60s, configurable)
-2. Tool execution timeout (default: 30s, configurable)
-3. Per-project timeout overrides
-4. Visual countdown/progress indicator
+1. **Request Tracking**
+   - Track active LLM requests per chat
+   - Store AbortController reference
+   - Map: chatId -> { requestId, controller, startTime }
 
-### Backend Implementation
-1. Track active requests with AbortController
-2. Store request state (pending, streaming, completed, cancelled)
-3. Cleanup partial responses on cancel
-4. Log cancellation events
+2. **Cancel Endpoint**
+   - POST /api/projects/:id/chats/:chatId/cancel
+   - Find active request for chat
+   - Call controller.abort()
+   - Return cancellation result
 
-### API Endpoints
-- POST /api/projects/:projectId/chats/:chatId/cancel
-- Cancel current active request for chat
-- Returns: { cancelled: boolean, requestId }
+3. **Update LLM Service**
+   - Accept AbortSignal in callLLM and streamLLMResponse
+   - Pass signal to axios/fetch
+   - Handle AbortError gracefully
+   - Clean up on abort
 
-### Frontend Implementation
-1. Cancel button during LLM calls
-2. Cancel button during streaming
-3. Visual feedback (spinner → cancelled state)
-4. Keyboard shortcut (Escape key)
+4. **Timeout Configuration**
+   - Default timeout from config (e.g., 120s)
+   - Per-request timeout option
+   - Auto-cancel on timeout
+   - Log timeout events
 
-### Implementation Steps
+### Frontend Cancel Implementation
 
-1. **Add Request Tracking**
-   - backend/src/services/requestTracker.js
-   - Track active requests per chat
-   - Store AbortController references
+5. **Create CancelButton Component**
+   - Show only during active request
+   - Disabled state while cancelling
+   - Visual feedback on click
 
-2. **Update LLM Service**
-   - Accept AbortSignal parameter
-   - Handle abort during streaming
-   - Clean up on cancellation
+6. **Update Chat View**
+   - Track streaming state
+   - Show cancel button during streaming
+   - Handle cancel response
+   - Show cancellation message
 
-3. **Create Cancel Endpoint**
-   - POST /api/.../cancel
-   - Find and abort active request
-   - Return cancellation status
+7. **API Client Update**
+   - Add cancelRequest method
+   - Handle abort in streaming
 
-4. **Update Config**
-   - Add timeout settings
-   - LLM timeout, tool timeout
-   - Per-project overrides
+### Testing
 
-5. **Frontend Cancel UI**
-   - Cancel button component
-   - Integrate with message input
-   - Show during active requests
-   - Escape key handler
-
-6. **Add Tests**
-   - Cancel during request
-   - Cancel during streaming
-   - Timeout behavior
-   - Cleanup verification
+8. **Add Tests**
+   - Unit tests for cancel logic
+   - Test timeout behavior
+   - Integration tests for cancel endpoint
+   - Frontend component tests
 
 ## Verification
-- [ ] Cancel stops LLM request
-- [ ] Partial response cleaned up
-- [ ] Timeout triggers automatically
-- [ ] Cancel button visible during requests
-- [ ] Escape key cancels
-- [ ] Cancellation logged
+- [ ] Active requests tracked correctly
+- [ ] Cancel endpoint aborts request
+- [ ] Partial content preserved on cancel
+- [ ] Timeout auto-cancels request
+- [ ] UI shows cancel button during streaming
+- [ ] Cancellation feedback shown to user
 - [ ] All tests passing
 
 ## Task Cleanup
 ```bash
-python3 tools/task_cleanup.py --task-id 2.3.5
+python3 tools/task_manager.py move 2.3.5 --date $(date +%Y-%m-%d) --commit $(git rev-parse HEAD) --summary "Implemented cancel LLM request with timeout support"
 ```

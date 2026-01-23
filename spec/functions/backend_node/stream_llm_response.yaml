@@ -1,0 +1,161 @@
+# Stream LLM Response Function Specification
+# Spec Reference: python3 tools/doc_query.py --query "spec/functions/backend_node/stream_llm_response.yaml" --mode file --pretty
+
+version: "1.0.0"
+module: backend_node
+function_id: stream_llm_response
+
+signature:
+  name: streamLLMResponse
+  async: true
+  generator: true
+  params:
+    - name: request
+      type: object
+      required: true
+      description: "LLM request configuration"
+      properties:
+        model:
+          type: string
+          required: true
+          description: "Model identifier (e.g., 'openai/gpt-4')"
+        messages:
+          type: array
+          required: true
+          description: "Array of messages for context"
+        temperature:
+          type: number
+          default: 0.7
+        max_tokens:
+          type: integer
+          description: "Maximum tokens in response"
+        abortSignal:
+          type: AbortSignal
+          description: "Signal to cancel the request"
+    - name: onToken
+      type: function
+      required: false
+      description: "Callback for each token received"
+    - name: onComplete
+      type: function
+      required: false
+      description: "Callback when streaming completes"
+    - name: onError
+      type: function
+      required: false
+      description: "Callback on error"
+  returns:
+    type: AsyncGenerator
+    description: "Yields tokens as they arrive"
+    yields:
+      type: object
+      properties:
+        token: { type: string, description: "The token text" }
+        done: { type: boolean, description: "True if this is the final chunk" }
+        accumulated: { type: string, description: "Full response so far" }
+  throws:
+    - ValidationError: "Invalid request parameters"
+    - LLMError: "API error from OpenRouter"
+    - AbortError: "Request was cancelled"
+    - TimeoutError: "Request timed out"
+
+contract:
+  preconditions:
+    - "Model is valid and available"
+    - "Messages array is non-empty"
+    - "API key is configured"
+  postconditions:
+    - "All tokens yielded in order"
+    - "Final yield has done=true"
+    - "Accumulated contains full response"
+  invariants:
+    - "Tokens are yielded in order received"
+    - "Cancellation stops further yields"
+
+algorithm:
+  fol_specification: |
+    ∀ stream_request(request, callbacks):
+      LET connection = openSSEConnection(OPENROUTER_URL, request)
+      LET accumulated = ""
+      WHILE NOT connection.done AND NOT request.abortSignal.aborted:
+        LET chunk = AWAIT connection.nextChunk()
+        IF chunk.type = "token":
+          accumulated += chunk.token
+          YIELD { token: chunk.token, done: false, accumulated }
+          IF callbacks.onToken: callbacks.onToken(chunk.token)
+        ELSE IF chunk.type = "done":
+          YIELD { token: "", done: true, accumulated }
+          IF callbacks.onComplete: callbacks.onComplete(accumulated)
+          BREAK
+        ELSE IF chunk.type = "error":
+          IF callbacks.onError: callbacks.onError(chunk.error)
+          THROW LLMError(chunk.error)
+      IF request.abortSignal.aborted:
+        THROW AbortError("Request cancelled")
+
+  steps:
+    - step: 1
+      action: "Validate request"
+      details: "Check model, messages, and API configuration"
+      
+    - step: 2
+      action: "Prepare SSE request"
+      details: "Set stream=true in request body"
+      
+    - step: 3
+      action: "Open connection"
+      details: "Connect to OpenRouter streaming endpoint"
+      
+    - step: 4
+      action: "Process chunks"
+      details: "Read SSE events, parse delta content"
+      
+    - step: 5
+      action: "Yield tokens"
+      details: "Yield each token with accumulated text"
+      
+    - step: 6
+      action: "Handle completion"
+      details: "Yield final chunk with done=true"
+      
+    - step: 7
+      action: "Handle cancellation"
+      details: "Check abortSignal, cleanup on cancel"
+      
+    - step: 8
+      action: "Handle errors"
+      details: "Parse error responses, throw appropriate errors"
+
+complexity:
+  time: "O(n) where n is response length"
+  space: "O(n) for accumulated response"
+
+error_handling:
+  - error: "Connection failed"
+    action: "Throw LLMError with connection details"
+  - error: "API rate limit"
+    action: "Throw LLMError with retry-after"
+  - error: "Invalid response format"
+    action: "Throw LLMError with parse error"
+  - error: "Abort signal"
+    action: "Close connection, throw AbortError"
+  - error: "Timeout"
+    action: "Close connection, throw TimeoutError"
+
+sse_format: |
+  OpenRouter SSE format:
+  data: {"choices":[{"delta":{"content":"token"}}]}
+  data: {"choices":[{"delta":{},"finish_reason":"stop"}]}
+  data: [DONE]
+
+testing:
+  scenarios:
+    - name: "Successful stream"
+      input: { model: "openai/gpt-4", messages: [...] }
+      expected: "Multiple yields, final with done=true"
+    - name: "Cancelled stream"
+      input: { abortSignal: "aborted after 2 tokens" }
+      expected: "AbortError thrown"
+    - name: "API error"
+      input: { model: "invalid-model" }
+      expected: "LLMError thrown"

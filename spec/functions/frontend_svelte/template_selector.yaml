@@ -1,0 +1,155 @@
+# Template Selector Component Specification
+# Spec Reference: python3 tools/doc_query.py --query "spec/functions/frontend_svelte/template_selector.yaml" --mode file --pretty
+
+version: "1.0.0"
+module: frontend_svelte
+function_id: template_selector
+
+component:
+  name: TemplateSelector
+  type: svelte_component
+  file: frontend/src/lib/components/TemplateSelector.svelte
+  description: "Modal for selecting and configuring prompt templates"
+
+props:
+  - name: isOpen
+    type: boolean
+    required: true
+    description: "Whether the modal is open"
+  - name: projectId
+    type: string
+    required: true
+    description: "Current project ID for project-level templates"
+  - name: onSelect
+    type: function
+    required: true
+    description: "Callback when template is selected: (renderedContent) => void"
+  - name: onClose
+    type: function
+    required: true
+    description: "Callback to close the modal"
+
+state:
+  - name: templates
+    type: array
+    description: "Available templates (global + project)"
+  - name: selectedTemplate
+    type: object
+    description: "Currently selected template"
+  - name: variables
+    type: object
+    description: "Variable values entered by user"
+  - name: preview
+    type: string
+    description: "Rendered template preview"
+  - name: isLoading
+    type: boolean
+    description: "Loading templates or rendering"
+  - name: error
+    type: string
+    description: "Error message if any"
+
+ui_elements:
+  modal:
+    width: "max-w-2xl"
+    height: "max-h-[80vh]"
+    
+  template_list:
+    position: "left sidebar"
+    width: "200px"
+    sections:
+      - name: "Global Templates"
+        icon: "🌐"
+      - name: "Project Templates"
+        icon: "📁"
+        
+  template_item:
+    class: "p-2 hover:bg-gray-700 cursor-pointer rounded"
+    active_class: "bg-gray-700 border-l-2 border-blue-500"
+    
+  variable_form:
+    position: "main area"
+    fields: "dynamic based on template variables"
+    
+  variable_input:
+    types:
+      string: "text input"
+      text: "textarea"
+      number: "number input"
+      boolean: "checkbox"
+      select: "dropdown"
+      
+  preview_panel:
+    position: "bottom"
+    collapsible: true
+    syntax_highlighting: true
+    
+  action_buttons:
+    - name: "Insert"
+      class: "bg-blue-600 hover:bg-blue-700"
+      action: "insert rendered template"
+    - name: "Cancel"
+      class: "bg-gray-600 hover:bg-gray-700"
+      action: "close modal"
+
+styling:
+  modal_overlay: "fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+  modal_content: "bg-gray-900 rounded-lg shadow-xl flex flex-col"
+  header: "p-4 border-b border-gray-700 flex justify-between items-center"
+  body: "flex flex-1 overflow-hidden"
+  sidebar: "w-48 border-r border-gray-700 overflow-y-auto"
+  main: "flex-1 p-4 overflow-y-auto"
+  footer: "p-4 border-t border-gray-700 flex justify-end gap-2"
+
+template_format:
+  structure: |
+    name: "Template Name"
+    description: "What this template does"
+    variables:
+      - name: "variable_name"
+        type: "string"
+        required: true
+        default: "default value"
+        description: "What this variable is for"
+    content: |
+      Template content with {{variable_name}} placeholders
+
+keyboard_shortcuts:
+  - key: "Escape"
+    action: "Close modal"
+  - key: "Enter"
+    modifier: "Ctrl"
+    action: "Insert template"
+
+accessibility:
+  role: "dialog"
+  aria_modal: "true"
+  aria_labelledby: "template-selector-title"
+  focus_trap: true
+  initial_focus: "template list"
+
+algorithm:
+  steps:
+    - step: 1
+      action: "Load templates"
+      details: "Fetch global and project templates"
+      
+    - step: 2
+      action: "Display template list"
+      details: "Show templates grouped by scope"
+      
+    - step: 3
+      action: "Handle selection"
+      details: "Load template details, show variable form"
+      
+    - step: 4
+      action: "Collect variables"
+      details: "User fills in variable values"
+      
+    - step: 5
+      action: "Render preview"
+      details: "Call Python backend to render template"
+      
+    - step: 6
+      action: "Insert template"
+      details: "Pass rendered content to onSelect callback"

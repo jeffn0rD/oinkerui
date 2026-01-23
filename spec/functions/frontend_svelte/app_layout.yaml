@@ -1,0 +1,73 @@
+# =============================================================================
+# Component Specification: AppLayout
+# =============================================================================
+
+component:
+  id: frontend_svelte.app_layout
+  name: AppLayout
+  module: frontend_svelte
+  type: svelte_component
+  file: frontend/src/lib/components/AppLayout.svelte
+  purpose: |
+    Main application layout component. Provides the three-column layout
+    with left sidebar (projects/chats), main area (chat), and optional
+    right sidebar (details/settings). Handles responsive behavior.
+
+  props:
+    - name: showRightSidebar
+      type: boolean
+      default: false
+      description: "Whether to show the right sidebar"
+    - name: leftSidebarWidth
+      type: number
+      default: 280
+      description: "Width of left sidebar in pixels"
+    - name: rightSidebarWidth
+      type: number
+      default: 320
+      description: "Width of right sidebar in pixels"
+
+  slots:
+    - name: left
+      description: "Left sidebar content (projects/chats list)"
+    - name: main
+      description: "Main content area (chat view)"
+    - name: right
+      description: "Right sidebar content (details/settings)"
+
+  events:
+    - name: resize
+      payload:
+        leftWidth: number
+        rightWidth: number
+      description: "Fired when sidebar is resized"
+
+  state:
+    - name: leftCollapsed
+      type: boolean
+      default: false
+    - name: rightCollapsed
+      type: boolean
+      default: true
+
+  styling:
+    theme: dark
+    framework: tailwind
+    classes:
+      container: "flex h-screen bg-gray-900 text-gray-100"
+      leftSidebar: "flex-shrink-0 border-r border-gray-700 bg-gray-800"
+      mainArea: "flex-1 flex flex-col overflow-hidden"
+      rightSidebar: "flex-shrink-0 border-l border-gray-700 bg-gray-800"
+
+  accessibility:
+    - "Keyboard navigation between panels"
+    - "ARIA landmarks for regions"
+    - "Focus management on panel toggle"
+
+  references:
+    - type: spec
+      id: ui_spec
+      file: "spec/ui.yaml"
+    - type: module
+      id: frontend_svelte
+      file: "spec/modules/frontend_svelte.yaml"

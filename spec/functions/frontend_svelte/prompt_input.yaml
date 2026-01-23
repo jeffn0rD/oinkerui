@@ -1,0 +1,112 @@
+# =============================================================================
+# Component Specification: PromptInput
+# =============================================================================
+
+component:
+  id: frontend_svelte.prompt_input
+  name: PromptInput
+  module: frontend_svelte
+  type: svelte_component
+  file: frontend/src/lib/components/PromptInput.svelte
+  purpose: |
+    Text input area for composing messages. Supports multi-line input,
+    slash command autocomplete, template insertion, and keyboard shortcuts.
+    Shows context size indicator and send button.
+
+  props:
+    - name: disabled
+      type: boolean
+      default: false
+      description: "Disable input (e.g., during streaming)"
+    - name: placeholder
+      type: string
+      default: "Type a message or /command..."
+      description: "Placeholder text"
+    - name: contextTokens
+      type: number
+      required: false
+      description: "Current context token count"
+    - name: maxTokens
+      type: number
+      required: false
+      description: "Maximum context tokens"
+    - name: isStreaming
+      type: boolean
+      default: false
+      description: "Whether LLM is currently streaming"
+
+  events:
+    - name: send
+      payload:
+        content: string
+        options:
+          isAside: boolean
+          pureAside: boolean
+      description: "Fired when message is sent"
+    - name: cancel
+      description: "Fired when cancel button clicked during streaming"
+    - name: commandSelect
+      payload:
+        command: string
+      description: "Fired when slash command is selected from autocomplete"
+
+  state:
+    - name: content
+      type: string
+      default: ""
+    - name: showAutocomplete
+      type: boolean
+      default: false
+    - name: autocompleteItems
+      type: array
+      description: "Filtered command suggestions"
+    - name: selectedAutocompleteIndex
+      type: number
+      default: 0
+
+  behavior:
+    - "Auto-resize textarea based on content"
+    - "Show slash command autocomplete when typing /"
+    - "Ctrl+Enter to send, Shift+Enter for newline"
+    - "Escape to close autocomplete"
+    - "Tab to accept autocomplete suggestion"
+    - "Show cancel button during streaming"
+
+  keyboard_shortcuts:
+    - key: "Ctrl+Enter"
+      action: "Send message"
+    - key: "Shift+Enter"
+      action: "Insert newline"
+    - key: "Escape"
+      action: "Close autocomplete / Cancel"
+    - key: "Tab"
+      action: "Accept autocomplete"
+    - key: "ArrowUp/Down"
+      action: "Navigate autocomplete"
+
+  styling:
+    theme: dark
+    framework: tailwind
+    classes:
+      container: "border-t border-gray-700 p-4 bg-gray-800"
+      textarea: "w-full bg-gray-900 border border-gray-600 rounded-lg p-3 resize-none focus:ring-2 focus:ring-blue-500"
+      sendButton: "bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
+      cancelButton: "bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg"
+      autocomplete: "absolute bottom-full left-0 w-full bg-gray-800 border border-gray-600 rounded-lg shadow-lg"
+      contextIndicator: "text-sm text-gray-400"
+
+  accessibility:
+    - "ARIA labels for buttons"
+    - "Autocomplete listbox pattern"
+    - "Focus management"
+
+  references:
+    - type: spec
+      id: commands_spec
+      file: "spec/commands.yaml"
+    - type: component
+      id: context_size_display
+      file: "spec/functions/frontend_svelte/context_size_display.yaml"
+    - type: module
+      id: frontend_svelte
+      file: "spec/modules/frontend_svelte.yaml"

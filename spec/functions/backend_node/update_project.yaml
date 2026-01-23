@@ -1,0 +1,95 @@
+# =============================================================================
+# Function Specification: updateProject
+# =============================================================================
+
+function:
+  id: backend_node.update_project
+  name: updateProject
+  module: backend_node
+  purpose: |
+    Update project metadata and settings. Handles partial updates,
+    validates changes, and persists to storage. Triggers Git commit
+    if auto-commit is enabled.
+
+  signature:
+    parameters:
+      - name: projectId
+        type: string
+        required: true
+        description: "UUID of the project to update"
+        constraints:
+          - "Must be valid UUID"
+          - "Project must exist"
+      - name: updates
+        type: ProjectUpdates
+        required: true
+        description: "Fields to update"
+        constraints:
+          - "name: string, 1-100 chars"
+          - "description: string, max 1000 chars"
+          - "settings: partial settings object"
+          - "default_model: valid model ID"
+    returns:
+      type: Project
+      description: "Updated project object"
+
+  algorithm:
+    steps:
+      - step: 1
+        action: "Validate projectId"
+        details: "Check UUID format"
+      - step: 2
+        action: "Load existing project"
+        details: "Get current project data"
+      - step: 3
+        action: "Validate updates"
+        details: "Check all update fields are valid"
+      - step: 4
+        action: "Merge updates"
+        details: "Apply updates to project object"
+      - step: 5
+        action: "Set updated_at"
+        details: "Update timestamp"
+      - step: 6
+        action: "Save project.json"
+        details: "Write to project directory"
+      - step: 7
+        action: "Update index"
+        details: "Update project entry in index.json"
+      - step: 8
+        action: "Invalidate cache"
+        details: "Remove from memory cache"
+      - step: 9
+        action: "Auto-commit if enabled"
+        details: "Git commit changes"
+      - step: 10
+        action: "Return updated project"
+
+  errors:
+    - code: VALIDATION_ERROR
+      condition: "Invalid update fields"
+      message: "Invalid project update"
+    - code: PROJECT_NOT_FOUND
+      condition: "Project does not exist"
+      message: "Project not found"
+    - code: FILE_SYSTEM_ERROR
+      condition: "Cannot write project files"
+      message: "Failed to update project"
+
+  preconditions:
+    - "projectId is valid UUID"
+    - "Project exists and is not deleted"
+    - "updates contains at least one field"
+  
+  postconditions:
+    - "Project is updated in storage"
+    - "updated_at is set to current time"
+    - "Cache is invalidated"
+
+  references:
+    - type: entity
+      id: project
+      file: "spec/domain.yaml#Project"
+    - type: module
+      id: backend_node
+      file: "spec/modules/backend_node.yaml"

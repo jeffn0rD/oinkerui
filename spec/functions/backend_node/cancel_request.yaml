@@ -1,0 +1,127 @@
+# Cancel Request Function Specification
+# Spec Reference: python3 tools/doc_query.py --query "spec/functions/backend_node/cancel_request.yaml" --mode file --pretty
+
+version: "1.0.0"
+module: backend_node
+function_id: cancel_request
+
+signature:
+  name: cancelRequest
+  async: true
+  params:
+    - name: projectId
+      type: string
+      required: true
+      description: "UUID of the project"
+    - name: chatId
+      type: string
+      required: true
+      description: "UUID of the chat with active request"
+  returns:
+    type: object
+    description: "Cancellation result"
+    properties:
+      cancelled:
+        type: boolean
+        description: "True if a request was cancelled"
+      requestId:
+        type: string
+        description: "ID of the cancelled request (if any)"
+      requestType:
+        type: string
+        enum: ["llm", "tool", "workflow"]
+        description: "Type of request that was cancelled"
+      partialResponse:
+        type: string
+        description: "Any partial response received before cancellation"
+  throws:
+    - ValidationError: "Invalid project or chat ID"
+    - NotFoundError: "No active request to cancel"
+
+contract:
+  preconditions:
+    - "Project and chat IDs are valid"
+  postconditions:
+    - "If active request existed, it is cancelled"
+    - "AbortController signal is triggered"
+    - "Partial response is preserved if any"
+  invariants:
+    - "Cancellation is idempotent"
+
+algorithm:
+  fol_specification: |
+    ∀ cancel_request(projectId, chatId):
+      LET active = requestTracker.get(chatId)
+      IF active = NULL:
+        RETURN { cancelled: false, requestId: null }
+      active.abortController.abort()
+      LET partial = active.partialResponse OR ""
+      requestTracker.remove(chatId)
+      RETURN { cancelled: true, requestId: active.id, requestType: active.type, partialResponse: partial }
+
+  steps:
+    - step: 1
+      action: "Validate inputs"
+      details: "Check project and chat IDs are valid UUIDs"
+      
+    - step: 2
+      action: "Look up active request"
+      details: "Check requestTracker for active request on this chat"
+      
+    - step: 3
+      action: "Return if no active request"
+      details: "Return cancelled=false if nothing to cancel"
+      
+    - step: 4
+      action: "Trigger abort signal"
+      details: "Call abortController.abort() to cancel the request"
+      
+    - step: 5
+      action: "Capture partial response"
+      details: "Save any partial response received before cancellation"
+      
+    - step: 6
+      action: "Clean up tracking"
+      details: "Remove request from tracker"
+      
+    - step: 7
+      action: "Log cancellation"
+      details: "Log the cancellation event"
+      
+    - step: 8
+      action: "Return result"
+      details: "Return cancellation details"
+
+complexity:
+  time: "O(1)"
+  space: "O(1)"
+
+related_components:
+  request_tracker:
+    description: "In-memory tracker for active requests"
+    structure: |
+      Map<chatId, {
+        id: string,
+        type: 'llm' | 'tool' | 'workflow',
+        abortController: AbortController,
+        startedAt: Date,
+        partialResponse: string
+      }>
+
+error_handling:
+  - error: "Invalid chat ID"
+    action: "Throw ValidationError"
+  - error: "Abort already triggered"
+    action: "Return cancelled=true (idempotent)"
+
+testing:
+  scenarios:
+    - name: "Cancel active LLM request"
+      setup: "Start LLM request, then cancel"
+      expected: "cancelled=true, requestType='llm'"
+    - name: "Cancel with no active request"
+      setup: "No request in progress"
+      expected: "cancelled=false"
+    - name: "Cancel streaming request"
+      setup: "Start streaming, cancel mid-stream"
+      expected: "cancelled=true, partialResponse contains tokens"

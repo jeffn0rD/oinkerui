@@ -40,29 +40,26 @@ prompt_guidance: "Always follow these guidelines and update project documentatio
   \ if it is outside the scope.\n* ALWAYS COMMIT AND PUSH the repository after a task.\n"
 current:
 - task:
+    id: 2.0.0
+    name: Backend Testing Errors
+    goal: Backend tests execute with 0 errors (on all platforms)
+    details: Review test output log (log/backend_tests_012226.txt) and fix issues.  This test was done on windows 11.
+    files:
+      - log/backend_tests_012226.txt    
+- task:
     id: 2.0.2
     name: Module and Function Spec Review
     goal: Specification files in ./spec/modules and ./spec/functions are consistent and ready for phase 2 development.
-    prompt: ./prompts/dev/prompt_2_0_2.md
-    details:
-      description: 'Review specifications for modules and functions.  They need to be ready and complete for phase 2 development.
-
-        Function signatures and algorithms should exist for planned development.  Everything must be consistent with existing
-        codebase
-
-        and phase 2 targets.  Frontend UI doesn''t have coverage here.  That will need to be generated.
-
-        Review the remaining phase 2 tasks (2.0.5 - 2.9.0) and thier associated prompts, make sure any new information is
-        incorporated
-
-        so they will be used as ground source truth for further development.  Add references to any tool and appropriate doc_query''s
-        to
-
-        bring new spec information into the tasks.
-
-        '
+    prompt: ""
+    details: |
+      Review specifications for modules and functions.  They need to be ready and complete for phase 2 development.
+      Function signatures and algorithms should exist for planned development.  Everything must be consistent with existing codebase
+      and phase 2 targets.  Frontend UI doesn't have coverage here.  That will need to be generated.
+      Review the remaining phase 2 tasks (2.0.5 - 2.9.0) and thier associated prompts, make sure any new information is incorporated
+      so they will be used as ground source truth for further development.  Add references to any tool and appropriate doc_query's to
+      bring new spec information into the tasks.
     files:
-    - spec/**
+      - spec/**   
 - task:
     id: 2.0.5
     name: Implement Message Context Flags

@@ -1,0 +1,101 @@
+# =============================================================================
+# Function Specification: listChats
+# =============================================================================
+
+function:
+  id: backend_node.list_chats
+  name: listChats
+  module: backend_node
+  purpose: |
+    List all chats within a project. Returns chat summaries for display
+    in the UI sidebar. Supports filtering by status and pagination.
+
+  signature:
+    parameters:
+      - name: projectId
+        type: string
+        required: true
+        description: "UUID of the project"
+        constraints:
+          - "Must be valid UUID"
+          - "Project must exist"
+      - name: options
+        type: ListChatsOptions
+        required: false
+        default: {}
+        description: "Filtering and pagination options"
+        constraints:
+          - "status: 'active' | 'archived' | 'all'"
+          - "limit: positive integer"
+          - "offset: non-negative integer"
+    returns:
+      type: ChatSummary[]
+      description: "Array of chat summaries"
+      schema:
+        items:
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+            status:
+              type: string
+            message_count:
+              type: integer
+            last_message_at:
+              type: string
+            created_at:
+              type: string
+            updated_at:
+              type: string
+
+  algorithm:
+    steps:
+      - step: 1
+        action: "Validate projectId"
+        details: "Check UUID format"
+      - step: 2
+        action: "Load project"
+        details: "Verify project exists"
+      - step: 3
+        action: "Load chat index"
+        details: "Read project_root/chats/index.json"
+      - step: 4
+        action: "Apply status filter"
+        details: "Filter by status if specified (default: active)"
+      - step: 5
+        action: "Sort by updated_at"
+        details: "Most recently updated first"
+      - step: 6
+        action: "Apply pagination"
+        details: "Apply offset and limit if specified"
+      - step: 7
+        action: "Return summaries"
+        details: "Return array of chat summaries"
+
+  errors:
+    - code: VALIDATION_ERROR
+      condition: "Invalid projectId format"
+      message: "Invalid project ID"
+    - code: PROJECT_NOT_FOUND
+      condition: "Project does not exist"
+      message: "Project not found"
+    - code: FILE_SYSTEM_ERROR
+      condition: "Cannot read chat index"
+      message: "Failed to load chats"
+
+  preconditions:
+    - "projectId is valid UUID"
+    - "Project exists"
+  
+  postconditions:
+    - "Returns array (may be empty)"
+    - "All returned chats belong to specified project"
+
+  references:
+    - type: entity
+      id: chat
+      file: "spec/domain.yaml#Chat"
+    - type: module
+      id: backend_node
+      file: "spec/modules/backend_node.yaml"

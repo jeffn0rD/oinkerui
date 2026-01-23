@@ -1,0 +1,138 @@
+# =============================================================================
+# Function Specification: requery
+# =============================================================================
+
+function:
+  id: backend_node.requery
+  name: requery
+  module: backend_node
+  purpose: |
+    Regenerate the LLM response for the last prompt. Excludes the previous
+    response from context and makes a new LLM call. Supports keeping multiple
+    response branches for comparison.
+
+  signature:
+    parameters:
+      - name: projectId
+        type: string
+        required: true
+        description: "UUID of the project"
+      - name: chatId
+        type: string
+        required: true
+        description: "UUID of the chat"
+      - name: options
+        type: RequeryOptions
+        required: false
+        default: {}
+        description: "Requery options"
+        constraints:
+          - "keepPrevious: boolean - keep previous response as branch"
+          - "modelId: optional model override"
+          - "temperature: optional temperature override"
+    returns:
+      type: RequeryResult
+      description: "Result of requery operation"
+      schema:
+        properties:
+          success:
+            type: boolean
+          original_response:
+            type: object
+            description: "The response being replaced"
+            properties:
+              id:
+                type: string
+              content:
+                type: string
+              is_discarded:
+                type: boolean
+          new_response:
+            type: object
+            description: "The new LLM response"
+            properties:
+              id:
+                type: string
+              content:
+                type: string
+              model:
+                type: string
+              usage:
+                type: object
+          branch_created:
+            type: boolean
+            description: "True if previous response kept as branch"
+
+  algorithm:
+    steps:
+      - step: 1
+        action: "Validate IDs"
+        details: "Check projectId and chatId are valid"
+      - step: 2
+        action: "Load chat and messages"
+        details: "Get all messages from storage"
+      - step: 3
+        action: "Find last prompt/response pair"
+        details: "Identify the user message and assistant response to requery"
+      - step: 4
+        action: "Mark previous response"
+        condition: "keepPrevious=true"
+        details: "Set is_discarded=true, parent_message_id for branching"
+      - step: 5
+        action: "Construct context"
+        details: "Build context excluding the previous response"
+      - step: 6
+        action: "Call LLM"
+        details: "Make new LLM request with same prompt"
+      - step: 7
+        action: "Save new response"
+        details: "Create new assistant message"
+      - step: 8
+        action: "Update chat"
+        details: "Update chat timestamp"
+      - step: 9
+        action: "Return result"
+
+  errors:
+    - code: VALIDATION_ERROR
+      condition: "Invalid IDs"
+      message: "Invalid project or chat ID"
+    - code: PROJECT_NOT_FOUND
+      condition: "Project does not exist"
+      message: "Project not found"
+    - code: CHAT_NOT_FOUND
+      condition: "Chat does not exist"
+      message: "Chat not found"
+    - code: NO_RESPONSE_TO_REQUERY
+      condition: "No assistant response found"
+      message: "No response to requery"
+    - code: LLM_ERROR
+      condition: "LLM call failed"
+      message: "Failed to get new response"
+
+  preconditions:
+    - "projectId is valid UUID"
+    - "chatId is valid UUID"
+    - "Chat has at least one user message and assistant response"
+  
+  postconditions:
+    - "New assistant response is saved"
+    - "If keepPrevious: original response marked as discarded"
+    - "Chat updated_at is updated"
+
+  references:
+    - type: spec
+      id: context_spec
+      file: "spec/context.yaml"
+    - type: function
+      id: call_llm
+      file: "spec/functions/backend_node/call_llm.yaml"
+    - type: function
+      id: construct_context
+      file: "spec/functions/backend_node/construct_context.yaml"
+    - type: entity
+      id: message
+      file: "spec/domain.yaml#Message"
+    - type: module
+      id: backend_node
+      file: "spec/modules/backend_node.yaml"

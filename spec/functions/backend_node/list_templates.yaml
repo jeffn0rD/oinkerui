@@ -1,0 +1,98 @@
+# =============================================================================
+# Function Specification: listTemplates
+# =============================================================================
+
+function:
+  id: backend_node.list_templates
+  name: listTemplates
+  module: backend_node
+  purpose: |
+    List available prompt templates. Returns templates from global and
+    project-level locations. Used for template picker UI and autocomplete.
+
+  signature:
+    parameters:
+      - name: options
+        type: ListTemplatesOptions
+        required: false
+        default: {}
+        description: "Filtering options"
+        constraints:
+          - "projectId: include project-level templates"
+          - "category: filter by category"
+          - "search: search in name/description"
+    returns:
+      type: TemplateSummary[]
+      description: "Array of template summaries"
+      schema:
+        items:
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+            description:
+              type: string
+            category:
+              type: string
+            scope:
+              type: string
+              enum: [global, project]
+            variables:
+              type: array
+              items:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  required:
+                    type: boolean
+                  default:
+                    type: string
+            path:
+              type: string
+
+  algorithm:
+    steps:
+      - step: 1
+        action: "Load global templates"
+        details: "Read from workspace_root/global/templates/"
+      - step: 2
+        action: "Load project templates"
+        condition: "projectId is provided"
+        details: "Read from project_root/templates/"
+      - step: 3
+        action: "Parse template metadata"
+        details: "Extract frontmatter from each template"
+      - step: 4
+        action: "Apply category filter"
+        details: "Filter by category if specified"
+      - step: 5
+        action: "Apply search filter"
+        details: "Search in name and description"
+      - step: 6
+        action: "Sort by name"
+        details: "Alphabetical order"
+      - step: 7
+        action: "Return summaries"
+
+  errors:
+    - code: PROJECT_NOT_FOUND
+      condition: "Project does not exist"
+      message: "Project not found"
+    - code: FILE_SYSTEM_ERROR
+      condition: "Cannot read template directories"
+      message: "Failed to load templates"
+
+  preconditions:
+    - "Workspace root exists"
+  
+  postconditions:
+    - "Returns array (may be empty)"
+    - "Global templates always included"
+    - "Project templates included if projectId provided"
+
+  references:
+    - type: module
+      id: backend_node
+      file: "spec/modules/backend_node.yaml"

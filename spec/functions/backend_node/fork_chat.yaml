@@ -1,0 +1,133 @@
+# Fork Chat Function Specification
+# Spec Reference: python3 tools/doc_query.py --query "spec/functions/backend_node/fork_chat.yaml" --mode file --pretty
+
+version: "1.0.0"
+module: backend_node
+function_id: fork_chat
+
+signature:
+  name: forkChat
+  async: true
+  params:
+    - name: projectId
+      type: string
+      required: true
+      description: "UUID of the project containing the chat"
+    - name: chatId
+      type: string
+      required: true
+      description: "UUID of the chat to fork"
+    - name: options
+      type: object
+      required: false
+      description: "Fork options"
+      properties:
+        fromMessageId:
+          type: string
+          description: "Fork from this message (inclusive). If omitted, fork entire chat."
+        prune:
+          type: boolean
+          default: false
+          description: "If true, exclude messages with include_in_context=false"
+        name:
+          type: string
+          description: "Name for the forked chat. Defaults to 'Fork of {original_name}'"
+  returns:
+    type: object
+    description: "The newly created forked chat"
+    properties:
+      id: { type: string }
+      name: { type: string }
+      project_id: { type: string }
+      forked_from_chat_id: { type: string }
+      forked_at_message_id: { type: string }
+      message_count: { type: integer }
+  throws:
+    - ValidationError: "Invalid project or chat ID"
+    - NotFoundError: "Project, chat, or message not found"
+    - FileSystemError: "Failed to create forked chat files"
+
+contract:
+  preconditions:
+    - "Project exists and is active"
+    - "Chat exists and belongs to project"
+    - "If fromMessageId provided, message exists in chat"
+  postconditions:
+    - "New chat created with unique ID"
+    - "Messages copied up to fork point"
+    - "forked_from_chat_id set to original chat"
+    - "forked_at_message_id set if fromMessageId provided"
+    - "Original chat unchanged"
+  invariants:
+    - "Forked chat is independent of original"
+    - "Message IDs in fork are new UUIDs"
+
+algorithm:
+  fol_specification: |
+    ∀ fork_request(projectId, chatId, options):
+      LET original_chat = getChat(projectId, chatId)
+      LET fork_point = options.fromMessageId OR last_message_id(original_chat)
+      LET messages_to_copy = filter_messages(original_chat, fork_point, options.prune)
+      LET new_chat = create_chat_with_messages(projectId, messages_to_copy)
+      SET new_chat.forked_from_chat_id = chatId
+      SET new_chat.forked_at_message_id = fork_point
+      RETURN new_chat
+
+  steps:
+    - step: 1
+      action: "Validate project and chat exist"
+      details: "Load project and chat, verify active status"
+      
+    - step: 2
+      action: "Determine fork point"
+      details: "Use fromMessageId if provided, otherwise use last message"
+      
+    - step: 3
+      action: "Load messages to copy"
+      details: "Load all messages up to and including fork point"
+      
+    - step: 4
+      action: "Apply pruning if requested"
+      details: "If prune=true, filter out messages with include_in_context=false"
+      
+    - step: 5
+      action: "Create new chat"
+      details: "Create chat with forked_from metadata"
+      
+    - step: 6
+      action: "Copy messages with new IDs"
+      details: "Generate new UUIDs for each message, preserve content and flags"
+      
+    - step: 7
+      action: "Update project chat list"
+      details: "Add forked chat to project"
+      
+    - step: 8
+      action: "Return forked chat"
+      details: "Return the new chat object with message count"
+
+complexity:
+  time: "O(n) where n is number of messages to copy"
+  space: "O(n) for message storage"
+
+error_handling:
+  - error: "Project not found"
+    action: "Throw NotFoundError"
+  - error: "Chat not found"
+    action: "Throw NotFoundError"
+  - error: "Message not found"
+    action: "Throw NotFoundError with message ID"
+  - error: "File system error"
+    action: "Cleanup partial fork, throw FileSystemError"
+
+testing:
+  scenarios:
+    - name: "Fork entire chat"
+      input: { projectId: "valid", chatId: "valid", options: {} }
+      expected: "New chat with all messages"
+    - name: "Fork from specific message"
+      input: { projectId: "valid", chatId: "valid", options: { fromMessageId: "msg-5" } }
+      expected: "New chat with messages 1-5"
+    - name: "Fork with pruning"
+      input: { projectId: "valid", chatId: "valid", options: { prune: true } }
+      expected: "New chat without excluded messages"

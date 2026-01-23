@@ -1,0 +1,126 @@
+# =============================================================================
+# Function Specification: getContextPreview
+# =============================================================================
+
+function:
+  id: backend_node.get_context_preview
+  name: getContextPreview
+  module: backend_node
+  purpose: |
+    Preview the context that would be sent to the LLM without making an
+    actual API call. Shows which messages are included, token counts,
+    and truncation effects. Used for debugging and UI feedback.
+
+  signature:
+    parameters:
+      - name: projectId
+        type: string
+        required: true
+        description: "UUID of the project"
+      - name: chatId
+        type: string
+        required: true
+        description: "UUID of the chat"
+      - name: draftMessage
+        type: string
+        required: false
+        description: "Draft message to include in preview"
+      - name: options
+        type: PreviewOptions
+        required: false
+        default: {}
+        description: "Preview options"
+        constraints:
+          - "modelId: model to use for token limits"
+          - "includeTokenBreakdown: show per-message tokens"
+    returns:
+      type: ContextPreview
+      description: "Preview of context construction"
+      schema:
+        properties:
+          messages:
+            type: array
+            description: "Messages that would be included"
+            items:
+              properties:
+                id:
+                  type: string
+                role:
+                  type: string
+                content_preview:
+                  type: string
+                  description: "First 100 chars"
+                tokens:
+                  type: integer
+                is_pinned:
+                  type: boolean
+                is_truncated:
+                  type: boolean
+          total_tokens:
+            type: integer
+          max_tokens:
+            type: integer
+          model:
+            type: string
+          truncation_applied:
+            type: boolean
+          excluded_count:
+            type: integer
+            description: "Messages excluded due to flags"
+          truncated_count:
+            type: integer
+            description: "Messages removed due to token limit"
+
+  algorithm:
+    steps:
+      - step: 1
+        action: "Validate IDs"
+        details: "Check projectId and chatId are valid"
+      - step: 2
+        action: "Load chat and messages"
+        details: "Get all messages from storage"
+      - step: 3
+        action: "Get model token limit"
+        details: "Look up max tokens for model"
+      - step: 4
+        action: "Run context construction"
+        details: "Apply full algorithm from spec/context.yaml"
+      - step: 5
+        action: "Calculate token breakdown"
+        details: "Count tokens per message"
+      - step: 6
+        action: "Build preview response"
+        details: "Format for UI display"
+      - step: 7
+        action: "Return preview"
+
+  errors:
+    - code: VALIDATION_ERROR
+      condition: "Invalid IDs"
+      message: "Invalid project or chat ID"
+    - code: PROJECT_NOT_FOUND
+      condition: "Project does not exist"
+      message: "Project not found"
+    - code: CHAT_NOT_FOUND
+      condition: "Chat does not exist"
+      message: "Chat not found"
+
+  preconditions:
+    - "projectId is valid UUID"
+    - "chatId is valid UUID"
+    - "Project and chat exist"
+  
+  postconditions:
+    - "Returns valid ContextPreview"
+    - "Token counts are accurate estimates"
+
+  references:
+    - type: spec
+      id: context_spec
+      file: "spec/context.yaml"
+    - type: function
+      id: construct_context
+      file: "spec/functions/backend_node/construct_context.yaml"
+    - type: module
+      id: backend_node
+      file: "spec/modules/backend_node.yaml"
