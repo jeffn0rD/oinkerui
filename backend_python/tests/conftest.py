@@ -2,6 +2,13 @@
 Pytest configuration and fixtures for backend_python tests.
 """
 
+import sys
+from pathlib import Path
+
+# Add the backend_python directory to the Python path
+backend_python_dir = Path(__file__).parent.parent
+sys.path.insert(0, str(backend_python_dir))
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -9,7 +16,7 @@ from fastapi.testclient import TestClient
 @pytest.fixture
 def test_client():
     """Create a test client for the FastAPI app."""
-    from backend_python.src.main import app
+    from src.main import app
     return TestClient(app)
 
 

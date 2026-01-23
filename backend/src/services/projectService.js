@@ -387,6 +387,48 @@ async function addChatToProject(projectId, chat) {
   await projectIndex.update(project);
 }
 
+/**
+ * Update a specific chat within a project
+ * 
+ * @param {string} projectId - UUID of the project
+ * @param {string} chatId - UUID of the chat to update
+ * @param {Object} updates - Fields to update on the chat
+ * @returns {Promise<Object>} Updated chat object
+ */
+async function updateChatInProject(projectId, chatId, updates) {
+  const project = await getProject(projectId);
+  
+  if (!project.chats) {
+    throw new NotFoundError('Chat not found');
+  }
+  
+  const chatIndex = project.chats.findIndex(c => c.id === chatId);
+  if (chatIndex === -1) {
+    throw new NotFoundError('Chat not found');
+  }
+  
+  // Apply updates
+  project.chats[chatIndex] = {
+    ...project.chats[chatIndex],
+    ...updates,
+    updated_at: new Date().toISOString()
+  };
+  
+  // Save updated project
+  const projectPath = path.join(config.workspace.root, 'projects', project.slug);
+  await fs.writeFile(
+    path.join(projectPath, 'project.json'),
+    JSON.stringify(project, null, 2),
+    'utf8'
+  );
+
+  // Update index
+  const projectIndex = new ProjectIndex(config.workspace.root);
+  await projectIndex.update(project);
+  
+  return project.chats[chatIndex];
+}
+
 module.exports = {
   createProject,
   getProject,
@@ -394,6 +436,7 @@ module.exports = {
   updateProject,
   deleteProject,
   addChatToProject,
+  updateChatInProject,
   ValidationError,
   ConflictError,
   NotFoundError,

@@ -12,7 +12,10 @@
   afterUpdate(async () => {
     if (autoScroll && shouldScroll && container) {
       await tick();
-      container.scrollTop = container.scrollHeight;
+      // Check container still exists after tick (component might have unmounted)
+      if (container) {
+        container.scrollTop = container.scrollHeight;
+      }
     }
   });
   

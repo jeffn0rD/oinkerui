@@ -194,6 +194,62 @@ async function chatRoutes(fastify, options) {
   });
 
   /**
+   * Fork a chat
+   * POST /api/projects/:projectId/chats/:chatId/fork
+   * 
+   * Creates a new chat as a copy of an existing chat.
+   * 
+   * Request body:
+   * {
+   *   fromMessageId?: string,  // Fork from this message (inclusive)
+   *   prune?: boolean,         // Exclude discarded/excluded messages
+   *   name?: string            // Name for the forked chat
+   * }
+   * 
+   * Spec: spec/functions/backend_node/fork_chat.yaml
+   */
+  fastify.post('/api/projects/:projectId/chats/:chatId/fork', async (request, reply) => {
+    try {
+      const { projectId, chatId } = request.params;
+      const { fromMessageId, prune, name } = request.body || {};
+
+      const forkedChat = await chatService.forkChat(projectId, chatId, {
+        fromMessageId,
+        prune,
+        name
+      });
+
+      reply.code(201).send({
+        success: true,
+        data: forkedChat
+      });
+    } catch (error) {
+      if (error.name === 'ValidationError') {
+        reply.code(400).send({
+          success: false,
+          error: error.message
+        });
+      } else if (error.name === 'NotFoundError') {
+        reply.code(404).send({
+          success: false,
+          error: error.message
+        });
+      } else if (error.name === 'FileSystemError') {
+        reply.code(500).send({
+          success: false,
+          error: error.message
+        });
+      } else {
+        console.error('Error forking chat:', error);
+        reply.code(500).send({
+          success: false,
+          error: 'Internal server error'
+        });
+      }
+    }
+  });
+
+  /**
    * Cancel active request for a chat
    * POST /api/projects/:projectId/chats/:chatId/cancel
    * 

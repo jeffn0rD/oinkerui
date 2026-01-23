@@ -401,12 +401,160 @@ async function deleteChat(projectId, chatId, options = {}) {
   }
 }
 
+/**
+ * Fork a chat with optional message point and pruning
+ * 
+ * Creates a new chat as a copy of an existing chat, optionally:
+ * - Forking from a specific message point
+ * - Pruning messages that are discarded or excluded from context
+ * 
+ * @param {string} projectId - UUID of the project
+ * @param {string} chatId - UUID of the chat to fork
+ * @param {Object} options - Fork options
+ * @param {string} [options.fromMessageId] - Fork from this message (inclusive)
+ * @param {boolean} [options.prune=false] - Exclude discarded/excluded messages
+ * @param {string} [options.name] - Name for forked chat
+ * @returns {Promise<Object>} The newly created forked chat
+ * @throws {ValidationError} If IDs are invalid
+ * @throws {NotFoundError} If project, chat, or message not found
+ * @throws {FileSystemError} If cannot create forked chat files
+ * 
+ * Spec: spec/functions/backend_node/fork_chat.yaml
+ */
+async function forkChat(projectId, chatId, options = {}) {
+  // Step 1: Validate project and chat exist
+  if (!isValidUUID(projectId)) {
+    throw new ValidationError('Invalid project ID format');
+  }
+  if (!isValidUUID(chatId)) {
+    throw new ValidationError('Invalid chat ID format');
+  }
+
+  const project = await projectService.getProject(projectId);
+  if (!project) {
+    throw new NotFoundError('Project not found');
+  }
+  if (project.status !== 'active') {
+    throw new ValidationError('Cannot fork chat in non-active project');
+  }
+
+  const originalChat = await getChat(projectId, chatId);
+  if (!originalChat) {
+    throw new NotFoundError('Chat not found');
+  }
+
+  // Step 2 & 3: Load messages from original chat
+  const messageService = require('./messageService');
+  const allMessages = await messageService.listMessages(projectId, chatId);
+
+  // Step 2: Determine fork point
+  let forkPointIndex = allMessages.length - 1;
+  let forkedAtMessageId = null;
+
+  if (options.fromMessageId) {
+    const messageIndex = allMessages.findIndex(m => m.id === options.fromMessageId);
+    if (messageIndex === -1) {
+      throw new NotFoundError(`Message not found: ${options.fromMessageId}`);
+    }
+    forkPointIndex = messageIndex;
+    forkedAtMessageId = options.fromMessageId;
+  }
+
+  // Get messages up to and including fork point
+  let messagesToCopy = allMessages.slice(0, forkPointIndex + 1);
+
+  // Step 4: Apply pruning if requested
+  if (options.prune) {
+    messagesToCopy = messagesToCopy.filter(m => {
+      // Keep messages that are:
+      // - Not discarded
+      // - Included in context (or system messages which are always included)
+      if (m.is_discarded === true) return false;
+      if (m.include_in_context === false && m.role !== 'system') return false;
+      return true;
+    });
+  }
+
+  // Step 5: Create new chat with forked_from metadata
+  const forkName = options.name || `Fork of ${originalChat.name}`;
+  
+  // Copy system prelude from original if present
+  const newChatOptions = {
+    name: forkName
+  };
+  
+  if (originalChat.system_prelude) {
+    newChatOptions.system_prelude = originalChat.system_prelude;
+  }
+
+  const forkedChat = await createChat(projectId, newChatOptions);
+
+  // Add fork metadata
+  forkedChat.forked_from_chat_id = chatId;
+  forkedChat.forked_at_message_id = forkedAtMessageId;
+
+  // Step 6: Copy messages with new IDs
+  // Skip system messages if we already created one via system_prelude
+  const hasSystemPrelude = originalChat.system_prelude && originalChat.system_prelude.content;
+  
+  for (const originalMessage of messagesToCopy) {
+    // Skip system message if we already have one from prelude
+    if (hasSystemPrelude && originalMessage.role === 'system' && 
+        originalMessage.content === originalChat.system_prelude.content) {
+      continue;
+    }
+
+    const newMessage = {
+      ...originalMessage,
+      id: uuidv4(), // New unique ID
+      chat_id: forkedChat.id,
+      project_id: projectId,
+      created_at: new Date().toISOString()
+    };
+
+    // Remove fork-specific flags that shouldn't carry over
+    delete newMessage.is_discarded;
+    newMessage.include_in_context = true;
+
+    await messageService.saveMessage(projectId, forkedChat.id, newMessage);
+  }
+
+  // Step 7: Update project with fork metadata
+  await projectService.updateChatInProject(projectId, forkedChat.id, {
+    forked_from_chat_id: chatId,
+    forked_at_message_id: forkedAtMessageId
+  });
+
+  // Count messages in forked chat
+  const forkedMessages = await messageService.listMessages(projectId, forkedChat.id);
+
+  // Step 8: Return forked chat with message count
+  console.log('Chat forked:', {
+    event: 'chat_forked',
+    originalChatId: chatId,
+    forkedChatId: forkedChat.id,
+    projectId,
+    messageCount: forkedMessages.length,
+    pruned: options.prune || false,
+    fromMessageId: forkedAtMessageId,
+    timestamp: new Date().toISOString()
+  });
+
+  return {
+    ...forkedChat,
+    forked_from_chat_id: chatId,
+    forked_at_message_id: forkedAtMessageId,
+    message_count: forkedMessages.length
+  };
+}
+
 module.exports = {
   createChat,
   getChat,
   listChats,
   updateChat,
   deleteChat,
+  forkChat,
   // Export error classes for testing
   ValidationError,
   NotFoundError,

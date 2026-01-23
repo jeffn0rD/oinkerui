@@ -3,7 +3,7 @@ Unit tests for configuration module.
 """
 
 import pytest
-from backend_python.src.config import settings
+from src.config import settings
 
 
 @pytest.mark.unit

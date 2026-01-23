@@ -12,6 +12,14 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
       exclude: ['node_modules/', 'tests/']
-    }
+    },
+    // Required for Svelte 5 to use client-side code in tests
+    alias: [
+      { find: /^svelte$/, replacement: 'svelte' }
+    ]
+  },
+  resolve: {
+    // Ensure browser conditions are used for Svelte 5
+    conditions: ['browser']
   }
 });
