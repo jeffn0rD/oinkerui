@@ -41,6 +41,27 @@ prompt_guidance: "Always follow these guidelines and update project documentatio
 current:
 - task:
     id: 2.0.0
+    name: Backend Testing Errors
+    goal: Backend tests execute with 0 errors (on all platforms)
+    details: Review test output log (log/backend_tests_012226.txt) and fix issues.  This test was done on windows 11.
+    files:
+      - log/backend_tests_012226.txt    
+- task:
+    id: 2.0.2
+    name: Module and Function Spec Review
+    goal: Specification files in ./spec/modules and ./spec/functions are consistent and ready for phase 2 development.
+    prompt: ""
+    details: |
+      Review specifications for modules and functions.  They need to be ready and complete for phase 2 development.
+      Function signatures and algorithms should exist for planned development.  Everything must be consistent with existing codebase
+      and phase 2 targets.  Frontend UI doesn't have coverage here.  That will need to be generated.
+      Review the remaining phase 2 tasks (2.0.5 - 2.9.0) and thier associated prompts, make sure any new information is incorporated
+      so they will be used as ground source truth for further development.  Add references to any tool and appropriate doc_query's to
+      bring new spec information into the tasks.
+    files:
+      - spec/**   
+- task:
+    id: 2.0.5
     name: Implement Message Context Flags
     goal: Implement message context control flags (include_in_context, is_aside, pure_aside, is_pinned, is_discarded) in the
       backend and update the context construction algorithm.
@@ -50,6 +71,11 @@ current:
     name: Implement Slash Command Parser
     goal: Implement the slash command parsing system in the Node.js backend for commands defined in spec/commands.yaml.
     prompt: ./prompts/dev/prompt_2_1_0.md
+- task:
+    id: 2.1.5
+    name: Implement LLM Response Streaming
+    goal: Implement full LLM response streaming from OpenRouter to the frontend UI with SSE.
+    prompt: ./prompts/dev/prompt_2_1_5.md
 - task:
     id: 2.2.0
     name: Implement Chat Forking
@@ -61,10 +87,20 @@ current:
     goal: Implement real-time context size estimation and display showing tokens vs model maximum.
     prompt: ./prompts/dev/prompt_2_3_0.md
 - task:
+    id: 2.3.5
+    name: Implement Cancel LLM Request
+    goal: Implement ability to cancel in-progress LLM requests with timeout configuration and UI feedback.
+    prompt: ./prompts/dev/prompt_2_3_5.md
+- task:
     id: 2.4.0
     name: Implement Requery Functionality
     goal: Implement the requery feature to regenerate LLM responses with response branching support.
     prompt: ./prompts/dev/prompt_2_4_0.md
+- task:
+    id: 2.4.5
+    name: Implement Core Frontend Application
+    goal: Implement the core frontend application with functional UI, dark theme, and modern power-user styling.
+    prompt: ./prompts/dev/prompt_2_4_5.md
 - task:
     id: 2.5.0
     name: Implement Python Tools Backend
@@ -75,6 +111,11 @@ current:
     name: Implement Prompt Templates System
     goal: Implement prompt templates with Jinja2 rendering, variable substitution, and template management UI.
     prompt: ./prompts/dev/prompt_2_6_0.md
+- task:
+    id: 2.6.5
+    name: Implement Frontend-Backend Integration
+    goal: Complete frontend-backend integration with API calls, real-time updates, and smooth UX.
+    prompt: ./prompts/dev/prompt_2_6_5.md
 - task:
     id: 2.7.0
     name: Implement Message Flag UI Controls
@@ -90,28 +131,7 @@ current:
     name: Phase 2 Integration and Testing
     goal: Integrate all Phase 2 components and implement comprehensive end-to-end tests.
     prompt: ./prompts/dev/prompt_2_9_0.md
-- task:
-    id: 2.1.5
-    name: Implement LLM Response Streaming
-    goal: Implement full LLM response streaming from OpenRouter to the frontend UI with SSE.
-    prompt: ./prompts/dev/prompt_2_1_5.md
-- task:
-    id: 2.3.5
-    name: Implement Cancel LLM Request
-    goal: Implement ability to cancel in-progress LLM requests with timeout configuration and UI feedback.
-    prompt: ./prompts/dev/prompt_2_3_5.md
-- task:
-    id: 2.4.5
-    name: Implement Core Frontend Application
-    goal: Implement the core frontend application with functional UI, dark theme, and modern power-user styling.
-    prompt: ./prompts/dev/prompt_2_4_5.md
-- task:
-    id: 2.6.5
-    name: Implement Frontend-Backend Integration
-    goal: Complete frontend-backend integration with API calls, real-time updates, and smooth UX.
-    prompt: ./prompts/dev/prompt_2_6_5.md
 future:
-- need a way to cancel a current executing llm prompt/workflow
 - add context re-ordering feature; prompt/responses in chat history can be re-ordered in the left side list, drag and drop
   and/or buttons move up/down.  Need a reset button as well.
 open_questions: []

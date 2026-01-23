@@ -1,0 +1,195 @@
+FAIL  tests/e2e/fullWorkflow.test.js (5.427 s)
+  ● End-to-End Workflow › Complete Chat Workflow › Step 4: Send a message in the chat
+
+    expect(received).toBeDefined()
+
+    Received: undefined
+
+      130 |
+      131 |       expect(message).toBeDefined();
+    > 132 |       expect(message.id).toBeDefined();
+          |                          ^
+      133 |       expect(message.role).toBe('user');
+      134 |       expect(message.content).toBe('Hello, this is a test message!');
+      135 |     });
+
+      at Object.toBeDefined (tests/e2e/fullWorkflow.test.js:132:26)
+
+  ● End-to-End Workflow › Complete Chat Workflow › Step 5: List messages in the chat
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "Hello, this is a test message!"
+    Received: "You are a helpful assistant for testing."
+
+      140 |       expect(messages).toBeDefined();
+      141 |       expect(messages.length).toBeGreaterThan(0);
+    > 142 |       expect(messages[0].content).toBe('Hello, this is a test message!');
+          |                                   ^
+      143 |     });
+      144 |
+      145 |     it('Step 6: Verify chat is linked to project', async () => {
+
+      at Object.toBe (tests/e2e/fullWorkflow.test.js:142:35)
+
+  ● End-to-End Workflow › LLM Integration › should construct context correctly
+
+    expect(received).toBeGreaterThan(expected)
+
+    Matcher error: received value must be a number or bigint
+
+    Received has value: undefined
+
+      182 |
+      183 |       expect(context).toBeDefined();
+    > 184 |       expect(context.length).toBeGreaterThan(0);
+          |                              ^
+      185 |       expect(context[0].role).toBe('system');
+      186 |       expect(context[0].content).toBe('You are a test assistant.');
+      187 |     });
+
+      at Object.toBeGreaterThan (tests/e2e/fullWorkflow.test.js:184:30)
+
+  ● End-to-End Workflow › LLM Integration › should call LLM with correct parameters
+
+    ValidationError: Model is required
+
+      66 |   // Step 1: Validate request parameters
+      67 |   if (!request.model) {
+    > 68 |     throw new ValidationError('Model is required');
+         |           ^
+      69 |   }
+      70 |   if (!request.messages || !Array.isArray(request.messages) || request.messages.length === 0) {
+      71 |     throw new ValidationError('Messages are required and must be a non-empty array');
+
+      at Object.callLLM (src/services/llmService.js:68:11)
+      at Object.callLLM (tests/e2e/fullWorkflow.test.js:212:41)
+
+  ● End-to-End Workflow › Git Operations › should initialize git repository for project
+
+    ValidationError: Current message must have content
+
+      241 |   }
+      242 |   if (!currentMessage.content) {
+    > 243 |     throw new ValidationError('Current message must have content');
+          |           ^
+      244 |   }
+      245 |
+      246 |   // Step 1: Load all messages from chat JSONL file
+
+      at Object.constructContext (src/services/llmService.js:243:11)
+      at Object.constructContext (tests/e2e/fullWorkflow.test.js:179:34)
+
+  ● End-to-End Workflow › Git Operations › should get repository status
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: true
+    Received: undefined
+
+      237 |
+      238 |       expect(status).toBeDefined();
+    > 239 |       expect(status.isRepo).toBe(true);
+          |                             ^
+      240 |     });
+      241 |
+      242 |     it('should auto-commit changes', async () => {
+
+      at Object.toBe (tests/e2e/fullWorkflow.test.js:239:29)
+
+  ● End-to-End Workflow › Data Entity Management › should create a file entity
+
+    ValidationError: Entity path is required
+
+      58 | function validatePath(entityPath) {
+      59 |   if (!entityPath || typeof entityPath !== 'string') {
+    > 60 |     throw new ValidationError('Entity path is required');
+         |           ^
+      61 |   }
+      62 |
+      63 |   // Path must be relative (not start with /)
+
+      at validatePath (src/services/dataEntityService.js:60:11)
+      at Object.validatePath [as createDataEntity] (src/services/dataEntityService.js:107:3)
+      at Object.<anonymous> (tests/e2e/fullWorkflow.test.js:263:22)
+
+  ● End-to-End Workflow › Data Entity Management › should create an object entity
+
+    ValidationError: Entity path is required
+
+      58 | function validatePath(entityPath) {
+      59 |   if (!entityPath || typeof entityPath !== 'string') {
+    > 60 |     throw new ValidationError('Entity path is required');
+         |           ^
+      61 |   }
+      62 |
+      63 |   // Path must be relative (not start with /)
+
+      at validatePath (src/services/dataEntityService.js:60:11)
+      at Object.validatePath [as createDataEntity] (src/services/dataEntityService.js:107:3)
+      at Object.<anonymous> (tests/e2e/fullWorkflow.test.js:278:22)
+
+  ● End-to-End Workflow › Data Entity Management › should list entities in project
+
+    ValidationError: Entity path is required
+
+      58 | function validatePath(entityPath) {
+      59 |   if (!entityPath || typeof entityPath !== 'string') {
+    > 60 |     throw new ValidationError('Entity path is required');
+         |           ^
+      61 |   }
+      62 |
+      63 |   // Path must be relative (not start with /)
+
+      at validatePath (src/services/dataEntityService.js:60:11)
+      at Object.validatePath [as createDataEntity] (src/services/dataEntityService.js:107:3)
+      at Object.<anonymous> (tests/e2e/fullWorkflow.test.js:291:7)
+
+  ● End-to-End Workflow › Logging Service › should log LLM requests
+
+    ValidationError: project_id is required
+
+      81 |   // Step 1: Validate required fields
+      82 |   if (!entry.project_id) {
+    > 83 |     throw new ValidationError('project_id is required');
+         |           ^
+      84 |   }
+      85 |   if (!entry.chat_id) {
+      86 |     throw new ValidationError('chat_id is required');
+
+      at Object.logLLMRequest (src/services/loggingService.js:83:11)
+      at Object.logLLMRequest (tests/e2e/fullWorkflow.test.js:313:42)
+
+  ● End-to-End Workflow › Logging Service › should get stats for project
+
+    ValidationError: project_id is required
+
+      81 |   // Step 1: Validate required fields
+      82 |   if (!entry.project_id) {
+    > 83 |     throw new ValidationError('project_id is required');
+         |           ^
+      84 |   }
+      85 |   if (!entry.chat_id) {
+      86 |     throw new ValidationError('chat_id is required');
+
+      at Object.logLLMRequest (src/services/loggingService.js:83:11)
+      at Object.logLLMRequest (tests/e2e/fullWorkflow.test.js:331:28)
+
+  ● End-to-End Workflow › Concurrent Operations › should handle concurrent message sends
+
+    FileSystemError: Failed to load project data
+
+      263 |     return JSON.parse(data);
+      264 |   } catch (error) {
+    > 265 |     throw new FileSystemError('Failed to load project data', { projectId, error: error.message });
+          |           ^
+      266 |   }
+      267 | }
+      268 |
+
+      at getProject (src/services/projectService.js:265:11)
+      at Object.updateProject (src/services/projectService.js:306:19)
+      at Object.updateChat (src/services/chatService.js:323:3)
+      at Object.sendMessage (src/services/messageService.js:325:3)
+          at async Promise.all (index 2)
+      at Object.<anonymous> (tests/e2e/fullWorkflow.test.js:428:23)
