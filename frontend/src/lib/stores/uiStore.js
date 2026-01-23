@@ -57,6 +57,32 @@ export const theme = createThemeStore();
 export const loading = writable(false);
 export const loadingMessage = writable('');
 
+// Streaming state for LLM requests
+export const streaming = writable({
+  isActive: false,
+  chatId: null,
+  requestType: 'llm',
+  startedAt: null
+});
+
+export function startStreaming(chatId, requestType = 'llm') {
+  streaming.set({
+    isActive: true,
+    chatId,
+    requestType,
+    startedAt: Date.now()
+  });
+}
+
+export function stopStreaming() {
+  streaming.set({
+    isActive: false,
+    chatId: null,
+    requestType: 'llm',
+    startedAt: null
+  });
+}
+
 // Notifications/toasts
 export const notifications = writable([]);
 

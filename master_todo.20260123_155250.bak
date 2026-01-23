@@ -50,6 +50,11 @@ current:
     goal: Implement real-time context size estimation and display showing tokens vs model maximum.
     prompt: ./prompts/dev/prompt_2_3_0.md
 - task:
+    id: 2.3.5
+    name: Implement Cancel LLM Request
+    goal: Implement ability to cancel in-progress LLM requests with timeout configuration and UI feedback.
+    prompt: ./prompts/dev/prompt_2_3_5.md
+- task:
     id: 2.4.0
     name: Implement Requery Functionality
     goal: Implement the requery feature to regenerate LLM responses with response branching support.

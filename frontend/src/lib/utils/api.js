@@ -106,7 +106,27 @@ export const chatApi = {
   delete: (projectId, chatId, hard = false) => 
     request(`/projects/${projectId}/chats/${chatId}?hard=${hard}`, {
       method: 'DELETE'
-    })
+    }),
+  
+  /**
+   * Cancel an active LLM request for a chat
+   * @param {string} projectId - Project ID
+   * @param {string} chatId - Chat ID
+   * @returns {Promise<Object>} Cancellation result
+   */
+  cancel: (projectId, chatId) =>
+    request(`/projects/${projectId}/chats/${chatId}/cancel`, {
+      method: 'POST'
+    }),
+  
+  /**
+   * Get active request status for a chat
+   * @param {string} projectId - Project ID
+   * @param {string} chatId - Chat ID
+   * @returns {Promise<Object>} Status info
+   */
+  getStatus: (projectId, chatId) =>
+    request(`/projects/${projectId}/chats/${chatId}/status`)
 };
 
 // Message API

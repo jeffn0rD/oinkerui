@@ -9,9 +9,12 @@
  * - GET    /api/projects/:projectId/chats/:chatId - Get a specific chat
  * - PUT    /api/projects/:projectId/chats/:chatId - Update a chat
  * - DELETE /api/projects/:projectId/chats/:chatId - Delete a chat
+ * - POST   /api/projects/:projectId/chats/:chatId/cancel - Cancel active request
+ * - GET    /api/projects/:projectId/chats/:chatId/status - Get active request status
  */
 
 const chatService = require('../services/chatService');
+const cancelService = require('../services/cancelService');
 
 async function chatRoutes(fastify, options) {
   /**
@@ -182,6 +185,94 @@ async function chatRoutes(fastify, options) {
           error: error.message
         });
       } else {
+        reply.code(500).send({
+          success: false,
+          error: 'Internal server error'
+        });
+      }
+    }
+  });
+
+  /**
+   * Cancel active request for a chat
+   * POST /api/projects/:projectId/chats/:chatId/cancel
+   * 
+   * Cancels any in-progress LLM request for the specified chat.
+   * Returns cancellation result including any partial response received.
+   * 
+   * Spec: spec/functions/backend_node/cancel_request.yaml
+   */
+  fastify.post('/api/projects/:projectId/chats/:chatId/cancel', async (request, reply) => {
+    try {
+      const { projectId, chatId } = request.params;
+
+      // Verify chat exists
+      await chatService.getChat(projectId, chatId);
+
+      // Cancel the active request
+      const result = cancelService.cancelRequest(chatId);
+
+      reply.send({
+        success: true,
+        data: result
+      });
+    } catch (error) {
+      if (error.name === 'ValidationError') {
+        reply.code(400).send({
+          success: false,
+          error: error.message
+        });
+      } else if (error.name === 'NotFoundError') {
+        reply.code(404).send({
+          success: false,
+          error: error.message
+        });
+      } else {
+        console.error('Error cancelling request:', error);
+        reply.code(500).send({
+          success: false,
+          error: 'Internal server error'
+        });
+      }
+    }
+  });
+
+  /**
+   * Get active request status for a chat
+   * GET /api/projects/:projectId/chats/:chatId/status
+   * 
+   * Returns information about any active request for the chat.
+   */
+  fastify.get('/api/projects/:projectId/chats/:chatId/status', async (request, reply) => {
+    try {
+      const { projectId, chatId } = request.params;
+
+      // Verify chat exists
+      await chatService.getChat(projectId, chatId);
+
+      // Get active request info
+      const activeRequest = cancelService.getActiveRequest(chatId);
+
+      reply.send({
+        success: true,
+        data: {
+          hasActiveRequest: !!activeRequest,
+          request: activeRequest
+        }
+      });
+    } catch (error) {
+      if (error.name === 'ValidationError') {
+        reply.code(400).send({
+          success: false,
+          error: error.message
+        });
+      } else if (error.name === 'NotFoundError') {
+        reply.code(404).send({
+          success: false,
+          error: error.message
+        });
+      } else {
+        console.error('Error getting request status:', error);
         reply.code(500).send({
           success: false,
           error: 'Internal server error'

@@ -40,6 +40,11 @@ prompt_guidance: "Always follow these guidelines and update project documentatio
   \ if it is outside the scope.\n* ALWAYS COMMIT AND PUSH the repository after a task.\n"
 current:
 - task:
+    id: 2.1.5
+    name: Implement LLM Response Streaming
+    goal: Implement full LLM response streaming from OpenRouter to the frontend UI with SSE.
+    prompt: ./prompts/dev/prompt_2_1_5.md
+- task:
     id: 2.2.0
     name: Implement Chat Forking
     goal: Implement chat forking functionality with optional message point and pruning support.
@@ -49,6 +54,11 @@ current:
     name: Implement Live Context Size Display
     goal: Implement real-time context size estimation and display showing tokens vs model maximum.
     prompt: ./prompts/dev/prompt_2_3_0.md
+- task:
+    id: 2.3.5
+    name: Implement Cancel LLM Request
+    goal: Implement ability to cancel in-progress LLM requests with timeout configuration and UI feedback.
+    prompt: ./prompts/dev/prompt_2_3_5.md
 - task:
     id: 2.4.0
     name: Implement Requery Functionality

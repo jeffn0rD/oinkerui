@@ -2,9 +2,11 @@
   import { createEventDispatcher } from 'svelte';
   import MessageList from './MessageList.svelte';
   import MessageInput from './MessageInput.svelte';
+  import CancelButton from './CancelButton.svelte';
   import { currentChat, messages } from '../stores/chatStore.js';
   import { currentProject } from '../stores/projectStore.js';
-  import { loading } from '../stores/uiStore.js';
+  import { loading, streaming, stopStreaming } from '../stores/uiStore.js';
+  import { chatApi } from '../utils/api.js';
   
   const dispatch = createEventDispatcher();
   
@@ -48,6 +50,27 @@
   function handleMessageDiscard(event) {
     dispatch('discard', event.detail);
   }
+  
+  async function handleCancel() {
+    if (!$currentProject || !$currentChat) return;
+    
+    try {
+      const result = await chatApi.cancel($currentProject.id, $currentChat.id);
+      
+      // Stop streaming state
+      stopStreaming();
+      loading.set(false);
+      
+      // If there was a partial response, we could handle it here
+      if (result.data?.partialResponse) {
+        console.log('Partial response preserved:', result.data.partialResponse.length, 'chars');
+      }
+      
+      dispatch('cancelled', result.data);
+    } catch (error) {
+      console.error('Failed to cancel request:', error);
+    }
+  }
 </script>
 
 <div class="flex flex-col h-full bg-background">
@@ -64,6 +87,14 @@
       </div>
       
       <div class="flex items-center gap-2">
+        <!-- Cancel button - shows during active streaming -->
+        <CancelButton 
+          isActive={$streaming.isActive && $streaming.chatId === $currentChat?.id}
+          requestType={$streaming.requestType}
+          size="sm"
+          on:cancel={handleCancel}
+        />
+        
         <!-- Chat settings button -->
         <button 
           class="p-2 rounded-lg hover:bg-surface-hover text-muted hover:text-foreground transition-colors"

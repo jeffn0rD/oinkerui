@@ -541,55 +541,8 @@ async function sendLLMMessage(projectId, chatId, message, options = {}) {
 // =============================================================================
 // Active Request Tracking (for cancellation)
 // =============================================================================
-
-// Map of chatId -> { requestId, controller, startTime }
-const activeRequests = new Map();
-
-/**
- * Register an active request for tracking
- * @param {string} chatId - Chat ID
- * @param {string} requestId - Request ID
- * @param {AbortController} controller - Abort controller
- */
-function registerActiveRequest(chatId, requestId, controller) {
-  activeRequests.set(chatId, {
-    requestId,
-    controller,
-    startTime: Date.now()
-  });
-}
-
-/**
- * Unregister an active request
- * @param {string} chatId - Chat ID
- */
-function unregisterActiveRequest(chatId) {
-  activeRequests.delete(chatId);
-}
-
-/**
- * Get active request for a chat
- * @param {string} chatId - Chat ID
- * @returns {Object|null} Active request info or null
- */
-function getActiveRequest(chatId) {
-  return activeRequests.get(chatId) || null;
-}
-
-/**
- * Cancel an active request
- * @param {string} chatId - Chat ID
- * @returns {boolean} True if request was cancelled
- */
-function cancelActiveRequest(chatId) {
-  const request = activeRequests.get(chatId);
-  if (request) {
-    request.controller.abort();
-    activeRequests.delete(chatId);
-    return true;
-  }
-  return false;
-}
+// Now delegated to cancelService for centralized management
+const cancelService = require('./cancelService');
 
 // =============================================================================
 // Streaming LLM Response
@@ -813,6 +766,7 @@ async function* streamLLMResponse(request, callbacks = {}) {
  * 
  * High-level function to send a message and stream the response.
  * Combines context construction with streaming LLM call.
+ * Uses cancelService for request tracking and cancellation support.
  * 
  * @param {string} projectId - Project ID
  * @param {string} chatId - Chat ID
@@ -834,12 +788,32 @@ async function* sendLLMMessageStream(projectId, chatId, message, options = {}, c
   // Construct context
   const context = await constructContext(chat, message, model);
   
-  // Create abort controller for this request
-  const controller = new AbortController();
-  const requestId = require('uuid').v4();
+  // Register request with cancelService (includes timeout support)
+  const timeout = options.timeout || project.settings?.request_timeout || cancelService.DEFAULT_TIMEOUT_MS;
+  const { requestId, signal } = cancelService.registerRequest(chatId, {
+    type: 'llm',
+    timeout,
+    onTimeout: (requestInfo) => {
+      if (callbacks.onError) {
+        const timeoutError = new TimeoutError('Request timed out');
+        timeoutError.accumulated = cancelService.getPartialResponse(chatId);
+        callbacks.onError(timeoutError);
+      }
+    }
+  });
   
-  // Register active request
-  registerActiveRequest(chatId, requestId, controller);
+  // Wrap onToken callback to track partial response
+  const wrappedCallbacks = {
+    ...callbacks,
+    onToken: (token) => {
+      // Update partial response in cancelService
+      cancelService.updatePartialResponse(chatId, token);
+      // Call original callback
+      if (callbacks.onToken) {
+        callbacks.onToken(token);
+      }
+    }
+  };
   
   try {
     // Stream LLM response
@@ -848,15 +822,15 @@ async function* sendLLMMessageStream(projectId, chatId, message, options = {}, c
       messages: context,
       max_tokens: options.max_tokens,
       temperature: options.temperature,
-      abortSignal: controller.signal
-    }, callbacks);
+      abortSignal: signal
+    }, wrappedCallbacks);
     
     for await (const chunk of stream) {
       yield chunk;
     }
   } finally {
-    // Unregister active request
-    unregisterActiveRequest(chatId);
+    // Unregister active request on completion
+    cancelService.unregisterRequest(chatId);
   }
 }
 
@@ -867,11 +841,6 @@ module.exports = {
   streamLLMResponse,
   sendLLMMessageStream,
   countTokens,
-  // Active request management
-  registerActiveRequest,
-  unregisterActiveRequest,
-  getActiveRequest,
-  cancelActiveRequest,
   // Export error classes for testing
   ValidationError,
   ConfigError,

@@ -1074,18 +1074,3 @@ tasks:
     completed_date: '2025-01-23'
     git_commit: 0ecccdd
     summary: Implemented slash command parser and executor with all Phase 2 commands
-- task:
-    id: 2.1.5
-    name: Implement LLM Response Streaming
-    goal: Implement full LLM response streaming from OpenRouter to the frontend UI with SSE.
-    prompt: ./prompts/dev/prompt_2_1_5.md
-    completed_date: '2025-01-23'
-    git_commit: 1ee98ff
-    summary: Implemented LLM response streaming with SSE and cancellation support
-- task:
-    id: 2.3.5
-    name: Implement Cancel LLM Request
-    goal: Implement ability to cancel in-progress LLM requests with timeout configuration and UI feedback.
-    prompt: ./prompts/dev/prompt_2_3_5.md
-    completed_date: '2026-01-23'
-    summary: Implemented cancel LLM request with timeout support and UI feedback
