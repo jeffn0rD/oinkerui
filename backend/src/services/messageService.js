@@ -258,10 +258,12 @@ async function listMessages(projectId, chatId, options = {}) {
 }
 
 /**
- * Send a message in a chat (simplified version without LLM integration)
+ * Send a message in a chat with slash command support
  * 
- * This is a simplified implementation that saves the user message.
- * Full LLM integration will be added in a future task.
+ * This implementation:
+ * 1. Checks for slash commands and executes them
+ * 2. Saves the user message with appropriate flags
+ * 3. (Future) Calls LLM for response
  * 
  * @param {string} projectId - UUID of the project
  * @param {string} chatId - UUID of the chat
@@ -269,11 +271,17 @@ async function listMessages(projectId, chatId, options = {}) {
  * @param {string} request.raw_text - Message content
  * @param {string} [request.model_id] - Model ID for LLM
  * @param {boolean} [request.is_aside=false] - Whether message is an aside
- * @returns {Promise<Object>} Response with user message
+ * @param {boolean} [request.pure_aside=false] - Whether message is a pure aside
+ * @param {boolean} [request.is_pinned=false] - Whether message is pinned
+ * @returns {Promise<Object>} Response with user message and optional command result
  * @throws {ValidationError} If request is invalid
  * @throws {NotFoundError} If project or chat not found
+ * 
+ * Spec: spec/functions/backend_node/send_message.yaml
  */
 async function sendMessage(projectId, chatId, request) {
+  const commandService = require('./commandService');
+
   // Validate request
   if (!request.raw_text || typeof request.raw_text !== 'string' || request.raw_text.trim() === '') {
     throw new ValidationError('raw_text is required and must be non-empty');
@@ -305,21 +313,97 @@ async function sendMessage(projectId, chatId, request) {
     throw new ValidationError('Chat is not active');
   }
 
+  // Check for slash command
+  let commandResult = null;
+  let messageFlags = {
+    include_in_context: request.include_in_context !== false,
+    is_aside: request.is_aside || false,
+    pure_aside: request.pure_aside || false,
+    is_pinned: request.is_pinned || false,
+    is_discarded: false
+  };
+  let messageContent = request.raw_text;
+  let continueWithLLM = true;
+
+  if (commandService.isSlashCommand(request.raw_text)) {
+    try {
+      // Parse the slash command
+      const parsedCommand = await commandService.parseSlashCommand(request.raw_text);
+      
+      // Execute the command
+      commandResult = await commandService.executeSlashCommand(parsedCommand, {
+        projectId,
+        chatId,
+        message: null // Will be set after message is created
+      });
+
+      // Apply any flags from command result
+      if (commandResult.data?.flags) {
+        messageFlags = { ...messageFlags, ...commandResult.data.flags };
+      }
+
+      // Check if we should continue with LLM call
+      if (commandResult.continueWithLLM === false) {
+        continueWithLLM = false;
+      }
+
+      // For commands that don't continue with LLM, extract content after command
+      if (!continueWithLLM) {
+        // Return early for pure command execution (no message saved)
+        return {
+          user_message: null,
+          assistant_message: null,
+          request_log: null,
+          command_result: commandResult
+        };
+      }
+
+      // For commands like /aside, extract the actual message content
+      // The content is everything after the command
+      if (parsedCommand.raw_args) {
+        messageContent = parsedCommand.raw_args;
+      } else {
+        // If no content after command, use the original text
+        // (the command itself becomes the message)
+        messageContent = request.raw_text;
+      }
+
+    } catch (error) {
+      // If command parsing fails, treat as regular message or return error
+      if (error.name === 'UnknownCommandError') {
+        // Return error for unknown commands
+        return {
+          user_message: null,
+          assistant_message: null,
+          request_log: null,
+          command_result: {
+            success: false,
+            command: null,
+            error: error.message,
+            output: `Unknown command. ${error.suggestions?.length > 0 ? `Did you mean: ${error.suggestions.join(', ')}?` : ''}`
+          }
+        };
+      }
+      // For other errors, treat as regular message
+      console.warn('Command parsing error, treating as regular message:', error.message);
+    }
+  }
+
   // Create user message with all context flags
   const userMessage = {
     id: uuidv4(),
     chat_id: chatId,
     project_id: projectId,
     role: 'user',
-    content: request.raw_text,
+    content: messageContent,
     status: 'complete',
     created_at: new Date().toISOString(),
-    // Context flags with defaults per spec/domain.yaml
-    include_in_context: request.include_in_context !== false, // default: true
-    is_aside: request.is_aside || false,                      // default: false
-    pure_aside: request.pure_aside || false,                  // default: false
-    is_pinned: request.is_pinned || false,                    // default: false
-    is_discarded: false                                       // default: false (never set on creation)
+    // Context flags
+    include_in_context: messageFlags.include_in_context,
+    is_aside: messageFlags.is_aside,
+    pure_aside: messageFlags.pure_aside,
+    is_pinned: messageFlags.is_pinned,
+    is_discarded: messageFlags.is_discarded
   };
 
   // Save user message
@@ -330,12 +414,12 @@ async function sendMessage(projectId, chatId, request) {
     updated_at: new Date().toISOString()
   });
 
-  // Return response (without LLM call for now)
+  // Return response (LLM call will be added in streaming task)
   return {
     user_message: userMessage,
     assistant_message: null,
     request_log: null,
-    command_result: null
+    command_result: commandResult
   };
 }
 

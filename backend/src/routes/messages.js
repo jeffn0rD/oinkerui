@@ -7,9 +7,12 @@
  * - POST   /api/projects/:projectId/chats/:chatId/messages - Send a message
  * - GET    /api/projects/:projectId/chats/:chatId/messages - List messages
  * - GET    /api/projects/:projectId/chats/:chatId/messages/:messageId - Get a message
+ * - PATCH  /api/projects/:projectId/chats/:chatId/messages/:messageId/flags - Update message flags
+ * - GET    /api/commands - List available slash commands
  */
 
 const messageService = require('../services/messageService');
+const commandService = require('../services/commandService');
 
 async function messageRoutes(fastify, options) {
   /**
@@ -176,6 +179,60 @@ async function messageRoutes(fastify, options) {
           error: 'Internal server error'
         });
       }
+    }
+  });
+
+  /**
+   * List available slash commands
+   * GET /api/commands
+   * 
+   * Returns list of all registered slash commands with their definitions.
+   * Used for autocomplete and help display in the frontend.
+   */
+  fastify.get('/api/commands', async (request, reply) => {
+    try {
+      const commands = await commandService.getAvailableCommands();
+
+      reply.send({
+        success: true,
+        data: commands
+      });
+    } catch (error) {
+      console.error('Error listing commands:', error);
+      reply.code(500).send({
+        success: false,
+        error: 'Failed to list commands'
+      });
+    }
+  });
+
+  /**
+   * Get a specific command definition
+   * GET /api/commands/:commandName
+   */
+  fastify.get('/api/commands/:commandName', async (request, reply) => {
+    try {
+      const { commandName } = request.params;
+      const command = await commandService.getCommandDefinition(commandName);
+
+      if (!command) {
+        reply.code(404).send({
+          success: false,
+          error: `Command not found: ${commandName}`
+        });
+        return;
+      }
+
+      reply.send({
+        success: true,
+        data: command
+      });
+    } catch (error) {
+      console.error('Error getting command:', error);
+      reply.code(500).send({
+        success: false,
+        error: 'Failed to get command'
+      });
     }
   });
 }

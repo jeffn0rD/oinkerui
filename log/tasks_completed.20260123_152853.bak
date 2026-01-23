@@ -1057,12 +1057,3 @@ tasks:
     git_commit: b7c6b1e
     summary: Completed Module and Function Spec Review - created 18 missing function specs, updated all Phase 2 task prompts
       with spec references
-- task:
-    id: 2.0.5
-    name: Implement Message Context Flags
-    goal: Implement message context control flags (include_in_context, is_aside, pure_aside, is_pinned, is_discarded) in the
-      backend and update the context construction algorithm.
-    prompt: ./prompts/dev/prompt_2_0_0.md
-    completed_date: '2025-01-23'
-    git_commit: '7404842'
-    summary: Implemented message context flags and updated context construction algorithm per spec

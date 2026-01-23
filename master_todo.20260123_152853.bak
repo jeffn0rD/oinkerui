@@ -40,6 +40,12 @@ prompt_guidance: "Always follow these guidelines and update project documentatio
   \ if it is outside the scope.\n* ALWAYS COMMIT AND PUSH the repository after a task.\n"
 current:
 - task:
+    id: 2.0.5
+    name: Implement Message Context Flags
+    goal: Implement message context control flags (include_in_context, is_aside, pure_aside, is_pinned, is_discarded) in the
+      backend and update the context construction algorithm.
+    prompt: ./prompts/dev/prompt_2_0_0.md
+- task:
     id: 2.1.0
     name: Implement Slash Command Parser
     goal: Implement the slash command parsing system in the Node.js backend for commands defined in spec/commands.yaml.

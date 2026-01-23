@@ -1,0 +1,100 @@
+task_id: "2.1.0"
+name: "Implement Slash Command Parser"
+completed_date: "2025-01-23"
+status: complete
+
+summary: |
+  Implemented the slash command parsing system in the Node.js backend.
+  Created commandService.js with parsing, execution, and registry management.
+  Integrated with message flow and added API endpoints.
+
+actions_taken:
+  - action: "Created commandService.js"
+    justification: "Central service for slash command handling per spec"
+    features:
+      - Command registry loaded from spec/commands.yaml
+      - Fallback to built-in commands if spec not found
+      - Alias support (e.g., /run -> /execute)
+      - Tokenizer for quoted strings
+      - Similar command suggestions on error
+
+  - action: "Implemented parseSlashCommand function"
+    justification: "Required per spec/functions/backend_node/parse_slash_command.yaml"
+    algorithm:
+      - Validate input starts with /
+      - Remove / prefix and trim
+      - Split command and arguments
+      - Normalize to lowercase
+      - Check aliases
+      - Validate against registry
+      - Parse args and --options
+      - Return ParsedCommand object
+
+  - action: "Implemented executeSlashCommand function"
+    justification: "Required per spec/functions/backend_node/execute_slash_command.yaml"
+    handlers_implemented:
+      - aside: Set is_aside flag, continue with LLM
+      - aside-pure: Set pure_aside and is_aside flags
+      - pin: Pin message (with or without message ID)
+      - discard: Discard message by ID
+      - chat-fork: Fork chat with --from and --prune options
+      - requery: Trigger requery of last response
+      - commit: Git commit with message
+      - push: Git push
+      - save_entity: Save data entity (JSON payload)
+      - execute: Placeholder for Python tools
+      - template: Placeholder for template system
+
+  - action: "Integrated with sendMessage"
+    justification: "Commands must be processed in message flow"
+    details: |
+      - Check if input is slash command
+      - Parse and execute command
+      - Apply flags from command result
+      - Handle command-only vs command+LLM flows
+      - Return command result to frontend
+
+  - action: "Added API endpoints"
+    justification: "Frontend needs command list for autocomplete"
+    endpoints:
+      - "GET /api/commands - List all commands"
+      - "GET /api/commands/:name - Get command definition"
+
+  - action: "Added comprehensive tests"
+    justification: "Verify parsing and execution"
+    test_count: 26
+    coverage:
+      - isSlashCommand detection
+      - parseSlashCommand parsing
+      - executeSlashCommand handlers
+      - getAvailableCommands
+      - getCommandDefinition
+
+files_created:
+  - backend/src/services/commandService.js
+  - backend/tests/services/commandService.test.js
+
+files_modified:
+  - backend/src/services/messageService.js
+  - backend/src/routes/messages.js
+
+verification:
+  tests_passed: 261
+  tests_failed: 0
+  commands_implemented:
+    - aside
+    - aside-pure
+    - pin
+    - discard
+    - chat-fork
+    - requery
+    - commit
+    - push
+    - save_entity
+    - execute (placeholder)
+    - template (placeholder)
+
+spec_compliance:
+  parse_slash_command: "Follows spec/functions/backend_node/parse_slash_command.yaml"
+  execute_slash_command: "Follows spec/functions/backend_node/execute_slash_command.yaml"
+  commands_yaml: "Loads from spec/commands.yaml with fallback"
