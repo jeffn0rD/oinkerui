@@ -40,6 +40,11 @@ prompt_guidance: "Always follow these guidelines and update project documentatio
   \ if it is outside the scope.\n* ALWAYS COMMIT AND PUSH the repository after a task.\n"
 current:
 - task:
+    id: 2.1.0
+    name: Implement Slash Command Parser
+    goal: Implement the slash command parsing system in the Node.js backend for commands defined in spec/commands.yaml.
+    prompt: ./prompts/dev/prompt_2_1_0.md
+- task:
     id: 2.1.5
     name: Implement LLM Response Streaming
     goal: Implement full LLM response streaming from OpenRouter to the frontend UI with SSE.

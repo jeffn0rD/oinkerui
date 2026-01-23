@@ -538,11 +538,340 @@ async function sendLLMMessage(projectId, chatId, message, options = {}) {
   return response;
 }
 
+// =============================================================================
+// Active Request Tracking (for cancellation)
+// =============================================================================
+
+// Map of chatId -> { requestId, controller, startTime }
+const activeRequests = new Map();
+
+/**
+ * Register an active request for tracking
+ * @param {string} chatId - Chat ID
+ * @param {string} requestId - Request ID
+ * @param {AbortController} controller - Abort controller
+ */
+function registerActiveRequest(chatId, requestId, controller) {
+  activeRequests.set(chatId, {
+    requestId,
+    controller,
+    startTime: Date.now()
+  });
+}
+
+/**
+ * Unregister an active request
+ * @param {string} chatId - Chat ID
+ */
+function unregisterActiveRequest(chatId) {
+  activeRequests.delete(chatId);
+}
+
+/**
+ * Get active request for a chat
+ * @param {string} chatId - Chat ID
+ * @returns {Object|null} Active request info or null
+ */
+function getActiveRequest(chatId) {
+  return activeRequests.get(chatId) || null;
+}
+
+/**
+ * Cancel an active request
+ * @param {string} chatId - Chat ID
+ * @returns {boolean} True if request was cancelled
+ */
+function cancelActiveRequest(chatId) {
+  const request = activeRequests.get(chatId);
+  if (request) {
+    request.controller.abort();
+    activeRequests.delete(chatId);
+    return true;
+  }
+  return false;
+}
+
+// =============================================================================
+// Streaming LLM Response
+// =============================================================================
+
+/**
+ * streamLLMResponse
+ * 
+ * Stream an LLM response from OpenRouter using Server-Sent Events.
+ * Yields tokens as they arrive for real-time display.
+ * 
+ * @param {Object} request - LLM request configuration
+ * @param {string} request.model - Model identifier
+ * @param {Array} request.messages - Array of messages for context
+ * @param {number} [request.temperature=0.7] - Temperature
+ * @param {number} [request.max_tokens] - Maximum tokens in response
+ * @param {AbortSignal} [request.abortSignal] - Signal to cancel the request
+ * @param {Object} [callbacks] - Optional callbacks
+ * @param {Function} [callbacks.onToken] - Called for each token
+ * @param {Function} [callbacks.onComplete] - Called when streaming completes
+ * @param {Function} [callbacks.onError] - Called on error
+ * @returns {AsyncGenerator} Yields tokens as they arrive
+ * 
+ * Spec: spec/functions/backend_node/stream_llm_response.yaml
+ */
+async function* streamLLMResponse(request, callbacks = {}) {
+  // Step 1: Validate request
+  if (!request.model) {
+    throw new ValidationError('Model is required');
+  }
+  if (!request.messages || !Array.isArray(request.messages) || request.messages.length === 0) {
+    throw new ValidationError('Messages are required and must be a non-empty array');
+  }
+
+  // Get API key
+  const apiKey = config.api?.openrouter?.apiKey || process.env.OPENROUTER_API_KEY;
+  if (!apiKey) {
+    throw new ConfigError('OPENROUTER_API_KEY not set');
+  }
+
+  // Step 2: Prepare SSE request with stream=true
+  const body = {
+    model: request.model,
+    messages: request.messages,
+    stream: true,
+    ...(request.max_tokens && { max_tokens: request.max_tokens }),
+    ...(request.temperature !== undefined && { temperature: request.temperature })
+  };
+
+  const baseUrl = config.api?.openrouter?.baseUrl || 'https://openrouter.ai/api/v1';
+  const url = `${baseUrl}/chat/completions`;
+
+  let accumulated = '';
+  const startTime = Date.now();
+
+  try {
+    // Step 3: Open connection with streaming
+    const response = await axios({
+      method: 'POST',
+      url,
+      data: body,
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': process.env.APP_URL || 'http://localhost:3000',
+        'X-Title': 'OinkerUI'
+      },
+      responseType: 'stream',
+      signal: request.abortSignal,
+      timeout: config.api?.openrouter?.streamTimeout || 300000 // 5 minutes for streaming
+    });
+
+    // Step 4: Process SSE chunks
+    const stream = response.data;
+    let buffer = '';
+
+    for await (const chunk of stream) {
+      // Check for abort
+      if (request.abortSignal?.aborted) {
+        throw new Error('Request aborted');
+      }
+
+      buffer += chunk.toString();
+      
+      // Process complete SSE events
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+      for (const line of lines) {
+        const trimmedLine = line.trim();
+        
+        if (!trimmedLine || trimmedLine.startsWith(':')) {
+          continue; // Skip empty lines and comments
+        }
+
+        if (trimmedLine.startsWith('data: ')) {
+          const data = trimmedLine.slice(6);
+          
+          // Check for stream end
+          if (data === '[DONE]') {
+            // Step 6: Handle completion
+            const finalResult = {
+              token: '',
+              done: true,
+              accumulated,
+              usage: {
+                prompt_tokens: 0, // Not available in streaming
+                completion_tokens: countTokens(accumulated),
+                total_tokens: countTokens(accumulated)
+              },
+              latency_ms: Date.now() - startTime
+            };
+
+            if (callbacks.onComplete) {
+              callbacks.onComplete(accumulated);
+            }
+
+            yield finalResult;
+            return;
+          }
+
+          try {
+            const parsed = JSON.parse(data);
+            const delta = parsed.choices?.[0]?.delta;
+            const finishReason = parsed.choices?.[0]?.finish_reason;
+
+            if (delta?.content) {
+              // Step 5: Yield token
+              accumulated += delta.content;
+              
+              const tokenResult = {
+                token: delta.content,
+                done: false,
+                accumulated
+              };
+
+              if (callbacks.onToken) {
+                callbacks.onToken(delta.content);
+              }
+
+              yield tokenResult;
+            }
+
+            // Check for finish reason
+            if (finishReason) {
+              const finalResult = {
+                token: '',
+                done: true,
+                accumulated,
+                finish_reason: finishReason,
+                usage: parsed.usage || {
+                  prompt_tokens: 0,
+                  completion_tokens: countTokens(accumulated),
+                  total_tokens: countTokens(accumulated)
+                },
+                latency_ms: Date.now() - startTime
+              };
+
+              if (callbacks.onComplete) {
+                callbacks.onComplete(accumulated);
+              }
+
+              yield finalResult;
+              return;
+            }
+          } catch (parseError) {
+            console.warn('Failed to parse SSE data:', parseError.message);
+          }
+        }
+      }
+    }
+
+    // If we get here without a [DONE], yield final result
+    if (accumulated) {
+      yield {
+        token: '',
+        done: true,
+        accumulated,
+        latency_ms: Date.now() - startTime
+      };
+    }
+
+  } catch (error) {
+    // Step 7 & 8: Handle cancellation and errors
+    if (error.name === 'AbortError' || error.message === 'Request aborted' || request.abortSignal?.aborted) {
+      const abortError = new Error('Request cancelled');
+      abortError.name = 'AbortError';
+      abortError.accumulated = accumulated;
+      
+      if (callbacks.onError) {
+        callbacks.onError(abortError);
+      }
+      
+      throw abortError;
+    }
+
+    if (error.code === 'ECONNABORTED') {
+      const timeoutError = new TimeoutError('Stream request timed out');
+      timeoutError.accumulated = accumulated;
+      
+      if (callbacks.onError) {
+        callbacks.onError(timeoutError);
+      }
+      
+      throw timeoutError;
+    }
+
+    const llmError = new LLMError(error.message || 'Streaming failed');
+    llmError.accumulated = accumulated;
+    
+    if (callbacks.onError) {
+      callbacks.onError(llmError);
+    }
+    
+    throw llmError;
+  }
+}
+
+/**
+ * sendLLMMessageStream
+ * 
+ * High-level function to send a message and stream the response.
+ * Combines context construction with streaming LLM call.
+ * 
+ * @param {string} projectId - Project ID
+ * @param {string} chatId - Chat ID
+ * @param {Object} message - User message
+ * @param {Object} [options] - Options for the LLM call
+ * @param {Object} [callbacks] - Streaming callbacks
+ * @returns {AsyncGenerator} Yields tokens as they arrive
+ */
+async function* sendLLMMessageStream(projectId, chatId, message, options = {}, callbacks = {}) {
+  const chatService = require('./chatService');
+  
+  // Get chat
+  const chat = await chatService.getChat(projectId, chatId);
+  
+  // Get project for model selection
+  const project = await projectService.getProject(projectId);
+  const model = options.model || project.default_model || 'openai/gpt-4o-mini';
+  
+  // Construct context
+  const context = await constructContext(chat, message, model);
+  
+  // Create abort controller for this request
+  const controller = new AbortController();
+  const requestId = require('uuid').v4();
+  
+  // Register active request
+  registerActiveRequest(chatId, requestId, controller);
+  
+  try {
+    // Stream LLM response
+    const stream = streamLLMResponse({
+      model,
+      messages: context,
+      max_tokens: options.max_tokens,
+      temperature: options.temperature,
+      abortSignal: controller.signal
+    }, callbacks);
+    
+    for await (const chunk of stream) {
+      yield chunk;
+    }
+  } finally {
+    // Unregister active request
+    unregisterActiveRequest(chatId);
+  }
+}
+
 module.exports = {
   callLLM,
   constructContext,
   sendLLMMessage,
+  streamLLMResponse,
+  sendLLMMessageStream,
   countTokens,
+  // Active request management
+  registerActiveRequest,
+  unregisterActiveRequest,
+  getActiveRequest,
+  cancelActiveRequest,
   // Export error classes for testing
   ValidationError,
   ConfigError,

@@ -1066,11 +1066,3 @@ tasks:
     completed_date: '2025-01-23'
     git_commit: '7404842'
     summary: Implemented message context flags and updated context construction algorithm per spec
-- task:
-    id: 2.1.0
-    name: Implement Slash Command Parser
-    goal: Implement the slash command parsing system in the Node.js backend for commands defined in spec/commands.yaml.
-    prompt: ./prompts/dev/prompt_2_1_0.md
-    completed_date: '2025-01-23'
-    git_commit: 0ecccdd
-    summary: Implemented slash command parser and executor with all Phase 2 commands
