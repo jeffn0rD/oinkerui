@@ -1,0 +1,233 @@
+ FAIL  tests/services/streamingService.test.js
+  ● LLM Streaming Service › Active Request Management › should register an active request
+
+    TypeError: llmService.registerActiveRequest is not a function
+
+      27 |       const requestId = 'req-123';
+      28 |
+    > 29 |       llmService.registerActiveRequest(testChatId, requestId, controller);
+         |                  ^
+      30 |
+      31 |       const activeRequest = llmService.getActiveRequest(testChatId);
+      32 |       expect(activeRequest).toBeDefined();
+
+      at Object.registerActiveRequest (tests/services/streamingService.test.js:29:18)
+
+  ● LLM Streaming Service › Active Request Management › should register an active request
+
+    TypeError: llmService.unregisterActiveRequest is not a function
+
+      20 |     afterEach(() => {
+      21 |       // Clean up any active requests
+    > 22 |       llmService.unregisterActiveRequest(testChatId);
+         |                  ^
+      23 |     });
+      24 |
+      25 |     it('should register an active request', () => {
+
+      at Object.unregisterActiveRequest (tests/services/streamingService.test.js:22:18)
+
+  ● LLM Streaming Service › Active Request Management › should unregister an active request
+
+    TypeError: llmService.registerActiveRequest is not a function
+
+      38 |     it('should unregister an active request', () => {
+      39 |       const controller = new AbortController();
+    > 40 |       llmService.registerActiveRequest(testChatId, 'req-123', controller);
+         |                  ^
+      41 |
+      42 |       llmService.unregisterActiveRequest(testChatId);
+      43 |
+
+      at Object.registerActiveRequest (tests/services/streamingService.test.js:40:18)
+
+  ● LLM Streaming Service › Active Request Management › should unregister an active request
+
+    TypeError: llmService.unregisterActiveRequest is not a function
+
+      20 |     afterEach(() => {
+      21 |       // Clean up any active requests
+    > 22 |       llmService.unregisterActiveRequest(testChatId);
+         |                  ^
+      23 |     });
+      24 |
+      25 |     it('should register an active request', () => {
+
+      at Object.unregisterActiveRequest (tests/services/streamingService.test.js:22:18)
+
+  ● LLM Streaming Service › Active Request Management › should return null for non-existent request
+
+    TypeError: llmService.getActiveRequest is not a function
+
+      47 |
+      48 |     it('should return null for non-existent request', () => {
+    > 49 |       const activeRequest = llmService.getActiveRequest('non-existent-chat');
+         |                                        ^
+      50 |       expect(activeRequest).toBeNull();
+      51 |     });
+      52 |
+
+      at Object.getActiveRequest (tests/services/streamingService.test.js:49:40)
+
+  ● LLM Streaming Service › Active Request Management › should return null for non-existent request
+
+    TypeError: llmService.unregisterActiveRequest is not a function
+
+      20 |     afterEach(() => {
+      21 |       // Clean up any active requests
+    > 22 |       llmService.unregisterActiveRequest(testChatId);
+         |                  ^
+      23 |     });
+      24 |
+      25 |     it('should register an active request', () => {
+
+      at Object.unregisterActiveRequest (tests/services/streamingService.test.js:22:18)
+
+  ● LLM Streaming Service › Active Request Management › should cancel an active request
+
+    TypeError: llmService.registerActiveRequest is not a function
+
+      53 |     it('should cancel an active request', () => {
+      54 |       const controller = new AbortController();
+    > 55 |       llmService.registerActiveRequest(testChatId, 'req-123', controller);
+         |                  ^
+      56 |
+      57 |       const cancelled = llmService.cancelActiveRequest(testChatId);
+      58 |
+
+      at Object.registerActiveRequest (tests/services/streamingService.test.js:55:18)
+
+  ● LLM Streaming Service › Active Request Management › should cancel an active request
+
+    TypeError: llmService.unregisterActiveRequest is not a function
+
+      20 |     afterEach(() => {
+      21 |       // Clean up any active requests
+    > 22 |       llmService.unregisterActiveRequest(testChatId);
+         |                  ^
+      23 |     });
+      24 |
+      25 |     it('should register an active request', () => {
+
+      at Object.unregisterActiveRequest (tests/services/streamingService.test.js:22:18)
+
+  ● LLM Streaming Service › Active Request Management › should return false when cancelling non-existent request
+
+    TypeError: llmService.cancelActiveRequest is not a function
+
+      63 |
+      64 |     it('should return false when cancelling non-existent request', () => {
+    > 65 |       const cancelled = llmService.cancelActiveRequest('non-existent-chat');
+         |                                    ^
+      66 |       expect(cancelled).toBe(false);
+      67 |     });
+      68 |
+
+      at Object.cancelActiveRequest (tests/services/streamingService.test.js:65:36)
+
+  ● LLM Streaming Service › Active Request Management › should return false when cancelling non-existent request
+
+    TypeError: llmService.unregisterActiveRequest is not a function
+
+      20 |     afterEach(() => {
+      21 |       // Clean up any active requests
+    > 22 |       llmService.unregisterActiveRequest(testChatId);
+         |                  ^
+      23 |     });
+      24 |
+      25 |     it('should register an active request', () => {
+
+      at Object.unregisterActiveRequest (tests/services/streamingService.test.js:22:18)
+
+  ● LLM Streaming Service › Active Request Management › should track multiple active requests
+
+    TypeError: llmService.registerActiveRequest is not a function
+
+      71 |       const controller2 = new AbortController();
+      72 |
+    > 73 |       llmService.registerActiveRequest('chat-1', 'req-1', controller1);
+         |                  ^
+      74 |       llmService.registerActiveRequest('chat-2', 'req-2', controller2);
+      75 |
+      76 |       expect(llmService.getActiveRequest('chat-1')).toBeDefined();
+
+      at Object.registerActiveRequest (tests/services/streamingService.test.js:73:18)
+
+  ● LLM Streaming Service › Active Request Management › should track multiple active requests
+
+    TypeError: llmService.unregisterActiveRequest is not a function
+
+      20 |     afterEach(() => {
+      21 |       // Clean up any active requests
+    > 22 |       llmService.unregisterActiveRequest(testChatId);
+         |                  ^
+      23 |     });
+      24 |
+      25 |     it('should register an active request', () => {
+
+      at Object.unregisterActiveRequest (tests/services/streamingService.test.js:22:18)
+
+  ● LLM Streaming Service › Streaming exports › should export streaming functions
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "function"
+    Received: "undefined"
+
+      116 |       expect(typeof llmService.streamLLMResponse).toBe('function');
+      117 |       expect(typeof llmService.sendLLMMessageStream).toBe('function');
+    > 118 |       expect(typeof llmService.registerActiveRequest).toBe('function');
+          |                                                       ^
+      119 |       expect(typeof llmService.unregisterActiveRequest).toBe('function');
+      120 |       expect(typeof llmService.getActiveRequest).toBe('function');
+      121 |       expect(typeof llmService.cancelActiveRequest).toBe('function');
+
+      at Object.toBe (tests/services/streamingService.test.js:118:55)
+
+ FAIL  tests/integration/health.test.js
+  ● Health Check API › GET /api/health › returns health status
+
+    FastifyError: Method 'POST' already declared for route '/api/projects/:projectId/chats/:chatId/cancel'
+
+      264 |    * }
+      265 |    */
+    > 266 |   fastify.post('/api/projects/:projectId/chats/:chatId/cancel', async (request, reply) => {
+          |           ^
+      267 |     const { projectId, chatId } = request.params;
+      268 |
+      269 |     try {
+
+      at Object.addNewRoute (../node_modules/fastify/lib/route.js:371:19)
+      at Object.route (../node_modules/fastify/lib/route.js:265:19)
+      at Object.prepareRoute (../node_modules/fastify/lib/route.js:167:18)
+      at Object._post [as post] (../node_modules/fastify/fastify.js:271:34)
+      at post (src/routes/streaming.js:266:11)
+      at Plugin.exec (../node_modules/avvio/lib/plugin.js:125:28)
+      at Boot._loadPlugin (../node_modules/avvio/boot.js:432:10)
+
+  ● Health Check API › GET /api/health › includes timestamp
+
+    FastifyError: Method 'POST' already declared for route '/api/projects/:projectId/chats/:chatId/cancel'
+
+      264 |    * }
+      265 |    */
+    > 266 |   fastify.post('/api/projects/:projectId/chats/:chatId/cancel', async (request, reply) => {
+          |           ^
+      267 |     const { projectId, chatId } = request.params;
+      268 |
+      269 |     try {
+
+      at Object.addNewRoute (../node_modules/fastify/lib/route.js:371:19)
+      at Object.route (../node_modules/fastify/lib/route.js:265:19)
+      at Object.prepareRoute (../node_modules/fastify/lib/route.js:167:18)
+      at Object._post [as post] (../node_modules/fastify/fastify.js:271:34)
+      at post (src/routes/streaming.js:266:11)
+      at Plugin.exec (../node_modules/avvio/lib/plugin.js:125:28)
+      at Boot._loadPlugin (../node_modules/avvio/boot.js:432:10)
+
+ PASS  tests/unit/config.test.js
+
+Test Suites: 2 failed, 10 passed, 12 total
+Tests:       9 failed, 263 passed, 272 total
+Snapshots:   0 total
+Time:        57.359 s
