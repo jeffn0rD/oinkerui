@@ -305,7 +305,7 @@ async function sendMessage(projectId, chatId, request) {
     throw new ValidationError('Chat is not active');
   }
 
-  // Create user message
+  // Create user message with all context flags
   const userMessage = {
     id: uuidv4(),
     chat_id: chatId,
@@ -314,8 +314,12 @@ async function sendMessage(projectId, chatId, request) {
     content: request.raw_text,
     status: 'complete',
     created_at: new Date().toISOString(),
-    include_in_context: true,
-    is_aside: request.is_aside || false
+    // Context flags with defaults per spec/domain.yaml
+    include_in_context: request.include_in_context !== false, // default: true
+    is_aside: request.is_aside || false,                      // default: false
+    pure_aside: request.pure_aside || false,                  // default: false
+    is_pinned: request.is_pinned || false,                    // default: false
+    is_discarded: false                                       // default: false (never set on creation)
   };
 
   // Save user message
@@ -335,11 +339,100 @@ async function sendMessage(projectId, chatId, request) {
   };
 }
 
+/**
+ * Update message context flags
+ * 
+ * Updates one or more context flags on a message. Enforces invariants:
+ * - is_discarded=true implies include_in_context=false
+ * - pure_aside=true implies is_aside=true
+ * 
+ * @param {string} projectId - UUID of the project
+ * @param {string} chatId - UUID of the chat
+ * @param {string} messageId - UUID of the message to update
+ * @param {Object} flags - Flags to update
+ * @param {boolean} [flags.include_in_context] - Whether message is included in LLM context
+ * @param {boolean} [flags.is_aside] - Message is an aside (excluded from future context)
+ * @param {boolean} [flags.pure_aside] - Message ignores all prior history
+ * @param {boolean} [flags.is_pinned] - Message is pinned (always included, survives truncation)
+ * @param {boolean} [flags.is_discarded] - Message is discarded (never included)
+ * @returns {Promise<Object>} Updated message object
+ * @throws {ValidationError} If IDs or flag values are invalid
+ * @throws {NotFoundError} If project, chat, or message not found
+ * @throws {FileSystemError} If failed to update message file
+ * 
+ * Spec: spec/functions/backend_node/update_message_flags.yaml
+ * 
+ * Algorithm:
+ * 1. Validate inputs - Check all IDs are valid UUIDs, at least one flag provided
+ * 2. Load message - Read message from JSONL storage
+ * 3. Apply flag updates - Update each provided flag
+ * 4. Enforce invariants - If is_discarded, set include_in_context=false; if pure_aside, set is_aside=true
+ * 5. Update timestamp - Set updated_at to current time
+ * 6. Save message - Write updated message back to JSONL (update mode)
+ * 7. Return updated message - Return message with all current flags
+ */
+async function updateMessageFlags(projectId, chatId, messageId, flags) {
+  // Step 1: Validate inputs
+  if (!isValidUUID(projectId)) {
+    throw new ValidationError('Invalid project ID format');
+  }
+  if (!isValidUUID(chatId)) {
+    throw new ValidationError('Invalid chat ID format');
+  }
+  if (!isValidUUID(messageId)) {
+    throw new ValidationError('Invalid message ID format');
+  }
+  
+  // Validate at least one flag is provided
+  const validFlags = ['include_in_context', 'is_aside', 'pure_aside', 'is_pinned', 'is_discarded'];
+  const providedFlags = Object.keys(flags).filter(key => validFlags.includes(key));
+  
+  if (providedFlags.length === 0) {
+    throw new ValidationError('At least one valid flag must be provided');
+  }
+  
+  // Validate flag values are booleans
+  for (const flag of providedFlags) {
+    if (typeof flags[flag] !== 'boolean') {
+      throw new ValidationError(`Flag ${flag} must be a boolean`);
+    }
+  }
+  
+  // Step 2: Load message
+  const message = await getMessage(projectId, chatId, messageId);
+  
+  // Step 3: Apply flag updates
+  for (const flag of providedFlags) {
+    message[flag] = flags[flag];
+  }
+  
+  // Step 4: Enforce invariants
+  // is_discarded=true implies include_in_context=false
+  if (message.is_discarded === true) {
+    message.include_in_context = false;
+  }
+  
+  // pure_aside=true implies is_aside=true
+  if (message.pure_aside === true) {
+    message.is_aside = true;
+  }
+  
+  // Step 5: Update timestamp
+  message.updated_at = new Date().toISOString();
+  
+  // Step 6: Save message (update mode)
+  await saveMessage(projectId, chatId, message, { mode: 'update' });
+  
+  // Step 7: Return updated message
+  return message;
+}
+
 module.exports = {
   saveMessage,
   getMessage,
   listMessages,
   sendMessage,
+  updateMessageFlags,
   // Export error classes for testing
   ValidationError,
   NotFoundError,

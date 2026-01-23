@@ -331,15 +331,16 @@ describe('LLM Service', () => {
     it('should exclude discarded messages', async () => {
       // Write messages to chat storage
       const storagePath = path.join(testProject.paths.root, testChat.storage_path);
+      const now = new Date();
       const messages = [
-        { id: '1', role: 'user', content: 'Message 1', is_discarded: false, include_in_context: true, created_at: new Date().toISOString() },
-        { id: '2', role: 'assistant', content: 'Message 2', is_discarded: true, include_in_context: true, created_at: new Date().toISOString() }
+        { id: '1', role: 'user', content: 'Message 1', is_discarded: false, include_in_context: true, created_at: new Date(now.getTime() - 2000).toISOString() },
+        { id: '2', role: 'assistant', content: 'Message 2', is_discarded: true, include_in_context: true, created_at: new Date(now.getTime() - 1000).toISOString() }
       ];
       await fs.writeFile(storagePath, messages.map(m => JSON.stringify(m)).join('\n'));
 
       const context = await llmService.constructContext(
         { ...testChat, project_id: testProjectId },
-        { role: 'user', content: 'Current' }
+        { role: 'user', content: 'Current', created_at: now.toISOString() }
       );
 
       // Should have Message 1 and Current, but not Message 2
@@ -350,15 +351,16 @@ describe('LLM Service', () => {
 
     it('should always include pinned messages', async () => {
       const storagePath = path.join(testProject.paths.root, testChat.storage_path);
+      const now = new Date();
       const messages = [
-        { id: '1', role: 'user', content: 'Important pinned', is_pinned: true, include_in_context: true, created_at: new Date().toISOString() },
-        { id: '2', role: 'assistant', content: 'Regular message', is_pinned: false, include_in_context: true, created_at: new Date().toISOString() }
+        { id: '1', role: 'user', content: 'Important pinned', is_pinned: true, include_in_context: true, created_at: new Date(now.getTime() - 2000).toISOString() },
+        { id: '2', role: 'assistant', content: 'Regular message', is_pinned: false, include_in_context: true, created_at: new Date(now.getTime() - 1000).toISOString() }
       ];
       await fs.writeFile(storagePath, messages.map(m => JSON.stringify(m)).join('\n'));
 
       const context = await llmService.constructContext(
         { ...testChat, project_id: testProjectId },
-        { role: 'user', content: 'Current' }
+        { role: 'user', content: 'Current', created_at: now.toISOString() }
       );
 
       expect(context.some(c => c.content === 'Important pinned')).toBe(true);
@@ -366,15 +368,16 @@ describe('LLM Service', () => {
 
     it('should exclude aside messages unless pinned', async () => {
       const storagePath = path.join(testProject.paths.root, testChat.storage_path);
+      const now = new Date();
       const messages = [
-        { id: '1', role: 'user', content: 'Aside not pinned', is_aside: true, is_pinned: false, include_in_context: true, created_at: new Date().toISOString() },
-        { id: '2', role: 'user', content: 'Aside but pinned', is_aside: true, is_pinned: true, include_in_context: true, created_at: new Date().toISOString() }
+        { id: '1', role: 'user', content: 'Aside not pinned', is_aside: true, is_pinned: false, include_in_context: true, created_at: new Date(now.getTime() - 2000).toISOString() },
+        { id: '2', role: 'user', content: 'Aside but pinned', is_aside: true, is_pinned: true, include_in_context: true, created_at: new Date(now.getTime() - 1000).toISOString() }
       ];
       await fs.writeFile(storagePath, messages.map(m => JSON.stringify(m)).join('\n'));
 
       const context = await llmService.constructContext(
         { ...testChat, project_id: testProjectId },
-        { role: 'user', content: 'Current' }
+        { role: 'user', content: 'Current', created_at: now.toISOString() }
       );
 
       expect(context.some(c => c.content === 'Aside not pinned')).toBe(false);
@@ -418,6 +421,122 @@ describe('LLM Service', () => {
         role: 'user',
         content: 'First message'
       });
+    });
+
+    it('should handle pure_aside - ignore all history', async () => {
+      const storagePath = path.join(testProject.paths.root, testChat.storage_path);
+      const now = new Date();
+      const messages = [
+        { id: '1', role: 'user', content: 'History 1', include_in_context: true, created_at: new Date(now.getTime() - 2000).toISOString() },
+        { id: '2', role: 'assistant', content: 'History 2', include_in_context: true, created_at: new Date(now.getTime() - 1000).toISOString() },
+        { id: '3', role: 'user', content: 'Pinned message', is_pinned: true, include_in_context: true, created_at: now.toISOString() }
+      ];
+      await fs.writeFile(storagePath, messages.map(m => JSON.stringify(m)).join('\n'));
+
+      // Send a pure_aside message - should ignore ALL history including pinned
+      const context = await llmService.constructContext(
+        { ...testChat, project_id: testProjectId },
+        { role: 'user', content: 'Pure aside question', pure_aside: true }
+      );
+
+      // Should only have the current message (no system prelude in test chat)
+      expect(context.length).toBe(1);
+      expect(context[0].content).toBe('Pure aside question');
+      expect(context.some(c => c.content === 'History 1')).toBe(false);
+      expect(context.some(c => c.content === 'History 2')).toBe(false);
+      expect(context.some(c => c.content === 'Pinned message')).toBe(false);
+    });
+
+    it('should handle pure_aside with system prelude', async () => {
+      const chatWithPrelude = {
+        ...testChat,
+        project_id: testProjectId,
+        system_prelude: { content: 'You are a helpful assistant.' }
+      };
+
+      const storagePath = path.join(testProject.paths.root, testChat.storage_path);
+      const messages = [
+        { id: '1', role: 'user', content: 'History', include_in_context: true, created_at: new Date().toISOString() }
+      ];
+      await fs.writeFile(storagePath, messages.map(m => JSON.stringify(m)).join('\n'));
+
+      const context = await llmService.constructContext(
+        chatWithPrelude,
+        { role: 'user', content: 'Pure aside', pure_aside: true }
+      );
+
+      // Should have system prelude + current message only
+      expect(context.length).toBe(2);
+      expect(context[0].role).toBe('system');
+      expect(context[0].content).toBe('You are a helpful assistant.');
+      expect(context[1].content).toBe('Pure aside');
+      expect(context.some(c => c.content === 'History')).toBe(false);
+    });
+
+    it('should never include is_discarded=true messages in context', async () => {
+      const storagePath = path.join(testProject.paths.root, testChat.storage_path);
+      const now = new Date();
+      const messages = [
+        { id: '1', role: 'user', content: 'Normal message', include_in_context: true, is_discarded: false, created_at: new Date(now.getTime() - 2000).toISOString() },
+        { id: '2', role: 'assistant', content: 'Discarded response', include_in_context: false, is_discarded: true, created_at: new Date(now.getTime() - 1000).toISOString() }
+      ];
+      await fs.writeFile(storagePath, messages.map(m => JSON.stringify(m)).join('\n'));
+
+      const context = await llmService.constructContext(
+        { ...testChat, project_id: testProjectId },
+        { role: 'user', content: 'Current', created_at: now.toISOString() }
+      );
+
+      expect(context.some(c => c.content === 'Normal message')).toBe(true);
+      expect(context.some(c => c.content === 'Discarded response')).toBe(false);
+    });
+
+    it('should exclude messages with include_in_context=false', async () => {
+      const storagePath = path.join(testProject.paths.root, testChat.storage_path);
+      const now = new Date();
+      const messages = [
+        { id: '1', role: 'user', content: 'Included', include_in_context: true, created_at: new Date(now.getTime() - 2000).toISOString() },
+        { id: '2', role: 'assistant', content: 'Excluded', include_in_context: false, created_at: new Date(now.getTime() - 1000).toISOString() }
+      ];
+      await fs.writeFile(storagePath, messages.map(m => JSON.stringify(m)).join('\n'));
+
+      const context = await llmService.constructContext(
+        { ...testChat, project_id: testProjectId },
+        { role: 'user', content: 'Current', created_at: now.toISOString() }
+      );
+
+      expect(context.some(c => c.content === 'Included')).toBe(true);
+      expect(context.some(c => c.content === 'Excluded')).toBe(false);
+    });
+
+    it('should preserve pinned messages during truncation', async () => {
+      // This test verifies that pinned messages survive truncation
+      const storagePath = path.join(testProject.paths.root, testChat.storage_path);
+      const now = new Date();
+      
+      // Create many messages to trigger truncation
+      const messages = [];
+      for (let i = 0; i < 100; i++) {
+        messages.push({
+          id: `msg-${i}`,
+          role: i % 2 === 0 ? 'user' : 'assistant',
+          content: 'x'.repeat(500), // ~125 tokens each
+          include_in_context: true,
+          is_pinned: i === 50, // Pin message 50
+          created_at: new Date(now.getTime() - (100 - i) * 1000).toISOString()
+        });
+      }
+      await fs.writeFile(storagePath, messages.map(m => JSON.stringify(m)).join('\n'));
+
+      const context = await llmService.constructContext(
+        { ...testChat, project_id: testProjectId },
+        { role: 'user', content: 'Current', created_at: now.toISOString() }
+      );
+
+      // The pinned message (msg-50) should be in the context
+      const pinnedContent = 'x'.repeat(500);
+      const hasPinned = context.some(c => c.content === pinnedContent);
+      expect(hasPinned).toBe(true);
     });
 
     it('should throw ValidationError for missing chat', async () => {

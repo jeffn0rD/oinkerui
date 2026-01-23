@@ -126,6 +126,58 @@ async function messageRoutes(fastify, options) {
       }
     }
   });
+
+  /**
+   * Update message context flags
+   * PATCH /api/projects/:projectId/chats/:chatId/messages/:messageId/flags
+   * 
+   * Request body:
+   * {
+   *   include_in_context?: boolean,
+   *   is_aside?: boolean,
+   *   pure_aside?: boolean,
+   *   is_pinned?: boolean,
+   *   is_discarded?: boolean
+   * }
+   * 
+   * Spec: spec/functions/backend_node/update_message_flags.yaml
+   */
+  fastify.patch('/api/projects/:projectId/chats/:chatId/messages/:messageId/flags', async (request, reply) => {
+    try {
+      const { projectId, chatId, messageId } = request.params;
+      const flags = request.body;
+
+      const updatedMessage = await messageService.updateMessageFlags(projectId, chatId, messageId, flags);
+
+      reply.send({
+        success: true,
+        data: updatedMessage
+      });
+    } catch (error) {
+      if (error.name === 'ValidationError') {
+        reply.code(400).send({
+          success: false,
+          error: error.message
+        });
+      } else if (error.name === 'NotFoundError') {
+        reply.code(404).send({
+          success: false,
+          error: error.message
+        });
+      } else if (error.name === 'FileSystemError') {
+        reply.code(500).send({
+          success: false,
+          error: error.message
+        });
+      } else {
+        console.error('Error updating message flags:', error);
+        reply.code(500).send({
+          success: false,
+          error: 'Internal server error'
+        });
+      }
+    }
+  });
 }
 
 module.exports = messageRoutes;

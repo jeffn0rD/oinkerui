@@ -1,0 +1,81 @@
+task_id: "2.0.5"
+name: "Implement Message Context Flags"
+completed_date: "2025-01-23"
+status: complete
+
+summary: |
+  Implemented message context control flags and updated the context construction
+  algorithm to follow the 7-step spec exactly. Added API endpoint for updating
+  message flags and comprehensive tests.
+
+actions_taken:
+  - action: "Added updateMessageFlags function to messageService.js"
+    justification: "Required per spec/functions/backend_node/update_message_flags.yaml"
+    details: |
+      - Validates all inputs (UUIDs, flag values)
+      - Enforces invariants: is_discarded implies include_in_context=false
+      - Enforces invariants: pure_aside implies is_aside=true
+      - Updates timestamp on change
+      - Uses update mode for JSONL persistence
+
+  - action: "Rewrote constructContext in llmService.js"
+    justification: "Must follow 7-step algorithm from spec/context.yaml exactly"
+    details: |
+      Step 1: Prepare system prelude
+      Step 2: Handle pure_aside (TERMINATES EARLY - only system + current)
+      Step 3: Filter prior messages (exclude discarded, aside, include_in_context=false)
+      Step 4: Order prior messages chronologically
+      Step 5: Assemble initial context
+      Step 6: Estimate tokens
+      Step 7: Truncate if needed (preserve pinned messages)
+
+  - action: "Added PATCH endpoint for message flags"
+    justification: "Required API endpoint per spec"
+    endpoint: "PATCH /api/projects/:projectId/chats/:chatId/messages/:messageId/flags"
+    file: "backend/src/routes/messages.js"
+
+  - action: "Updated sendMessage to include all context flags"
+    justification: "Messages must have all flags with proper defaults"
+    flags_added:
+      - include_in_context (default: true)
+      - is_aside (default: false)
+      - pure_aside (default: false)
+      - is_pinned (default: false)
+      - is_discarded (default: false)
+
+  - action: "Added comprehensive tests"
+    justification: "Verify all flag operations and context construction"
+    tests_added:
+      - updateMessageFlags tests (8 tests)
+      - sendMessage with context flags tests (3 tests)
+      - pure_aside context construction tests (2 tests)
+      - discarded/excluded message tests (2 tests)
+      - pinned message truncation test (1 test)
+
+files_modified:
+  - backend/src/services/messageService.js
+  - backend/src/services/llmService.js
+  - backend/src/routes/messages.js
+  - backend/tests/services/messageService.test.js
+  - backend/tests/services/llmService.test.js
+
+verification:
+  tests_passed: 235
+  tests_failed: 0
+  coverage_areas:
+    - Message flag CRUD operations
+    - Context construction algorithm
+    - Pure aside behavior
+    - Pinned message preservation
+    - Discarded message exclusion
+    - API endpoint functionality
+
+spec_compliance:
+  context_algorithm: "Follows spec/context.yaml 7-step algorithm exactly"
+  message_flags: "All flags from spec/domain.yaml#Message implemented"
+  api_endpoint: "PATCH endpoint per spec/functions/backend_node/update_message_flags.yaml"
+  invariants:
+    - "system_first: System prelude always first"
+    - "current_prompt_last: Current message always last"
+    - "no_discarded: Discarded messages never included"
+    - "pure_aside_no_history: Pure aside ignores all prior messages"

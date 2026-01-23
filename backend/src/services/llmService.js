@@ -231,6 +231,29 @@ async function callLLM(request, options = {}) {
  * 
  * Spec: spec/functions/backend_node/construct_context.yaml
  */
+/**
+ * constructContext
+ * 
+ * Build the message context array for an LLM request following the 7-step
+ * context construction algorithm defined in spec/context.yaml.
+ * 
+ * Algorithm Steps:
+ * 1. Prepare system prelude - Start with chat.system_prelude as first message
+ * 2. Handle pure_aside - If current_prompt.pure_aside==true, return [system, current] only
+ * 3. Filter prior messages - Exclude discarded, aside, include_in_context=false
+ * 4. Order prior messages - Sort by created_at ascending
+ * 5. Assemble initial context - [system] + prior_ordered + [current]
+ * 6. Estimate tokens - Calculate total tokens vs limit
+ * 7. Truncate if needed - Remove oldest non-pinned first, preserve pinned
+ * 
+ * @param {Object} chat - Chat object with message history
+ * @param {Object} currentMessage - Current user message being processed
+ * @param {string} [modelId] - Model ID for token limit lookup
+ * @returns {Promise<Array>} Array of messages formatted for LLM API
+ * 
+ * Spec: spec/functions/backend_node/construct_context.yaml
+ * Context Algorithm: spec/context.yaml
+ */
 async function constructContext(chat, currentMessage, modelId) {
   // Validate inputs
   if (!chat) {
@@ -243,12 +266,47 @@ async function constructContext(chat, currentMessage, modelId) {
     throw new ValidationError('Current message must have content');
   }
   
-  // Step 1: Load all messages from chat JSONL file
+  // =========================================================================
+  // STEP 1: Prepare system prelude
+  // =========================================================================
+  // Start with chat.system_prelude as the first message
+  const systemMessage = chat.system_prelude?.content ? {
+    role: 'system',
+    content: chat.system_prelude.content
+  } : null;
+  
+  // =========================================================================
+  // STEP 2: Handle pure_aside (TERMINATES EARLY)
+  // =========================================================================
+  // If pure_aside is true, ignore all prior messages; context is only
+  // system prelude + current prompt
+  if (currentMessage.pure_aside === true) {
+    const context = [];
+    if (systemMessage) {
+      context.push(systemMessage);
+    }
+    context.push({
+      role: currentMessage.role || 'user',
+      content: currentMessage.content
+    });
+    
+    console.log('Context constructed (pure_aside):', {
+      event: 'context_constructed',
+      pure_aside: true,
+      messageCount: context.length,
+      hasSystemPrelude: !!systemMessage
+    });
+    
+    return context;
+  }
+  
+  // =========================================================================
+  // Load all messages from chat JSONL file
+  // =========================================================================
   let allMessages = [];
   
   if (chat.storage_path) {
     try {
-      // Get project to find the storage path
       const project = await projectService.getProject(chat.project_id);
       const storagePath = path.join(project.paths.root, chat.storage_path);
       
@@ -265,7 +323,6 @@ async function constructContext(chat, currentMessage, modelId) {
       }
     } catch (error) {
       if (error.code === 'ENOENT') {
-        // File doesn't exist yet - that's okay, just use empty array
         allMessages = [];
       } else if (error.name === 'NotFoundError') {
         throw error;
@@ -275,101 +332,154 @@ async function constructContext(chat, currentMessage, modelId) {
     }
   }
   
-  // Step 2: Filter out discarded messages
-  // Step 3: Filter out aside messages (unless pinned)
-  const eligibleMessages = allMessages.filter(m =>
-    !m.is_discarded &&
-    m.include_in_context !== false &&
-    (!m.is_aside || m.is_pinned)
+  // =========================================================================
+  // STEP 3: Filter prior messages
+  // =========================================================================
+  // Consider all messages with created_at < current_prompt.created_at
+  // Exclude messages where:
+  //   - is_discarded == true, OR
+  //   - include_in_context == false, OR
+  //   - is_aside == true (aside messages are not included in future contexts)
+  // Include pinned messages regardless of recency, if not discarded
+  const currentTime = currentMessage.created_at ? new Date(currentMessage.created_at) : new Date();
+  
+  const priorCandidates = allMessages.filter(m => {
+    // Must be before current message
+    const msgTime = new Date(m.created_at);
+    if (msgTime >= currentTime) return false;
+    
+    // Never include discarded messages
+    if (m.is_discarded === true) return false;
+    
+    // Check include_in_context flag (default true)
+    if (m.include_in_context === false) return false;
+    
+    // Aside messages excluded from future context (unless pinned)
+    if (m.is_aside === true && m.is_pinned !== true) return false;
+    
+    return true;
+  });
+  
+  // =========================================================================
+  // STEP 4: Order prior messages
+  // =========================================================================
+  // Sort prior_candidates by created_at ascending
+  // Pinned messages remain in chronological position but marked for retention
+  const priorOrdered = [...priorCandidates].sort((a, b) => 
+    new Date(a.created_at) - new Date(b.created_at)
   );
   
-  // Step 4: Separate pinned messages from regular messages
-  const pinnedMessages = eligibleMessages.filter(m => m.is_pinned);
-  const regularMessages = eligibleMessages.filter(m => !m.is_pinned);
+  // =========================================================================
+  // STEP 5: Assemble initial context
+  // =========================================================================
+  // Construct: [system_message] + prior_ordered + [current_prompt]
+  // (We'll format this after truncation)
   
-  // Step 5: Get max_context_tokens from project settings or model config
+  // =========================================================================
+  // STEP 6: Estimate tokens
+  // =========================================================================
   let maxTokens = 32000; // Default
   try {
     const project = await projectService.getProject(chat.project_id);
     maxTokens = project.settings?.max_context_tokens || 32000;
   } catch (error) {
-    // Use default if project not found
     console.warn('Could not get project settings, using default max_context_tokens');
   }
   
-  // Step 6-8: Calculate and reserve tokens
-  let usedTokens = 0;
-  const selectedMessages = [];
+  // Calculate token usage
+  let systemTokens = systemMessage ? countTokens(systemMessage.content) : 0;
+  let currentTokens = countTokens(currentMessage.content);
+  let reservedTokens = systemTokens + currentTokens;
   
-  // Reserve tokens for system prelude
-  if (chat.system_prelude?.content) {
-    usedTokens += countTokens(chat.system_prelude.content);
-  }
+  // Calculate tokens for all prior messages
+  const messagesWithTokens = priorOrdered.map(m => ({
+    message: m,
+    tokens: countTokens(m.content),
+    isPinned: m.is_pinned === true
+  }));
   
-  // Reserve tokens for current message
-  usedTokens += countTokens(currentMessage.content);
+  const totalPriorTokens = messagesWithTokens.reduce((sum, m) => sum + m.tokens, 0);
+  const estimatedTokens = reservedTokens + totalPriorTokens;
   
-  // Reserve tokens for pinned messages (always include)
-  for (const msg of pinnedMessages) {
-    const msgTokens = countTokens(msg.content);
-    usedTokens += msgTokens;
-    selectedMessages.push(msg);
-  }
+  // =========================================================================
+  // STEP 7: Truncate if needed
+  // =========================================================================
+  let selectedMessages = messagesWithTokens;
   
-  // Check if over budget already
-  if (usedTokens > maxTokens) {
-    console.warn('Pinned messages exceed token budget', {
-      usedTokens,
-      maxTokens,
-      pinnedCount: pinnedMessages.length
+  if (estimatedTokens > maxTokens) {
+    // Apply truncation:
+    // 1. Always keep system_message (already reserved)
+    // 2. Always keep pinned messages if possible
+    // 3. Remove oldest non-pinned messages first until under limit
+    
+    const availableBudget = maxTokens - reservedTokens;
+    
+    // Separate pinned and non-pinned
+    const pinnedMsgs = messagesWithTokens.filter(m => m.isPinned);
+    const nonPinnedMsgs = messagesWithTokens.filter(m => !m.isPinned);
+    
+    // Calculate pinned tokens
+    const pinnedTokens = pinnedMsgs.reduce((sum, m) => sum + m.tokens, 0);
+    
+    if (pinnedTokens > availableBudget) {
+      console.warn('Pinned messages exceed token budget', {
+        pinnedTokens,
+        availableBudget,
+        pinnedCount: pinnedMsgs.length
+      });
+      // Still include pinned messages even if over budget
+      selectedMessages = pinnedMsgs;
+    } else {
+      // Start with pinned messages
+      let usedBudget = pinnedTokens;
+      const includedNonPinned = [];
+      
+      // Add non-pinned from newest to oldest (reverse order) until budget exhausted
+      // Then we'll re-sort chronologically
+      const nonPinnedNewestFirst = [...nonPinnedMsgs].reverse();
+      
+      for (const m of nonPinnedNewestFirst) {
+        if (usedBudget + m.tokens <= availableBudget) {
+          includedNonPinned.push(m);
+          usedBudget += m.tokens;
+        }
+      }
+      
+      // Combine and sort chronologically
+      selectedMessages = [...pinnedMsgs, ...includedNonPinned].sort((a, b) =>
+        new Date(a.message.created_at) - new Date(b.message.created_at)
+      );
+    }
+    
+    console.log('Context truncated:', {
+      event: 'context_truncated',
+      originalCount: messagesWithTokens.length,
+      selectedCount: selectedMessages.length,
+      pinnedCount: pinnedMsgs.length,
+      estimatedTokens,
+      maxTokens
     });
   }
   
-  // Step 9: Sort remaining messages by created_at descending (newest first)
-  const sortedRegular = [...regularMessages].sort((a, b) => 
-    new Date(b.created_at) - new Date(a.created_at)
-  );
-  
-  // Step 10: Add messages until budget exhausted
-  const remainingBudget = maxTokens - usedTokens;
-  let budgetUsed = 0;
-  
-  for (const msg of sortedRegular) {
-    // Skip if this is the current message (already counted)
-    if (msg.id === currentMessage.id) continue;
-    
-    const msgTokens = countTokens(msg.content);
-    if (budgetUsed + msgTokens <= remainingBudget) {
-      selectedMessages.push(msg);
-      budgetUsed += msgTokens;
-    }
-  }
-  
-  // Step 11: Sort selected messages chronologically
-  selectedMessages.sort((a, b) => 
-    new Date(a.created_at) - new Date(b.created_at)
-  );
-  
-  // Step 12: Format as [{role, content}] array
+  // =========================================================================
+  // Format final context array
+  // =========================================================================
   const context = [];
   
-  // System prelude first (if present)
-  if (chat.system_prelude?.content) {
+  // System prelude first (invariant: system_first)
+  if (systemMessage) {
+    context.push(systemMessage);
+  }
+  
+  // Add selected prior messages
+  for (const m of selectedMessages) {
     context.push({
-      role: 'system',
-      content: chat.system_prelude.content
+      role: m.message.role,
+      content: m.message.content
     });
   }
   
-  // Add selected messages
-  for (const msg of selectedMessages) {
-    context.push({
-      role: msg.role,
-      content: msg.content
-    });
-  }
-  
-  // Current message last
+  // Current message last (invariant: current_prompt_last)
   context.push({
     role: currentMessage.role || 'user',
     content: currentMessage.content
@@ -378,16 +488,18 @@ async function constructContext(chat, currentMessage, modelId) {
   console.log('Context constructed:', {
     event: 'context_constructed',
     totalMessages: allMessages.length,
-    eligibleMessages: eligibleMessages.length,
-    selectedMessages: selectedMessages.length + 1, // +1 for current
-    pinnedMessages: pinnedMessages.length,
-    hasSystemPrelude: !!chat.system_prelude?.content,
-    estimatedTokens: usedTokens + budgetUsed,
+    priorCandidates: priorCandidates.length,
+    selectedMessages: selectedMessages.length,
+    finalContextSize: context.length,
+    hasSystemPrelude: !!systemMessage,
+    estimatedTokens: reservedTokens + selectedMessages.reduce((sum, m) => sum + m.tokens, 0),
     maxTokens
   });
   
   return context;
 }
+
+
 
 /**
  * sendLLMMessage

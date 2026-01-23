@@ -418,4 +418,130 @@ describe('Message Service', () => {
       expect(parsed2.id).toBe(message2.id);
     });
   });
+
+  describe('updateMessageFlags', () => {
+    let testMessageId;
+
+    beforeEach(async () => {
+      // Create a test message
+      const message = {
+        id: require('uuid').v4(),
+        role: 'user',
+        content: 'Test message for flag updates',
+        status: 'complete',
+        include_in_context: true,
+        is_aside: false,
+        pure_aside: false,
+        is_pinned: false,
+        is_discarded: false
+      };
+      await messageService.saveMessage(testProjectId, testChatId, message);
+      testMessageId = message.id;
+    });
+
+    it('should update is_pinned flag', async () => {
+      const updated = await messageService.updateMessageFlags(
+        testProjectId, testChatId, testMessageId,
+        { is_pinned: true }
+      );
+
+      expect(updated.is_pinned).toBe(true);
+      expect(updated.updated_at).toBeDefined();
+
+      // Verify persisted
+      const retrieved = await messageService.getMessage(testProjectId, testChatId, testMessageId);
+      expect(retrieved.is_pinned).toBe(true);
+    });
+
+    it('should update is_aside flag', async () => {
+      const updated = await messageService.updateMessageFlags(
+        testProjectId, testChatId, testMessageId,
+        { is_aside: true }
+      );
+
+      expect(updated.is_aside).toBe(true);
+    });
+
+    it('should enforce is_discarded implies include_in_context=false', async () => {
+      const updated = await messageService.updateMessageFlags(
+        testProjectId, testChatId, testMessageId,
+        { is_discarded: true }
+      );
+
+      expect(updated.is_discarded).toBe(true);
+      expect(updated.include_in_context).toBe(false);
+    });
+
+    it('should enforce pure_aside implies is_aside=true', async () => {
+      const updated = await messageService.updateMessageFlags(
+        testProjectId, testChatId, testMessageId,
+        { pure_aside: true }
+      );
+
+      expect(updated.pure_aside).toBe(true);
+      expect(updated.is_aside).toBe(true);
+    });
+
+    it('should update multiple flags at once', async () => {
+      const updated = await messageService.updateMessageFlags(
+        testProjectId, testChatId, testMessageId,
+        { is_pinned: true, include_in_context: false }
+      );
+
+      expect(updated.is_pinned).toBe(true);
+      expect(updated.include_in_context).toBe(false);
+    });
+
+    it('should throw ValidationError for invalid message ID', async () => {
+      await expect(
+        messageService.updateMessageFlags(testProjectId, testChatId, 'invalid-id', { is_pinned: true })
+      ).rejects.toThrow(messageService.ValidationError);
+    });
+
+    it('should throw ValidationError when no flags provided', async () => {
+      await expect(
+        messageService.updateMessageFlags(testProjectId, testChatId, testMessageId, {})
+      ).rejects.toThrow(messageService.ValidationError);
+    });
+
+    it('should throw ValidationError for non-boolean flag values', async () => {
+      await expect(
+        messageService.updateMessageFlags(testProjectId, testChatId, testMessageId, { is_pinned: 'yes' })
+      ).rejects.toThrow(messageService.ValidationError);
+    });
+
+    it('should throw NotFoundError for non-existent message', async () => {
+      const fakeMessageId = require('uuid').v4();
+      await expect(
+        messageService.updateMessageFlags(testProjectId, testChatId, fakeMessageId, { is_pinned: true })
+      ).rejects.toThrow(messageService.NotFoundError);
+    });
+  });
+
+  describe('sendMessage with context flags', () => {
+    it('should create message with all default flags', async () => {
+      const request = { raw_text: 'Test message' };
+      const response = await messageService.sendMessage(testProjectId, testChatId, request);
+
+      expect(response.user_message.include_in_context).toBe(true);
+      expect(response.user_message.is_aside).toBe(false);
+      expect(response.user_message.pure_aside).toBe(false);
+      expect(response.user_message.is_pinned).toBe(false);
+      expect(response.user_message.is_discarded).toBe(false);
+    });
+
+    it('should respect pure_aside flag in request', async () => {
+      const request = { raw_text: 'Pure aside message', pure_aside: true };
+      const response = await messageService.sendMessage(testProjectId, testChatId, request);
+
+      expect(response.user_message.pure_aside).toBe(true);
+    });
+
+    it('should respect is_pinned flag in request', async () => {
+      const request = { raw_text: 'Pinned message', is_pinned: true };
+      const response = await messageService.sendMessage(testProjectId, testChatId, request);
+
+      expect(response.user_message.is_pinned).toBe(true);
+    });
+  });
 });
