@@ -55,6 +55,11 @@ current:
     goal: Implement the requery feature to regenerate LLM responses with response branching support.
     prompt: ./prompts/dev/prompt_2_4_0.md
 - task:
+    id: 2.4.5
+    name: Implement Core Frontend Application
+    goal: Implement the core frontend application with functional UI, dark theme, and modern power-user styling.
+    prompt: ./prompts/dev/prompt_2_4_5.md
+- task:
     id: 2.5.0
     name: Implement Python Tools Backend
     goal: Set up the Python FastAPI tools backend for Jinja2 template rendering and code execution.

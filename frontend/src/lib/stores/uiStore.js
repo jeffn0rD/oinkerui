@@ -1,5 +1,7 @@
 import { writable, derived } from 'svelte/store';
-import { browser } from '$app/environment';
+
+// Browser detection for SSR compatibility
+const browser = typeof window !== 'undefined';
 
 // Sidebar state
 export const sidebarCollapsed = writable(false);
@@ -7,14 +9,18 @@ export const sidebarCollapsed = writable(false);
 // Theme management
 function createThemeStore() {
   // Get initial theme from localStorage or system preference
-  let initialTheme = 'light';
+  let initialTheme = 'dark'; // Default to dark theme per spec
   
   if (browser) {
     const stored = localStorage.getItem('theme');
     if (stored) {
       initialTheme = stored;
-    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      initialTheme = 'dark';
+    } else if (window.matchMedia('(prefers-color-scheme: light)').matches) {
+      initialTheme = 'light';
+    }
+    // Apply initial theme class
+    if (initialTheme === 'dark') {
+      document.documentElement.classList.add('dark');
     }
   }
   
