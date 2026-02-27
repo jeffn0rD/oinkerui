@@ -351,4 +351,163 @@ describe('Chat Service', () => {
       expect(updatedProject.chats.find(c => c.id === chat3.id)).toBeDefined();
     });
   });
+
+  describe('forkChat', () => {
+    let messageService;
+    let testChat;
+    let testMessages;
+
+    beforeEach(async () => {
+      messageService = require('../../src/services/messageService');
+      const { v4: uuidv4 } = require('uuid');
+      
+      // Create a chat with messages for forking tests
+      testChat = await chatService.createChat(testProjectId, {
+        name: 'Original Chat'
+      });
+
+      // Add several messages with required id field
+      testMessages = [];
+      const roles = ['user', 'assistant', 'user', 'assistant', 'user'];
+      const contents = ['Hello', 'Hi there!', 'How are you?', 'I am fine.', 'Great!'];
+      
+      for (let i = 0; i < roles.length; i++) {
+        const msg = await messageService.saveMessage(testProjectId, testChat.id, {
+          id: uuidv4(),
+          role: roles[i],
+          content: contents[i],
+          include_in_context: true
+        });
+        testMessages.push(msg);
+      }
+    });
+
+    it('should fork entire chat with all messages', async () => {
+      const forkedChat = await chatService.forkChat(testProjectId, testChat.id);
+
+      expect(forkedChat).toBeDefined();
+      expect(forkedChat.id).not.toBe(testChat.id);
+      expect(forkedChat.name).toBe('Fork of Original Chat');
+      expect(forkedChat.forked_from_chat_id).toBe(testChat.id);
+      expect(forkedChat.message_count).toBe(testMessages.length);
+
+      // Verify messages were copied
+      const forkedMessages = await messageService.listMessages(testProjectId, forkedChat.id);
+      expect(forkedMessages.length).toBe(testMessages.length);
+
+      // Verify message content matches
+      for (let i = 0; i < testMessages.length; i++) {
+        expect(forkedMessages[i].content).toBe(testMessages[i].content);
+        expect(forkedMessages[i].role).toBe(testMessages[i].role);
+        // IDs should be different
+        expect(forkedMessages[i].id).not.toBe(testMessages[i].id);
+      }
+    });
+
+    it('should fork with custom name', async () => {
+      const forkedChat = await chatService.forkChat(testProjectId, testChat.id, {
+        name: 'My Custom Fork'
+      });
+
+      expect(forkedChat.name).toBe('My Custom Fork');
+    });
+
+    it('should fork from specific message point', async () => {
+      // Fork from the 3rd message (index 2)
+      const forkPointMessage = testMessages[2];
+      const forkedChat = await chatService.forkChat(testProjectId, testChat.id, {
+        fromMessageId: forkPointMessage.id
+      });
+
+      expect(forkedChat.forked_at_message_id).toBe(forkPointMessage.id);
+      // Should have messages 0, 1, 2 (3 messages)
+      expect(forkedChat.message_count).toBe(3);
+
+      // Verify only first 3 messages were copied
+      const forkedMessages = await messageService.listMessages(testProjectId, forkedChat.id);
+      expect(forkedMessages.length).toBe(3);
+      expect(forkedMessages[0].content).toBe('Hello');
+      expect(forkedMessages[1].content).toBe('Hi there!');
+      expect(forkedMessages[2].content).toBe('How are you?');
+    });
+
+    it('should fork with pruning - exclude discarded messages', async () => {
+      // Mark a message as discarded
+      await messageService.updateMessageFlags(testProjectId, testChat.id, testMessages[1].id, {
+        is_discarded: true
+      });
+
+      const forkedChat = await chatService.forkChat(testProjectId, testChat.id, {
+        prune: true
+      });
+
+      // Should have 4 messages (5 total - 1 discarded)
+      expect(forkedChat.message_count).toBe(4);
+
+      // Verify discarded message was excluded
+      const forkedMessages = await messageService.listMessages(testProjectId, forkedChat.id);
+      const contents = forkedMessages.map(m => m.content);
+      expect(contents).not.toContain('Hi there!');
+      expect(contents).toContain('Hello');
+      expect(contents).toContain('How are you?');
+    });
+
+    it('should fork with pruning - exclude context-excluded messages', async () => {
+      // Mark a message as excluded from context
+      await messageService.updateMessageFlags(testProjectId, testChat.id, testMessages[2].id, {
+        include_in_context: false
+      });
+
+      const forkedChat = await chatService.forkChat(testProjectId, testChat.id, {
+        prune: true
+      });
+
+      // Should have 4 messages (5 total - 1 excluded)
+      expect(forkedChat.message_count).toBe(4);
+
+      const forkedMessages = await messageService.listMessages(testProjectId, forkedChat.id);
+      const contents = forkedMessages.map(m => m.content);
+      expect(contents).not.toContain('How are you?');
+    });
+
+    it('should set forked_from metadata correctly', async () => {
+      const forkedChat = await chatService.forkChat(testProjectId, testChat.id);
+
+      expect(forkedChat.forked_from_chat_id).toBe(testChat.id);
+      expect(forkedChat.project_id).toBe(testProjectId);
+    });
+
+    it('should not modify original chat', async () => {
+      const originalMessages = await messageService.listMessages(testProjectId, testChat.id);
+      
+      await chatService.forkChat(testProjectId, testChat.id, { prune: true });
+
+      // Original chat should be unchanged
+      const afterForkMessages = await messageService.listMessages(testProjectId, testChat.id);
+      expect(afterForkMessages.length).toBe(originalMessages.length);
+      
+      const originalChat = await chatService.getChat(testProjectId, testChat.id);
+      expect(originalChat.name).toBe('Original Chat');
+    });
+
+    it('should throw NotFoundError for invalid message ID', async () => {
+      await expect(
+        chatService.forkChat(testProjectId, testChat.id, {
+          fromMessageId: 'non-existent-message-id'
+        })
+      ).rejects.toThrow('Message not found');
+    });
+
+    it('should throw NotFoundError for invalid chat ID', async () => {
+      await expect(
+        chatService.forkChat(testProjectId, '00000000-0000-4000-8000-000000000000')
+      ).rejects.toThrow('Chat not found');
+    });
+
+    it('should throw ValidationError for invalid project ID', async () => {
+      await expect(
+        chatService.forkChat('invalid-id', testChat.id)
+      ).rejects.toThrow('Invalid project ID format');
+    });
+  });
 });

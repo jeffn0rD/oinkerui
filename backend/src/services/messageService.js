@@ -511,12 +511,175 @@ async function updateMessageFlags(projectId, chatId, messageId, flags) {
   return message;
 }
 
+/**
+ * Requery - Regenerate the LLM response for the last prompt
+ * 
+ * Finds the last user message and assistant response pair,
+ * marks the previous response as discarded (or keeps it as a branch),
+ * constructs context WITHOUT the previous response, and makes a new LLM call.
+ * 
+ * @param {string} projectId - UUID of the project
+ * @param {string} chatId - UUID of the chat
+ * @param {Object} options - Requery options
+ * @param {boolean} [options.keepPrevious=false] - Keep previous response as branch
+ * @param {string} [options.modelId] - Model override
+ * @param {number} [options.temperature] - Temperature override
+ * @returns {Promise<Object>} Requery result with original and new response
+ * @throws {ValidationError} If no messages to requery
+ * @throws {NotFoundError} If project or chat not found
+ * 
+ * Spec: spec/functions/backend_node/requery.yaml
+ */
+async function requery(projectId, chatId, options = {}) {
+  // Validate IDs
+  if (!isValidUUID(projectId)) {
+    throw new ValidationError('Invalid project ID format');
+  }
+  if (!isValidUUID(chatId)) {
+    throw new ValidationError('Invalid chat ID format');
+  }
+
+  // Verify project and chat exist
+  const projectService = require('./projectService');
+  const project = await projectService.getProject(projectId);
+  if (!project) {
+    throw new NotFoundError('Project not found');
+  }
+
+  const chat = await chatService.getChat(projectId, chatId);
+  if (!chat) {
+    throw new NotFoundError('Chat not found');
+  }
+
+  // Load all messages
+  const allMessages = await listMessages(projectId, chatId);
+  if (allMessages.length === 0) {
+    throw new ValidationError('No messages to requery');
+  }
+
+  // Find the last assistant response (non-discarded)
+  let lastAssistantIdx = -1;
+  for (let i = allMessages.length - 1; i >= 0; i--) {
+    if (allMessages[i].role === 'assistant' && !allMessages[i].is_discarded) {
+      lastAssistantIdx = i;
+      break;
+    }
+  }
+
+  if (lastAssistantIdx === -1) {
+    throw new ValidationError('No assistant response found to requery');
+  }
+
+  const originalResponse = allMessages[lastAssistantIdx];
+
+  // Find the user message that prompted this response
+  let lastUserIdx = -1;
+  for (let i = lastAssistantIdx - 1; i >= 0; i--) {
+    if (allMessages[i].role === 'user' && !allMessages[i].is_discarded) {
+      lastUserIdx = i;
+      break;
+    }
+  }
+
+  if (lastUserIdx === -1) {
+    throw new ValidationError('No user message found before the assistant response');
+  }
+
+  const userMessage = allMessages[lastUserIdx];
+
+  // Mark the previous response
+  if (options.keepPrevious) {
+    // Keep as branch - mark with branch metadata but don't discard
+    await updateMessageFlags(projectId, chatId, originalResponse.id, {
+      is_discarded: false,
+      _is_branch: true,
+      _branch_replaced_at: new Date().toISOString()
+    });
+  } else {
+    // Discard the previous response
+    await updateMessageFlags(projectId, chatId, originalResponse.id, {
+      is_discarded: true
+    });
+  }
+
+  // Make a new LLM call using the same user message
+  // The context construction will automatically exclude the discarded response
+  const llmService = require('./llmService');
+  
+  const model = options.modelId || project.settings?.default_model || 'openai/gpt-4';
+  
+  // Construct context (discarded messages are excluded automatically)
+  const context = await llmService.constructContext(
+    { ...chat, project_id: projectId },
+    { role: 'user', content: userMessage.content },
+    model
+  );
+
+  // Call LLM
+  const llmResponse = await llmService.callLLM({
+    model,
+    messages: context,
+    temperature: options.temperature,
+    max_tokens: options.max_tokens
+  });
+
+  // Save the new response
+  const { v4: uuidv4 } = require('uuid');
+  const newResponse = {
+    id: uuidv4(),
+    chat_id: chatId,
+    project_id: projectId,
+    role: 'assistant',
+    content: llmResponse.content,
+    status: 'complete',
+    created_at: new Date().toISOString(),
+    include_in_context: true,
+    parent_message_id: options.keepPrevious ? originalResponse.id : undefined,
+    model: model,
+    usage: llmResponse.usage
+  };
+
+  await saveMessage(projectId, chatId, newResponse);
+
+  console.log('Requery completed:', {
+    event: 'requery_complete',
+    projectId,
+    chatId,
+    originalResponseId: originalResponse.id,
+    newResponseId: newResponse.id,
+    keepPrevious: options.keepPrevious || false,
+    model,
+    timestamp: new Date().toISOString()
+  });
+
+  return {
+    success: true,
+    original_response: {
+      id: originalResponse.id,
+      content: originalResponse.content,
+      is_discarded: !options.keepPrevious
+    },
+    new_response: {
+      id: newResponse.id,
+      content: newResponse.content,
+      model,
+      usage: llmResponse.usage
+    },
+    branch_created: options.keepPrevious || false,
+    user_message: {
+      id: userMessage.id,
+      content: userMessage.content
+    }
+  };
+}
+
 module.exports = {
   saveMessage,
   getMessage,
   listMessages,
   sendMessage,
   updateMessageFlags,
+  requery,
   // Export error classes for testing
   ValidationError,
   NotFoundError,

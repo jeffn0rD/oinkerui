@@ -1122,19 +1122,3 @@ tasks:
     completed_date: '2026-02-27'
     git_commit: 826eb60
     summary: Completed frontend-backend integration with streaming, fork, flags, and error handling
-- task:
-    id: 2.3.0
-    name: Implement Live Context Size Display
-    goal: Implement real-time context size estimation and display showing tokens vs model maximum.
-    prompt: ./prompts/dev/prompt_2_3_0.md
-    completed_date: '2026-02-27'
-    git_commit: ac01093992de9d60d152570397e6213bfa81f053
-    summary: Implemented live context size display with token estimation and color-coded progress bar
-- task:
-    id: 2.4.0
-    name: Implement Requery Functionality
-    goal: Implement the requery feature to regenerate LLM responses with response branching support.
-    prompt: ./prompts/dev/prompt_2_4_0.md
-    completed_date: '2026-02-27'
-    git_commit: e2ca99afe343e2f7274720c9c4de32e6c779e8d2
-    summary: Implemented requery functionality with response branching support

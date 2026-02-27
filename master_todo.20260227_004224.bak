@@ -39,7 +39,21 @@ prompt_guidance: "Always follow these guidelines and update project documentatio
   \ closely and carefully. Constrain work and scope to the task. Return with questions if\nneeded and confirm any extra work\
   \ if it is outside the scope.\n* ALWAYS COMMIT AND PUSH the repository after a task.\n"
 current:
-
+- task:
+    id: 2.2.0
+    name: Implement Chat Forking
+    goal: Implement chat forking functionality with optional message point and pruning support.
+    prompt: ./prompts/dev/prompt_2_2_0.md
+- task:
+    id: 2.3.0
+    name: Implement Live Context Size Display
+    goal: Implement real-time context size estimation and display showing tokens vs model maximum.
+    prompt: ./prompts/dev/prompt_2_3_0.md
+- task:
+    id: 2.4.0
+    name: Implement Requery Functionality
+    goal: Implement the requery feature to regenerate LLM responses with response branching support.
+    prompt: ./prompts/dev/prompt_2_4_0.md
 - task:
     id: 2.5.0
     name: Implement Python Tools Backend
@@ -50,6 +64,11 @@ current:
     name: Implement Prompt Templates System
     goal: Implement prompt templates with Jinja2 rendering, variable substitution, and template management UI.
     prompt: ./prompts/dev/prompt_2_6_0.md
+- task:
+    id: 2.6.5
+    name: Implement Frontend-Backend Integration
+    goal: Complete frontend-backend integration with API calls, real-time updates, and smooth UX.
+    prompt: ./prompts/dev/prompt_2_6_5.md
 - task:
     id: 2.7.0
     name: Implement Message Flag UI Controls
@@ -68,6 +87,5 @@ current:
 future:
 - add context re-ordering feature; prompt/responses in chat history can be re-ordered in the left side list, drag and drop
   and/or buttons move up/down.  Need a reset button as well.
-- workflows implemented with lang chain or lang graph (possibly deeper integration into entire application, chat chain as
-  a lang chain)
+- workflows implemented with lang chain or lang graph (possibly deeper integration into entire application, chat chain as a lang chain)
 open_questions: []
