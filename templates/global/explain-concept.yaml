@@ -1,0 +1,28 @@
+id: explain-concept
+name: "Explain Concept"
+description: "Explain a technical concept clearly"
+category: "learning"
+variables:
+  - name: concept
+    required: true
+    description: "The concept to explain"
+  - name: audience
+    required: false
+    default: "intermediate developer"
+    description: "Target audience level"
+  - name: examples
+    required: false
+    default: "true"
+    description: "Include code examples"
+template: |
+  Explain {{ concept }} for a {{ audience }}.
+
+  {% if examples == "true" %}
+  Include practical code examples to illustrate the concept.
+  {% endif %}
+
+  Structure your explanation with:
+  - A brief overview
+  - Key principles
+  - Common use cases
+  - Potential pitfalls

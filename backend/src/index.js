@@ -18,6 +18,7 @@ function buildApp(opts = {}) {
   fastify.register(require('./routes/chats'));
   fastify.register(require('./routes/messages'));
   fastify.register(require('./routes/streaming'));
+  fastify.register(require('./routes/templates'));
 
   // Health check endpoint
   fastify.get('/api/health', async (_request, _reply) => {

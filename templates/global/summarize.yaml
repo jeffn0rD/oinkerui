@@ -1,0 +1,16 @@
+id: summarize
+name: "Summarize Text"
+description: "Summarize text content concisely"
+category: "general"
+variables:
+  - name: text
+    required: true
+    description: "Text to summarize"
+  - name: length
+    required: false
+    default: "brief"
+    description: "Summary length (brief, detailed, bullet-points)"
+template: |
+  Summarize the following text in a {{ length }} format:
+
+  {{ text }}

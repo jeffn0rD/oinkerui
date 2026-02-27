@@ -1,15 +1,18 @@
 <script>
   import { createEventDispatcher } from 'svelte';
   import { loading } from '../stores/uiStore.js';
+  import TemplateSelector from './TemplateSelector.svelte';
   
   export let placeholder = 'Type your message...';
   export let disabled = false;
+  export let projectId = '';
   
   const dispatch = createEventDispatcher();
   
   let message = '';
   let textarea;
   let isComposing = false;
+  let showTemplateSelector = false;
   
   function handleSubmit() {
     if (message.trim() && !$loading && !disabled) {
@@ -30,6 +33,12 @@
       event.preventDefault();
       handleSubmit();
     }
+    
+    // Ctrl+T to open template selector
+    if ((event.ctrlKey || event.metaKey) && event.key === 't') {
+      event.preventDefault();
+      showTemplateSelector = true;
+    }
   }
   
   function handleInput() {
@@ -46,6 +55,20 @@
   
   function handleCompositionEnd() {
     isComposing = false;
+  }
+  
+  function handleTemplateSelect(content) {
+    message = content;
+    // Resize textarea
+    if (textarea) {
+      textarea.style.height = 'auto';
+      requestAnimationFrame(() => {
+        if (textarea) {
+          textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px';
+          textarea.focus();
+        }
+      });
+    }
   }
   
   // Focus textarea on mount
@@ -69,6 +92,19 @@
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
                 d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+        </svg>
+      </button>
+      
+      <!-- Template button -->
+      <button
+        on:click={() => showTemplateSelector = true}
+        class="p-2 rounded-lg hover:bg-surface-hover text-muted hover:text-foreground transition-colors"
+        title="Prompt Templates (Ctrl+T)"
+        disabled={$loading || disabled}
+      >
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
         </svg>
       </button>
       
@@ -126,7 +162,7 @@
     
     <!-- Hints -->
     <div class="flex items-center justify-between mt-2 text-xs text-muted">
-      <span>Press <kbd class="px-1.5 py-0.5 bg-surface-hover rounded">Enter</kbd> to send, <kbd class="px-1.5 py-0.5 bg-surface-hover rounded">Shift+Enter</kbd> for new line</span>
+      <span>Press <kbd class="px-1.5 py-0.5 bg-surface-hover rounded">Enter</kbd> to send, <kbd class="px-1.5 py-0.5 bg-surface-hover rounded">Ctrl+T</kbd> for templates</span>
       {#if $loading}
         <span class="flex items-center gap-1">
           <span class="w-2 h-2 bg-primary rounded-full animate-pulse"></span>
@@ -136,6 +172,14 @@
     </div>
   </div>
 </div>
+
+<!-- Template Selector Modal -->
+<TemplateSelector
+  isOpen={showTemplateSelector}
+  {projectId}
+  onSelect={handleTemplateSelect}
+  onClose={() => showTemplateSelector = false}
+/>
 
 <style>
   textarea {

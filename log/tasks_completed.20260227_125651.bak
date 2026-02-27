@@ -1146,11 +1146,3 @@ tasks:
     completed_date: '2026-02-27'
     git_commit: 5e0f5fe93e8039fca243d044635525bd0682572f
     summary: Implemented Python tools backend with Jinja2 template rendering, sandboxed code execution, and utility services
-- task:
-    id: 2.6.0
-    name: Implement Prompt Templates System
-    goal: Implement prompt templates with Jinja2 rendering, variable substitution, and template management UI.
-    prompt: ./prompts/dev/prompt_2_6_0.md
-    completed_date: '2026-02-27'
-    git_commit: 8b8aeff7d58e913e4f4e82171e9d9cf519e6ed3f
-    summary: Implemented prompt templates system with Jinja2 rendering, variable substitution, and template management UI

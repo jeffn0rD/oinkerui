@@ -1,0 +1,68 @@
+task_id: "2.6.0"
+task_name: "Implement Prompt Templates System"
+status: completed
+completion_date: "2025-02-27"
+summary: >
+  Implemented prompt templates system with Jinja2 rendering, variable substitution,
+  and template management UI. Includes global template storage, backend service
+  with caching, REST API endpoints, and a frontend TemplateSelector modal component.
+
+deliverables:
+  - name: "Global Templates"
+    path: "templates/global/"
+    description: "5 default templates: code-review, explain-concept, write-tests, refactor-code, summarize"
+
+  - name: "Template Service"
+    path: "backend/src/services/templateService.js"
+    description: "Template loading, caching, merging, variable substitution, and Jinja2 delegation"
+
+  - name: "Template Routes"
+    path: "backend/src/routes/templates.js"
+    description: "GET /api/templates, GET /api/templates/:id, POST /api/templates/resolve, POST /api/templates/render-inline"
+
+  - name: "Frontend Template API"
+    path: "frontend/src/lib/utils/api.js"
+    description: "templateApi with list, get, resolve, renderInline methods"
+
+  - name: "TemplateSelector Component"
+    path: "frontend/src/lib/components/TemplateSelector.svelte"
+    description: "Modal dialog with template list, search, category filter, variable form, and preview"
+
+  - name: "MessageInput Integration"
+    path: "frontend/src/lib/components/MessageInput.svelte"
+    description: "Template button and Ctrl+T shortcut to open TemplateSelector"
+
+  - name: "Backend Tests"
+    path: "backend/tests/services/templateService.test.js"
+    description: "22 tests covering simpleSubstitute, listTemplates, getTemplate, resolveTemplate"
+
+testing:
+  backend_tests: 22
+  total_node_tests: 308
+  total_python_tests: 66
+  total_frontend_tests: 7
+  all_passing: true
+  verification_checks: 45
+
+endpoints:
+  - "GET /api/templates - List templates with optional filtering"
+  - "GET /api/templates/:templateId - Get single template"
+  - "POST /api/templates/resolve - Resolve template with variables"
+  - "POST /api/templates/render-inline - Render inline template string"
+
+features:
+  - "Global template storage in YAML format"
+  - "Project-level template override support"
+  - "Simple {{ variable }} substitution"
+  - "Full Jinja2 rendering via Python backend delegation"
+  - "Template caching with mtime invalidation"
+  - "Category-based filtering and search"
+  - "Variable defaults and required validation"
+  - "Frontend modal with live preview"
+  - "Ctrl+T keyboard shortcut"
+
+notes:
+  - "All 308 Node.js tests passing"
+  - "All 66 Python tests passing"
+  - "All 7 frontend tests passing"
+  - "45/45 verification checks passed"

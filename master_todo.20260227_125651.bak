@@ -40,6 +40,11 @@ prompt_guidance: "Always follow these guidelines and update project documentatio
   \ if it is outside the scope.\n* ALWAYS COMMIT AND PUSH the repository after a task.\n"
 current:
 - task:
+    id: 2.6.0
+    name: Implement Prompt Templates System
+    goal: Implement prompt templates with Jinja2 rendering, variable substitution, and template management UI.
+    prompt: ./prompts/dev/prompt_2_6_0.md
+- task:
     id: 2.7.0
     name: Implement Message Flag UI Controls
     goal: Implement frontend UI controls for managing message context flags with visual indicators.

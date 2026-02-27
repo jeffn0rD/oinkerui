@@ -361,6 +361,66 @@ export const messageApi = {
 };
 
 // =============================================================================
+// Template API
+// =============================================================================
+
+export const templateApi = {
+  /**
+   * List available templates
+   * @param {Object} options - Filter options
+   * @param {string} [options.projectId] - Include project templates
+   * @param {string} [options.category] - Filter by category
+   * @param {string} [options.search] - Search in name/description
+   * @returns {Promise<Object>} Template list
+   */
+  list: (options = {}) => {
+    const params = new URLSearchParams();
+    if (options.projectId) params.set('projectId', options.projectId);
+    if (options.category) params.set('category', options.category);
+    if (options.search) params.set('search', options.search);
+    const qs = params.toString();
+    return request(`/templates${qs ? '?' + qs : ''}`);
+  },
+
+  /**
+   * Get a single template by ID
+   * @param {string} templateId - Template ID
+   * @param {string} [projectId] - Project ID
+   * @returns {Promise<Object>} Template details
+   */
+  get: (templateId, projectId) => {
+    const qs = projectId ? `?projectId=${projectId}` : '';
+    return request(`/templates/${templateId}${qs}`);
+  },
+
+  /**
+   * Resolve a template with variables
+   * @param {string} templateId - Template ID
+   * @param {Object} variables - Template variables
+   * @param {Object} options - Resolution options
+   * @returns {Promise<Object>} Resolved template
+   */
+  resolve: (templateId, variables = {}, options = {}) =>
+    request('/templates/resolve', {
+      method: 'POST',
+      body: { templateId, variables, ...options },
+    }),
+
+  /**
+   * Render an inline template string
+   * @param {string} template - Template string
+   * @param {Object} variables - Template variables
+   * @param {Object} options - Render options
+   * @returns {Promise<Object>} Rendered result
+   */
+  renderInline: (template, variables = {}, options = {}) =>
+    request('/templates/render-inline', {
+      method: 'POST',
+      body: { template, variables, ...options },
+    }),
+};
+
+// =============================================================================
 // Command API
 // =============================================================================
 
