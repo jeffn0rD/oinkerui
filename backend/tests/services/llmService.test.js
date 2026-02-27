@@ -387,10 +387,11 @@ describe('LLM Service', () => {
     it('should maintain chronological order', async () => {
       const storagePath = path.join(testProject.paths.root, testChat.storage_path);
       const now = new Date();
+      // Use wide time gaps to avoid race conditions with Date.now() in constructContext
       const messages = [
-        { id: '1', role: 'user', content: 'First', include_in_context: true, created_at: new Date(now.getTime() - 2000).toISOString() },
-        { id: '2', role: 'assistant', content: 'Second', include_in_context: true, created_at: new Date(now.getTime() - 1000).toISOString() },
-        { id: '3', role: 'user', content: 'Third', include_in_context: true, created_at: now.toISOString() }
+        { id: '1', role: 'user', content: 'First', include_in_context: true, created_at: new Date(now.getTime() - 30000).toISOString() },
+        { id: '2', role: 'assistant', content: 'Second', include_in_context: true, created_at: new Date(now.getTime() - 20000).toISOString() },
+        { id: '3', role: 'user', content: 'Third', include_in_context: true, created_at: new Date(now.getTime() - 10000).toISOString() }
       ];
       await fs.writeFile(storagePath, messages.map(m => JSON.stringify(m)).join('\n'));
 
