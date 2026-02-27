@@ -1,27 +1,34 @@
-# Task 2.3.5: Implement Cancel LLM Request
+# Task 2.5.0: Implement Python Tools Backend
 
-## Overview
-Implement ability to cancel in-progress LLM requests with timeout configuration and UI feedback.
+## Phase 1: Project Structure Setup
+- [x] Gather context from specs
+- [ ] Create Python backend directory structure
+- [ ] Create requirements.txt with dependencies
+- [ ] Create Pydantic request/response models
 
-## Tasks
+## Phase 2: Core Services
+- [ ] Create template_service.py (Jinja2 sandboxed rendering)
+- [ ] Create sandbox_service.py (sandbox management)
+- [ ] Create execution_service.py (code/shell execution)
 
-### Backend Implementation
-- [x] 1.1 Create cancel service with request tracking
-- [x] 1.2 Add cancel endpoint to chat routes
-- [x] 1.3 Update LLM service to support AbortSignal properly
-- [x] 1.4 Add timeout configuration support
+## Phase 3: FastAPI Routers
+- [ ] Create templates router (render, validate, filters)
+- [ ] Create execution router (execute code/shell)
+- [ ] Update main.py to register routers and middleware
 
-### Frontend Implementation
-- [x] 2.1 Create CancelButton.svelte component
-- [x] 2.2 Update uiStore with streaming state
-- [x] 2.3 Update API client with cancel method
-- [x] 2.4 Integrate cancel button into ChatInterface
+## Phase 4: Node.js Integration
+- [ ] Create pythonToolsClient service in Node.js backend
+- [ ] Add PYTHON_TOOLS_URL to Node.js config (already done)
 
-### Testing & Verification
-- [x] 3.1 Test cancel functionality manually
-- [x] 3.2 Create verification script
-- [x] 3.3 Document implementation
+## Phase 5: Testing
+- [ ] Create pytest tests for template service
+- [ ] Create pytest tests for execution service
+- [ ] Create pytest tests for API endpoints
+- [ ] Run all tests and verify passing
 
-### Cleanup
-- [x] 4.1 Create task summary
-- [ ] 4.2 Commit and push changes
+## Phase 6: Verification & Cleanup
+- [ ] Create verification script
+- [ ] Run verification
+- [ ] Create task summary
+- [ ] Run task cleanup
+- [ ] Commit and push

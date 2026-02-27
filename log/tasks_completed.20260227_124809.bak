@@ -1138,11 +1138,3 @@ tasks:
     completed_date: '2026-02-27'
     git_commit: e2ca99afe343e2f7274720c9c4de32e6c779e8d2
     summary: Implemented requery functionality with response branching support
-- task:
-    id: 2.5.0
-    name: Implement Python Tools Backend
-    goal: Set up the Python FastAPI tools backend for Jinja2 template rendering and code execution.
-    prompt: ./prompts/dev/prompt_2_5_0.md
-    completed_date: '2026-02-27'
-    git_commit: 5e0f5fe93e8039fca243d044635525bd0682572f
-    summary: Implemented Python tools backend with Jinja2 template rendering, sandboxed code execution, and utility services
