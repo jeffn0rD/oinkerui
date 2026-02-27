@@ -1,0 +1,73 @@
+task_id: "2.8.0"
+task_name: "Implement Aside and Pure Aside Functionality"
+status: completed
+completion_date: "2025-02-27"
+summary: >
+  Implemented complete aside and pure aside message functionality with context
+  handling and UI feedback. Backend already had full support for aside context
+  construction, slash commands, and flag management. Added frontend UI controls
+  for aside mode toggling, keyboard shortcuts, visual indicators, and aside
+  context tests.
+
+deliverables:
+  - name: "Updated MessageInput Component"
+    path: "frontend/src/lib/components/MessageInput.svelte"
+    description: "Aside mode toggle, Ctrl+Enter/Ctrl+Alt+Enter shortcuts, visual indicators"
+
+  - name: "Updated ChatInterface Component"
+    path: "frontend/src/lib/components/ChatInterface.svelte"
+    description: "Passes aside flags through send event dispatch"
+
+  - name: "Aside Context Tests"
+    path: "backend/tests/services/asideContext.test.js"
+    description: "3 tests: aside excluded from future context, pure aside system+current only, pinned aside included"
+
+backend_features_verified:
+  context_construction:
+    - "pure_aside: context = system prelude + current message only (step 2)"
+    - "is_aside: excluded from future context (step 3)"
+    - "Pinned aside messages still included in future context"
+  slash_commands:
+    - "/aside - sets is_aside=true, continues with LLM"
+    - "/aside-pure - sets pure_aside=true and is_aside=true, continues with LLM"
+  message_service:
+    - "is_aside and pure_aside flags in message creation"
+    - "Flag invariant: pure_aside=true implies is_aside=true"
+    - "updateMessageFlags handles aside flags"
+  streaming:
+    - "User message receives aside flags from request"
+    - "Assistant response inherits aside flag from user message"
+
+frontend_features:
+  message_input:
+    - "Aside mode toggle button (Normal → Aside → Pure Aside)"
+    - "Ctrl+Enter sends as aside"
+    - "Ctrl+Alt+Enter sends as pure aside"
+    - "Yellow border for aside mode"
+    - "Pink border for pure aside mode"
+    - "Mode indicator banner with description"
+    - "Cancel button to exit aside mode"
+    - "Keyboard shortcuts hint bar"
+  chat_interface:
+    - "is_aside and pure_aside passed through send event"
+    - "Optimistic UI shows aside flags on temp messages"
+  message_display:
+    - "Yellow left border for aside messages"
+    - "Pink left border for pure aside messages"
+    - "Aside badge/label on messages"
+    - "Dimmed opacity for aside messages"
+
+testing:
+  aside_context_tests: 3
+  total_node_tests: 311
+  total_python_tests: 66
+  total_frontend_tests: 7
+  all_passing: true
+  verification_checks: 43
+
+notes:
+  - "Backend aside functionality was already fully implemented"
+  - "Frontend aside UI controls and keyboard shortcuts added"
+  - "3 new aside context behavior tests added"
+  - "All 311 Node.js, 66 Python, 7 frontend tests passing"
+  - "43/43 verification checks passed"

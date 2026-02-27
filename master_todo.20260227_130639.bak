@@ -40,6 +40,11 @@ prompt_guidance: "Always follow these guidelines and update project documentatio
   \ if it is outside the scope.\n* ALWAYS COMMIT AND PUSH the repository after a task.\n"
 current:
 - task:
+    id: 2.8.0
+    name: Implement Aside and Pure Aside Functionality
+    goal: Implement complete aside and pure aside message functionality with context handling and UI feedback.
+    prompt: ./prompts/dev/prompt_2_8_0.md
+- task:
     id: 2.9.0
     name: Phase 2 Integration and Testing
     goal: Integrate all Phase 2 components and implement comprehensive end-to-end tests.

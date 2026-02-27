@@ -13,11 +13,18 @@
   let textarea;
   let isComposing = false;
   let showTemplateSelector = false;
+  let asideMode = 'normal'; // 'normal', 'aside', 'pure_aside'
   
-  function handleSubmit() {
+  function handleSubmit(overrideAside) {
+    const mode = overrideAside || asideMode;
     if (message.trim() && !$loading && !disabled) {
-      dispatch('send', { content: message.trim() });
+      dispatch('send', {
+        content: message.trim(),
+        is_aside: mode === 'aside' || mode === 'pure_aside',
+        pure_aside: mode === 'pure_aside',
+      });
       message = '';
+      asideMode = 'normal';
       // Reset textarea height
       if (textarea) {
         textarea.style.height = 'auto';
@@ -31,7 +38,15 @@
     
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
-      handleSubmit();
+      
+      // Ctrl+Shift+Enter = aside, Ctrl+Alt+Enter = pure aside
+      if (event.ctrlKey && event.altKey) {
+        handleSubmit('pure_aside');
+      } else if (event.ctrlKey) {
+        handleSubmit('aside');
+      } else {
+        handleSubmit();
+      }
     }
     
     // Ctrl+T to open template selector
@@ -70,6 +85,12 @@
       });
     }
   }
+
+  function cycleAsideMode() {
+    if (asideMode === 'normal') asideMode = 'aside';
+    else if (asideMode === 'aside') asideMode = 'pure_aside';
+    else asideMode = 'normal';
+  }
   
   // Focus textarea on mount
   import { onMount } from 'svelte';
@@ -78,10 +99,39 @@
       textarea.focus();
     }
   });
+
+  $: asideModeLabel = asideMode === 'aside' ? 'Aside' : asideMode === 'pure_aside' ? 'Pure Aside' : '';
+  $: asideModeColor = asideMode === 'aside' ? 'text-yellow-500' : asideMode === 'pure_aside' ? 'text-pink-500' : '';
 </script>
 
 <div class="border-t border-border bg-surface p-4">
   <div class="max-w-4xl mx-auto">
+    <!-- Aside mode indicator -->
+    {#if asideMode !== 'normal'}
+      <div class="flex items-center gap-2 mb-2 px-2">
+        <span class="text-xs font-medium {asideModeColor} flex items-center gap-1">
+          {#if asideMode === 'aside'}
+            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M13 5l7 7-7 7M5 5l7 7-7 7"/>
+            </svg>
+            Aside Mode — Message excluded from future context
+          {:else}
+            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M13 5l7 7-7 7M5 5l7 7-7 7"/>
+            </svg>
+            Pure Aside Mode — Context ignores all prior messages
+          {/if}
+        </span>
+        <button
+          on:click={() => asideMode = 'normal'}
+          class="text-xs text-muted hover:text-foreground transition-colors"
+          title="Cancel aside mode"
+        >
+          ✕
+        </button>
+      </div>
+    {/if}
+
     <div class="flex gap-3 items-end">
       <!-- Attachment button -->
       <button
@@ -107,6 +157,20 @@
                 d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
         </svg>
       </button>
+
+      <!-- Aside mode toggle button -->
+      <button
+        on:click={cycleAsideMode}
+        class="p-2 rounded-lg hover:bg-surface-hover transition-colors
+               {asideMode !== 'normal' ? asideModeColor : 'text-muted hover:text-foreground'}"
+        title="Toggle aside mode (Normal → Aside → Pure Aside)"
+        disabled={$loading || disabled}
+      >
+        <svg class="w-5 h-5" fill={asideMode !== 'normal' ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+        </svg>
+      </button>
       
       <!-- Text input -->
       <div class="flex-1 relative">
@@ -117,58 +181,46 @@
           on:input={handleInput}
           on:compositionstart={handleCompositionStart}
           on:compositionend={handleCompositionEnd}
-          {placeholder}
+          placeholder={asideMode === 'aside' ? 'Type aside message...' : asideMode === 'pure_aside' ? 'Type pure aside message...' : placeholder}
           disabled={$loading || disabled}
-          class="w-full resize-none rounded-xl border border-border bg-background px-4 py-3 pr-12
+          class="w-full resize-none rounded-xl border px-4 py-3 pr-12
                  text-foreground placeholder-muted
                  focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary
                  disabled:opacity-50 disabled:cursor-not-allowed
-                 transition-colors"
+                 transition-colors bg-background
+                 {asideMode === 'aside' ? 'border-yellow-400' : asideMode === 'pure_aside' ? 'border-pink-400' : 'border-border'}"
           rows="1"
-          style="min-height: 48px; max-height: 200px;"
+          style="max-height: 200px"
         ></textarea>
         
-        <!-- Character count (optional) -->
-        {#if message.length > 1000}
-          <div class="absolute bottom-2 right-14 text-xs text-muted">
-            {message.length}
-          </div>
-        {/if}
-      </div>
-      
-      <!-- Send button -->
-      <button
-        on:click={handleSubmit}
-        disabled={!message.trim() || $loading || disabled}
-        class="p-3 rounded-xl bg-primary text-white
-               hover:bg-primary-hover
-               disabled:opacity-50 disabled:cursor-not-allowed
-               transition-colors"
-        title="Send message (Enter)"
-      >
-        {#if $loading}
-          <svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
-        {:else}
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <!-- Send button -->
+        <button
+          on:click={() => handleSubmit()}
+          disabled={!message.trim() || $loading || disabled}
+          class="absolute right-2 bottom-2 p-2 rounded-lg
+                 {message.trim() && !$loading && !disabled
+                   ? 'bg-primary text-white hover:bg-primary-hover' 
+                   : 'bg-gray-200 dark:bg-gray-700 text-muted cursor-not-allowed'}
+                 transition-colors"
+          title="Send message (Enter)"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
                   d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
           </svg>
-        {/if}
-      </button>
+        </button>
+      </div>
     </div>
     
-    <!-- Hints -->
-    <div class="flex items-center justify-between mt-2 text-xs text-muted">
-      <span>Press <kbd class="px-1.5 py-0.5 bg-surface-hover rounded">Enter</kbd> to send, <kbd class="px-1.5 py-0.5 bg-surface-hover rounded">Ctrl+T</kbd> for templates</span>
-      {#if $loading}
-        <span class="flex items-center gap-1">
-          <span class="w-2 h-2 bg-primary rounded-full animate-pulse"></span>
-          AI is thinking...
-        </span>
-      {/if}
+    <!-- Keyboard shortcuts hint -->
+    <div class="flex items-center gap-3 mt-1.5 px-2 text-xs text-muted">
+      <span>Enter to send</span>
+      <span>·</span>
+      <span>Shift+Enter for new line</span>
+      <span>·</span>
+      <span>Ctrl+Enter for aside</span>
+      <span>·</span>
+      <span>Ctrl+Alt+Enter for pure aside</span>
     </div>
   </div>
 </div>
@@ -180,23 +232,3 @@
   onSelect={handleTemplateSelect}
   onClose={() => showTemplateSelector = false}
 />
-
-<style>
-  textarea {
-    scrollbar-width: thin;
-    scrollbar-color: var(--color-border) transparent;
-  }
-  
-  textarea::-webkit-scrollbar {
-    width: 6px;
-  }
-  
-  textarea::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  
-  textarea::-webkit-scrollbar-thumb {
-    background-color: var(--color-border);
-    border-radius: 3px;
-  }
-</style>

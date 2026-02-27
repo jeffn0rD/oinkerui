@@ -12,7 +12,7 @@
   const dispatch = createEventDispatcher();
   
   async function handleSendMessage(event) {
-    const { content } = event.detail;
+    const { content, is_aside, pure_aside } = event.detail;
     
     if (!$currentProject || !$currentChat) {
       console.error('No project or chat selected');
@@ -24,7 +24,9 @@
       id: `temp-${Date.now()}`,
       role: 'user',
       content,
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
+      is_aside: is_aside || false,
+      pure_aside: pure_aside || false,
     };
     
     messages.update(msgs => [...msgs, userMessage]);
@@ -35,7 +37,9 @@
       dispatch('send', {
         projectId: $currentProject.id,
         chatId: $currentChat.id,
-        content
+        content,
+        is_aside: is_aside || false,
+        pure_aside: pure_aside || false,
       });
     } catch (error) {
       console.error('Failed to send message:', error);
