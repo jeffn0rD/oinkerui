@@ -178,7 +178,22 @@ export const chatApi = {
    * @returns {Promise<Object>} Active request info
    */
   getActiveRequest: (projectId, chatId) =>
-    request(`/projects/${projectId}/chats/${chatId}/active-request`)
+    request(`/projects/${projectId}/chats/${chatId}/active-request`),
+  
+  /**
+   * Get context preview for a chat
+   * @param {string} projectId - Project ID
+   * @param {string} chatId - Chat ID
+   * @param {Object} options - Preview options
+   * @param {string} [options.draftMessage] - Draft message to include
+   * @param {string} [options.modelId] - Model for token limits
+   * @returns {Promise<Object>} Context preview with token counts
+   */
+  contextPreview: (projectId, chatId, options = {}) =>
+    request(`/projects/${projectId}/chats/${chatId}/context-preview`, {
+      method: 'POST',
+      body: options
+    })
 };
 
 // =============================================================================

@@ -336,6 +336,91 @@ async function chatRoutes(fastify, options) {
       }
     }
   });
+
+  /**
+   * Get context preview for a chat
+   * POST /api/projects/:projectId/chats/:chatId/context-preview
+   * 
+   * Preview the context that would be sent to the LLM without making
+   * an actual API call. Shows which messages are included, token counts,
+   * and truncation effects.
+   * 
+   * Request body:
+   * {
+   *   draftMessage?: string,  // Draft message to include in preview
+   *   modelId?: string        // Model for token limit lookup
+   * }
+   * 
+   * Spec: spec/functions/backend_node/get_context_preview.yaml
+   */
+  fastify.post('/api/projects/:projectId/chats/:chatId/context-preview', async (request, reply) => {
+    try {
+      const { projectId, chatId } = request.params;
+      const { draftMessage, modelId } = request.body || {};
+
+      const llmService = require('../services/llmService');
+      const chatService = require('../services/chatService');
+      const messageService = require('../services/messageService');
+      const projectService = require('../services/projectService');
+
+      // Get chat and project
+      const chat = await chatService.getChat(projectId, chatId);
+      const project = await projectService.getProject(projectId);
+
+      // Load messages
+      const allMessages = await messageService.listMessages(projectId, chatId);
+
+      // Build current message for context construction
+      const currentMessage = draftMessage 
+        ? { role: 'user', content: draftMessage }
+        : { role: 'user', content: '' };
+
+      // Construct context to see what would be included
+      const context = await llmService.constructContext(
+        { ...chat, project_id: projectId },
+        currentMessage,
+        modelId
+      );
+
+      // Calculate token breakdown
+      const maxTokens = project.settings?.max_context_tokens || 32000;
+      const breakdown = context.map((msg, index) => ({
+        index,
+        role: msg.role,
+        content_preview: msg.content.substring(0, 100) + (msg.content.length > 100 ? '...' : ''),
+        tokens: llmService.countTokens(msg.content),
+        included: true
+      }));
+
+      const totalTokens = breakdown.reduce((sum, m) => sum + m.tokens, 0);
+
+      // Count excluded messages
+      const includedCount = context.length - (draftMessage ? 1 : 0); // Subtract draft
+      const excludedCount = allMessages.length - includedCount;
+
+      reply.send({
+        success: true,
+        data: {
+          messages: breakdown,
+          total_tokens: totalTokens,
+          max_tokens: maxTokens,
+          model: modelId || project.settings?.default_model || 'default',
+          truncation_applied: excludedCount > 0,
+          excluded_count: Math.max(0, excludedCount),
+          usage_percent: Math.round((totalTokens / maxTokens) * 100)
+        }
+      });
+    } catch (error) {
+      if (error.name === 'ValidationError') {
+        reply.code(400).send({ success: false, error: error.message });
+      } else if (error.name === 'NotFoundError') {
+        reply.code(404).send({ success: false, error: error.message });
+      } else {
+        console.error('Error getting context preview:', error);
+        reply.code(500).send({ success: false, error: 'Internal server error' });
+      }
+    }
+  });
 }
 
 module.exports = chatRoutes;

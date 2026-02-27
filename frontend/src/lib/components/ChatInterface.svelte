@@ -3,6 +3,7 @@
   import MessageList from './MessageList.svelte';
   import MessageInput from './MessageInput.svelte';
   import CancelButton from './CancelButton.svelte';
+  import ContextSizeDisplay from './ContextSizeDisplay.svelte';
   import { currentChat, messages } from '../stores/chatStore.js';
   import { currentProject } from '../stores/projectStore.js';
   import { loading, streaming, stopStreaming } from '../stores/uiStore.js';
@@ -131,13 +132,22 @@
   
   <!-- Input area -->
   {#if $currentChat}
-    <MessageInput 
-      on:send={handleSendMessage}
-      disabled={$currentChat.status !== 'active'}
-      placeholder={$currentChat.status !== 'active' 
-        ? 'This chat is ' + $currentChat.status 
-        : 'Type your message...'}
-    />
+    <div class="border-t border-border bg-surface">
+      <!-- Context size display (compact) -->
+      <div class="flex items-center justify-between px-4 pt-2">
+        <ContextSizeDisplay compact={true} />
+        {#if $streaming.isActive}
+          <CancelButton on:cancel={handleCancel} />
+        {/if}
+      </div>
+      <MessageInput 
+        on:send={handleSendMessage}
+        disabled={$currentChat.status !== 'active'}
+        placeholder={$currentChat.status !== 'active' 
+          ? 'This chat is ' + $currentChat.status 
+          : 'Type your message...'}
+      />
+    </div>
   {/if}
 </div>
 
