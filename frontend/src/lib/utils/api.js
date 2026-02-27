@@ -228,6 +228,22 @@ export const messageApi = {
     }),
   
   /**
+   * Requery - regenerate the last LLM response
+   * @param {string} projectId - Project ID
+   * @param {string} chatId - Chat ID
+   * @param {Object} options - Requery options
+   * @param {boolean} [options.keepPrevious] - Keep previous response as branch
+   * @param {string} [options.modelId] - Model override
+   * @param {number} [options.temperature] - Temperature override
+   * @returns {Promise<Object>} Requery result
+   */
+  requery: (projectId, chatId, options = {}) =>
+    request(`/projects/${projectId}/chats/${chatId}/requery`, {
+      method: 'POST',
+      body: options
+    }),
+  
+  /**
    * Stream a message response using Server-Sent Events
    * @param {string} projectId - Project ID
    * @param {string} chatId - Chat ID

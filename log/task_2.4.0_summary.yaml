@@ -1,0 +1,57 @@
+task_id: "2.4.0"
+task_name: "Implement Requery Functionality"
+status: completed
+date: "2026-02-27"
+
+summary: |
+  Implemented the requery feature to regenerate LLM responses with response branching support.
+  Added backend requery function, API endpoint, and frontend integration.
+
+steps:
+  - step: 1
+    action: "Context gathering - reviewed requery spec and existing implementations"
+    justification: "Need to understand the requery algorithm and branching requirements"
+    result: "Found slash command stub exists, no requery service or endpoint"
+
+  - step: 2
+    action: "Implemented requery function in messageService.js"
+    justification: "Core requery logic needs to find last user/assistant pair, discard/branch, and regenerate"
+    result: |
+      requery() function with:
+      - Finds last user message and assistant response pair
+      - Marks previous response as discarded (or keeps as branch)
+      - Constructs context WITHOUT previous response
+      - Makes new LLM call with same prompt
+      - Saves new response with parent_message_id for branching
+      - Returns original_response, new_response, branch_created
+
+  - step: 3
+    action: "Added requery API endpoint"
+    justification: "Frontend needs HTTP endpoint to trigger requery"
+    result: "POST /api/projects/:id/chats/:chatId/requery in routes/messages.js"
+
+  - step: 4
+    action: "Added frontend API client and sync store integration"
+    justification: "Frontend needs to call requery and update local state"
+    result: |
+      - messageApi.requery in api.js
+      - messageSync.requery in syncStore.js with optimistic updates
+
+  - step: 5
+    action: "Verified all tests pass"
+    justification: "Ensure no regressions"
+    result: "286 backend tests, 7 frontend tests all pass"
+
+deliverables:
+  - "backend/src/services/messageService.js (requery function)"
+  - "backend/src/routes/messages.js (requery endpoint)"
+  - "frontend/src/lib/utils/api.js (requery method)"
+  - "frontend/src/lib/stores/syncStore.js (requery action)"
+  - "verify/task_2.4.0_requery.py"
+  - "log/task_2.4.0_summary.yaml"
+
+verification:
+  tests_passed: true
+  backend_tests: 286
+  frontend_tests: 7
+  verification_checks: 7

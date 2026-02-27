@@ -235,6 +235,62 @@ async function messageRoutes(fastify, options) {
       });
     }
   });
+/**
+   * Requery - Regenerate the last LLM response
+   * POST /api/projects/:projectId/chats/:chatId/requery
+   * 
+   * Finds the last assistant response, marks it as discarded (or keeps as branch),
+   * and generates a new response using the same user prompt.
+   * 
+   * Request body:
+   * {
+   *   keepPrevious?: boolean,  // Keep previous response as branch
+   *   modelId?: string,        // Model override
+   *   temperature?: number     // Temperature override
+   * }
+   * 
+   * Spec: spec/functions/backend_node/requery.yaml
+   */
+  fastify.post('/api/projects/:projectId/chats/:chatId/requery', async (request, reply) => {
+    try {
+      const { projectId, chatId } = request.params;
+      const { keepPrevious, modelId, temperature } = request.body || {};
+
+      const result = await messageService.requery(projectId, chatId, {
+        keepPrevious,
+        modelId,
+        temperature
+      });
+
+      reply.send({
+        success: true,
+        data: result
+      });
+    } catch (error) {
+      if (error.name === 'ValidationError') {
+        reply.code(400).send({
+          success: false,
+          error: error.message
+        });
+      } else if (error.name === 'NotFoundError') {
+        reply.code(404).send({
+          success: false,
+          error: error.message
+        });
+      } else if (error.name === 'LLMError') {
+        reply.code(502).send({
+          success: false,
+          error: error.message
+        });
+      } else {
+        console.error('Error during requery:', error);
+        reply.code(500).send({
+          success: false,
+          error: 'Internal server error'
+        });
+      }
+    }
+  });
 }
 
 module.exports = messageRoutes;

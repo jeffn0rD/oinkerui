@@ -441,6 +441,56 @@ export const messageSync = {
   },
 
   /**
+   * Requery - regenerate the last LLM response
+   * @param {string} projectId - Project ID
+   * @param {string} chatId - Chat ID
+   * @param {Object} options - Requery options
+   * @returns {Promise<Object>} Requery result
+   */
+  async requery(projectId, chatId, options = {}) {
+    loading.set(true);
+    clearError();
+    
+    try {
+      const response = await messageApi.requery(projectId, chatId, options);
+      const data = response.data || response;
+      
+      // Update messages in store
+      if (data.original_response && !data.branch_created) {
+        // Mark original as discarded in local state
+        updateMessage(data.original_response.id, { is_discarded: true });
+      }
+      
+      if (data.new_response) {
+        // Add the new response
+        addMessage({
+          id: data.new_response.id,
+          role: 'assistant',
+          content: data.new_response.content,
+          model: data.new_response.model,
+          created_at: new Date().toISOString(),
+          include_in_context: true
+        });
+      }
+      
+      addNotification({ 
+        type: 'success', 
+        message: data.branch_created 
+          ? 'Response regenerated (branch created)' 
+          : 'Response regenerated' 
+      });
+      
+      return data;
+    } catch (error) {
+      setError(error);
+      addNotification({ type: 'error', message: error.message || 'Failed to requery' });
+      throw error;
+    } finally {
+      loading.set(false);
+    }
+  },
+
+  /**
    * Update message flags (pin, discard, include_in_context, aside)
    * @param {string} projectId - Project ID
    * @param {string} chatId - Chat ID
