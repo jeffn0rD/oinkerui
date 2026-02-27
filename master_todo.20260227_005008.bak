@@ -40,6 +40,11 @@ prompt_guidance: "Always follow these guidelines and update project documentatio
   \ if it is outside the scope.\n* ALWAYS COMMIT AND PUSH the repository after a task.\n"
 current:
 - task:
+    id: 2.3.0
+    name: Implement Live Context Size Display
+    goal: Implement real-time context size estimation and display showing tokens vs model maximum.
+    prompt: ./prompts/dev/prompt_2_3_0.md
+- task:
     id: 2.4.0
     name: Implement Requery Functionality
     goal: Implement the requery feature to regenerate LLM responses with response branching support.
