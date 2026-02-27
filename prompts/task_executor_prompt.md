@@ -8,11 +8,10 @@ I need you to execute a series of task_executor.py commands sequentially, follow
 4. Only after fully completing all instructions from the current task, proceed to the next task
 
 **Tasks to execute in order:**
-1. `./tools/task_executor.py -t 2.0.0`
-1.5 Before executing task 2.0.2 review the task and create a prompt to use (in the master_todo.yaml task definition)
-2. `./tools/task_executor.py -t 2.0.2`
-3. `./tools/task_executor.py -t 2.0.5`
-4. `./tools/task_executor.py -t 2.1.0`
+1. `./tools/task_executor.py -t 2.1.7`
+2. `./tools/task_executor.py -t 2.4.5`
+3. `./tools/task_executor.py -t 2.2.0`
+4. `./tools/task_executor.py -t 2.3.0`
 
 **Important notes:**
 - Each task_executor.py call will return a prompt or set of instructions that you must follow completely

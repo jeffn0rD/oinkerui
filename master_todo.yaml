@@ -39,7 +39,7 @@ prompt_guidance: "Always follow these guidelines and update project documentatio
   \ closely and carefully. Constrain work and scope to the task. Return with questions if\nneeded and confirm any extra work\
   \ if it is outside the scope.\n* ALWAYS COMMIT AND PUSH the repository after a task.\n"
 current:
-- task:
+- task: 
     id: 2.2.0
     name: Implement Chat Forking
     goal: Implement chat forking functionality with optional message point and pruning support.
