@@ -40,6 +40,11 @@ prompt_guidance: "Always follow these guidelines and update project documentatio
   \ if it is outside the scope.\n* ALWAYS COMMIT AND PUSH the repository after a task.\n"
 current:
 - task:
+    id: 2.2.0
+    name: Implement Chat Forking
+    goal: Implement chat forking functionality with optional message point and pruning support.
+    prompt: ./prompts/dev/prompt_2_2_0.md
+- task:
     id: 2.3.0
     name: Implement Live Context Size Display
     goal: Implement real-time context size estimation and display showing tokens vs model maximum.
@@ -82,6 +87,5 @@ current:
 future:
 - add context re-ordering feature; prompt/responses in chat history can be re-ordered in the left side list, drag and drop
   and/or buttons move up/down.  Need a reset button as well.
-- workflows implemented with lang chain or lang graph (possibly deeper integration into entire application, chat chain as
-  a lang chain)
+- workflows implemented with lang chain or lang graph (possibly deeper integration into entire application, chat chain as a lang chain)
 open_questions: []

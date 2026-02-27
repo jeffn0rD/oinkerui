@@ -1106,11 +1106,3 @@ tasks:
     prompt: ./prompts/dev/prompt_2_4_5.md
     completed_date: '2026-01-23'
     summary: Implemented core frontend application with dark theme - fixed build issues and verified all components
-- task:
-    id: 2.2.0
-    name: Implement Chat Forking
-    goal: Implement chat forking functionality with optional message point and pruning support.
-    prompt: ./prompts/dev/prompt_2_2_0.md
-    completed_date: '2026-02-27'
-    git_commit: a21db4c
-    summary: Implemented chat forking with pruning support. Added 10 comprehensive test cases.
