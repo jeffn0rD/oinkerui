@@ -10,3 +10,5 @@ export { default as Message } from './Message.svelte';
 export { default as WorkspacePanel } from './WorkspacePanel.svelte';
 export { default as CancelButton } from './CancelButton.svelte';
 export { default as ContextSizeDisplay } from './ContextSizeDisplay.svelte';
+export { default as TemplateSelector } from './TemplateSelector.svelte';
+export { default as MessageFlagControls } from './MessageFlagControls.svelte';

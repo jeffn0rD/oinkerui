@@ -1,0 +1,23 @@
+id: refactor-code
+name: "Refactor Code"
+description: "Suggest refactoring improvements for code"
+category: "development"
+variables:
+  - name: language
+    required: true
+    description: "Programming language"
+  - name: code
+    required: true
+    description: "Code to refactor"
+  - name: goal
+    required: false
+    default: "readability and maintainability"
+    description: "Refactoring goal"
+template: |
+  Refactor the following {{ language }} code to improve {{ goal }}:
+
+  ```{{ language }}
+  {{ code }}
+  ```
+
+  Please provide the refactored code with explanations for each change.

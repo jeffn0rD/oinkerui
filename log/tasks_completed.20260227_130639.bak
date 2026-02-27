@@ -1162,11 +1162,3 @@ tasks:
     completed_date: '2026-02-27'
     git_commit: 2630dd7b79b1a1a2783b5f33658d0811ba681f53
     summary: Implemented message flag UI controls with visual indicators, optimistic updates, and accessibility
-- task:
-    id: 2.8.0
-    name: Implement Aside and Pure Aside Functionality
-    goal: Implement complete aside and pure aside message functionality with context handling and UI feedback.
-    prompt: ./prompts/dev/prompt_2_8_0.md
-    completed_date: '2026-02-27'
-    git_commit: 8dfb86a0c8c225a2b7fbea6f1c4dec310d8a25cc
-    summary: Implemented aside and pure aside functionality with context handling and UI feedback

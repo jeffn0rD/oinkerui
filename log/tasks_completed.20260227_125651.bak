@@ -1146,27 +1146,3 @@ tasks:
     completed_date: '2026-02-27'
     git_commit: 5e0f5fe93e8039fca243d044635525bd0682572f
     summary: Implemented Python tools backend with Jinja2 template rendering, sandboxed code execution, and utility services
-- task:
-    id: 2.6.0
-    name: Implement Prompt Templates System
-    goal: Implement prompt templates with Jinja2 rendering, variable substitution, and template management UI.
-    prompt: ./prompts/dev/prompt_2_6_0.md
-    completed_date: '2026-02-27'
-    git_commit: 8b8aeff7d58e913e4f4e82171e9d9cf519e6ed3f
-    summary: Implemented prompt templates system with Jinja2 rendering, variable substitution, and template management UI
-- task:
-    id: 2.7.0
-    name: Implement Message Flag UI Controls
-    goal: Implement frontend UI controls for managing message context flags with visual indicators.
-    prompt: ./prompts/dev/prompt_2_7_0.md
-    completed_date: '2026-02-27'
-    git_commit: 2630dd7b79b1a1a2783b5f33658d0811ba681f53
-    summary: Implemented message flag UI controls with visual indicators, optimistic updates, and accessibility
-- task:
-    id: 2.8.0
-    name: Implement Aside and Pure Aside Functionality
-    goal: Implement complete aside and pure aside message functionality with context handling and UI feedback.
-    prompt: ./prompts/dev/prompt_2_8_0.md
-    completed_date: '2026-02-27'
-    git_commit: 8dfb86a0c8c225a2b7fbea6f1c4dec310d8a25cc
-    summary: Implemented aside and pure aside functionality with context handling and UI feedback

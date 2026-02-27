@@ -1,27 +1,21 @@
-# Task 2.3.5: Implement Cancel LLM Request
+# Task Execution Progress - All Complete ✅
 
-## Overview
-Implement ability to cancel in-progress LLM requests with timeout configuration and UI feedback.
+## Task 2.5.0: Implement Python Tools Backend ✅ COMPLETE
+- [x] FastAPI app with Jinja2 template rendering, code execution, utilities
+- [x] 66 Python tests, 77/77 verification checks
+- [x] Committed and pushed (8b8aeff)
 
-## Tasks
+## Task 2.6.0: Implement Prompt Templates System ✅ COMPLETE
+- [x] Global templates, backend service, routes, frontend TemplateSelector
+- [x] 22 backend tests, 45/45 verification checks
+- [x] Committed and pushed (2630dd7)
 
-### Backend Implementation
-- [x] 1.1 Create cancel service with request tracking
-- [x] 1.2 Add cancel endpoint to chat routes
-- [x] 1.3 Update LLM service to support AbortSignal properly
-- [x] 1.4 Add timeout configuration support
+## Task 2.7.0: Implement Message Flag UI Controls ✅ COMPLETE
+- [x] MessageFlagControls component, visual indicators, optimistic updates
+- [x] 44/44 verification checks
+- [x] Committed and pushed (8dfb86a)
 
-### Frontend Implementation
-- [x] 2.1 Create CancelButton.svelte component
-- [x] 2.2 Update uiStore with streaming state
-- [x] 2.3 Update API client with cancel method
-- [x] 2.4 Integrate cancel button into ChatInterface
-
-### Testing & Verification
-- [x] 3.1 Test cancel functionality manually
-- [x] 3.2 Create verification script
-- [x] 3.3 Document implementation
-
-### Cleanup
-- [x] 4.1 Create task summary
-- [ ] 4.2 Commit and push changes
+## Task 2.8.0: Implement Aside and Pure Aside Functionality ✅ COMPLETE
+- [x] Frontend aside mode UI, keyboard shortcuts, context tests
+- [x] 3 aside context tests, 43/43 verification checks
+- [x] Committed and pushed (d94f930)

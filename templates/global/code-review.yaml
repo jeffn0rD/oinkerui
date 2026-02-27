@@ -1,0 +1,27 @@
+id: code-review
+name: "Code Review"
+description: "Review code for quality, bugs, and improvements"
+category: "development"
+variables:
+  - name: language
+    required: true
+    description: "Programming language"
+  - name: code
+    required: true
+    description: "Code to review"
+  - name: focus
+    required: false
+    default: "general"
+    description: "Focus area (security, performance, readability)"
+template: |
+  Please review the following {{ language }} code with a focus on {{ focus }}:
+
+  ```{{ language }}
+  {{ code }}
+  ```
+
+  Provide feedback on:
+  1. Code quality and readability
+  2. Potential bugs or issues
+  3. Performance considerations
+  4. Suggested improvements
