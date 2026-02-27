@@ -40,6 +40,11 @@ prompt_guidance: "Always follow these guidelines and update project documentatio
   \ if it is outside the scope.\n* ALWAYS COMMIT AND PUSH the repository after a task.\n"
 current:
 - task:
+    id: 2.4.0
+    name: Implement Requery Functionality
+    goal: Implement the requery feature to regenerate LLM responses with response branching support.
+    prompt: ./prompts/dev/prompt_2_4_0.md
+- task:
     id: 2.5.0
     name: Implement Python Tools Backend
     goal: Set up the Python FastAPI tools backend for Jinja2 template rendering and code execution.
