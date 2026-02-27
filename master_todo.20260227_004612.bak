@@ -60,6 +60,11 @@ current:
     goal: Implement prompt templates with Jinja2 rendering, variable substitution, and template management UI.
     prompt: ./prompts/dev/prompt_2_6_0.md
 - task:
+    id: 2.6.5
+    name: Implement Frontend-Backend Integration
+    goal: Complete frontend-backend integration with API calls, real-time updates, and smooth UX.
+    prompt: ./prompts/dev/prompt_2_6_5.md
+- task:
     id: 2.7.0
     name: Implement Message Flag UI Controls
     goal: Implement frontend UI controls for managing message context flags with visual indicators.
