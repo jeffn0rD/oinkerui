@@ -1,0 +1,66 @@
+task_id: "2.7.0"
+task_name: "Implement Message Flag UI Controls"
+status: completed
+completion_date: "2025-02-27"
+summary: >
+  Implemented frontend UI controls for managing message context flags with visual
+  indicators. Includes MessageFlagControls component with toggle buttons, optimistic
+  updates, and full accessibility support. Updated Message and MessageList components
+  with flag integration, visual indicators, and API-backed flag persistence.
+
+deliverables:
+  - name: "MessageFlagControls Component"
+    path: "frontend/src/lib/components/MessageFlagControls.svelte"
+    description: "Toggle buttons for is_pinned, include_in_context, is_aside, is_discarded with optimistic updates"
+
+  - name: "Updated Message Component"
+    path: "frontend/src/lib/components/Message.svelte"
+    description: "Integrated flag controls on hover, visual indicators for all flag states"
+
+  - name: "Updated MessageList Component"
+    path: "frontend/src/lib/components/MessageList.svelte"
+    description: "Flag change handler with optimistic UI updates, API calls, and rollback on error"
+
+  - name: "Component Index Update"
+    path: "frontend/src/lib/components/index.js"
+    description: "MessageFlagControls exported"
+
+testing:
+  total_node_tests: 308
+  total_python_tests: 66
+  total_frontend_tests: 7
+  all_passing: true
+  verification_checks: 44
+
+features:
+  flag_controls:
+    - "is_pinned toggle (pin icon, blue highlight)"
+    - "include_in_context toggle (eye icon, green highlight)"
+    - "is_aside toggle (chevron icon, yellow highlight)"
+    - "is_discarded toggle (trash icon, red highlight)"
+  visual_indicators:
+    - "Pinned: blue left border + 'Pinned' label"
+    - "Aside: yellow left border + dimmed opacity"
+    - "Pure aside: pink left border + more dimmed"
+    - "Discarded: strikethrough text + very dimmed"
+    - "Excluded: reduced opacity"
+  interactions:
+    - "Click to toggle flags"
+    - "Hover to show flag controls"
+    - "Optimistic UI updates"
+    - "API call on change"
+    - "Rollback on error"
+  accessibility:
+    - "ARIA labels on all buttons"
+    - "ARIA pressed state"
+    - "Keyboard navigation (Tab, Enter, Space)"
+    - "Toolbar role on container"
+    - "Article role on messages"
+
+notes:
+  - "All 308 Node.js tests passing"
+  - "All 66 Python tests passing"
+  - "All 7 frontend tests passing"
+  - "44/44 verification checks passed"
+  - "Backend PATCH /flags endpoint already existed"
+  - "Frontend updateFlags API method already existed"

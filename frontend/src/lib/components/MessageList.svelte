@@ -1,9 +1,14 @@
 <script>
-  import { afterUpdate, tick } from 'svelte';
+  import { afterUpdate, tick, createEventDispatcher } from 'svelte';
   import { messages } from '../stores/chatStore.js';
+  import { currentProject } from '../stores/projectStore.js';
+  import { currentChat } from '../stores/chatStore.js';
+  import { messageApi } from '../utils/api.js';
   import Message from './Message.svelte';
   
   export let autoScroll = true;
+  
+  const dispatch = createEventDispatcher();
   
   let container;
   let shouldScroll = true;
@@ -25,6 +30,50 @@
     const isAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
     shouldScroll = isAtBottom;
   }
+
+  /**
+   * Handle flag change from a message.
+   * Makes optimistic UI update and API call.
+   */
+  async function handleFlagChange(messageId, flagName, newValue) {
+    const projectId = $currentProject?.id;
+    const chatId = $currentChat?.id;
+
+    if (!projectId || !chatId) {
+      throw new Error('No project or chat selected');
+    }
+
+    // Optimistic update
+    messages.update(msgs =>
+      msgs.map(m => {
+        if (m.id === messageId) {
+          return { ...m, [flagName]: newValue };
+        }
+        return m;
+      })
+    );
+
+    try {
+      // API call
+      await messageApi.updateFlags(projectId, chatId, messageId, {
+        [flagName]: newValue,
+      });
+
+      dispatch('flagChanged', { messageId, flag: flagName, value: newValue });
+    } catch (err) {
+      // Rollback on error
+      messages.update(msgs =>
+        msgs.map(m => {
+          if (m.id === messageId) {
+            return { ...m, [flagName]: !newValue };
+          }
+          return m;
+        })
+      );
+      console.error('Failed to update flag:', err);
+      throw err;
+    }
+  }
 </script>
 
 <div 
@@ -33,7 +82,7 @@
   class="flex-1 overflow-y-auto p-4 space-y-4 bg-background"
 >
   {#each $messages as message, index (message.id || index)}
-    <Message {message} />
+    <Message {message} onFlagChange={handleFlagChange} />
   {:else}
     <div class="flex flex-col items-center justify-center h-full text-muted">
       <svg class="w-16 h-16 mb-4 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -1154,11 +1154,3 @@ tasks:
     completed_date: '2026-02-27'
     git_commit: 8b8aeff7d58e913e4f4e82171e9d9cf519e6ed3f
     summary: Implemented prompt templates system with Jinja2 rendering, variable substitution, and template management UI
-- task:
-    id: 2.7.0
-    name: Implement Message Flag UI Controls
-    goal: Implement frontend UI controls for managing message context flags with visual indicators.
-    prompt: ./prompts/dev/prompt_2_7_0.md
-    completed_date: '2026-02-27'
-    git_commit: 2630dd7b79b1a1a2783b5f33658d0811ba681f53
-    summary: Implemented message flag UI controls with visual indicators, optimistic updates, and accessibility

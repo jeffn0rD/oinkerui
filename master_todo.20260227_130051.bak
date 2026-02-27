@@ -40,6 +40,11 @@ prompt_guidance: "Always follow these guidelines and update project documentatio
   \ if it is outside the scope.\n* ALWAYS COMMIT AND PUSH the repository after a task.\n"
 current:
 - task:
+    id: 2.7.0
+    name: Implement Message Flag UI Controls
+    goal: Implement frontend UI controls for managing message context flags with visual indicators.
+    prompt: ./prompts/dev/prompt_2_7_0.md
+- task:
     id: 2.8.0
     name: Implement Aside and Pure Aside Functionality
     goal: Implement complete aside and pure aside message functionality with context handling and UI feedback.
