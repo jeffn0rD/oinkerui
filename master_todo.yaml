@@ -41,6 +41,18 @@ prompt_guidance: "Always follow these guidelines and update project documentatio
 current:
 
 - task:
+    id: 2.8.9
+    name: UI unresponsive icons and links
+    goal: All UI actionable features (icons, links) work
+    details: >
+      - create project shows dialog, use 'create project' button from dialog gives message 'Failed to fetch'
+      - cannot create a chat with '+' button -- you shouldn't need a project to create a chat
+      - profile icon does nothing -- is this future feature?
+      - settings icon does nothing
+      - 'dark mode' link in lower left corner does nothing      
+      - does not seem to be any way to add files to the workspace
+    prompt: 
+    
     id: 2.9.0
     name: Phase 2 Integration and Testing
     goal: Integrate all Phase 2 components and implement comprehensive end-to-end tests.
