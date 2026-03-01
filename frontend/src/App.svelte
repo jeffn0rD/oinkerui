@@ -27,10 +27,6 @@
   // Active stream controller
   let activeStreamController = null;
 
-  // Track what we've already loaded to prevent reactive re-triggers
-  let loadedChatsForProject = null;
-  let loadedMessagesForChat = null;
-
   async function checkServerStatus() {
     try {
       await healthApi.check();
@@ -57,14 +53,20 @@
     }
   });
 
-  // When current project changes, load its chats (with guard)
-  $: if ($currentProject && $currentProject.id !== loadedChatsForProject) {
-    loadChats($currentProject.id);
+  // Track last loaded IDs to avoid duplicate loads
+  let _lastProjectId = null;
+  let _lastChatId = null;
+
+  // When current project changes, load its chats
+  $: if ($currentProject) {
+    const pid = $currentProject.id;
+    if (pid !== _lastProjectId) {
+      _lastProjectId = pid;
+      _loadChats(pid);
+    }
   }
 
-  async function loadChats(projectId) {
-    loadedChatsForProject = projectId;
-    loadedMessagesForChat = null;
+  async function _loadChats(projectId) {
     clearChats();
     try {
       const response = await chatApi.list(projectId);
@@ -74,13 +76,16 @@
     }
   }
 
-  // When current chat changes, load its messages (with guard)
-  $: if ($currentChat && $currentProject && $currentChat.id !== loadedMessagesForChat) {
-    loadMessages($currentProject.id, $currentChat.id);
+  // When current chat changes, load its messages
+  $: if ($currentChat && $currentProject) {
+    const cid = $currentChat.id;
+    if (cid !== _lastChatId) {
+      _lastChatId = cid;
+      _loadMessages($currentProject.id, cid);
+    }
   }
 
-  async function loadMessages(projectId, chatId) {
-    loadedMessagesForChat = chatId;
+  async function _loadMessages(projectId, chatId) {
     try {
       const response = await messageApi.list(projectId, chatId);
       setMessages(unwrap(response));
@@ -140,7 +145,7 @@
   // Handle chat selection from sidebar
   function handleChatSelect(event) {
     const chat = event.detail;
-    loadedMessagesForChat = null; // Allow loading messages for the new chat
+    _lastChatId = null; // Reset so messages load for new selection
     selectChat(chat);
   }
 
@@ -165,7 +170,7 @@
       });
       const chat = response?.data || response;
       addChat(chat);
-      loadedMessagesForChat = null; // Allow loading messages for the new chat
+      _lastChatId = null; // Reset so messages load for new chat
       selectChat(chat);
       showCreateChat = false;
     } catch (err) {
@@ -251,7 +256,7 @@
       const response = await chatApi.fork(projectId, chatId, { name, fromMessageId });
       const forkedChat = response?.data || response;
       addChat(forkedChat);
-      loadedMessagesForChat = null;
+      _lastChatId = null;
       selectChat(forkedChat);
     } catch (err) {
       console.error('Failed to fork chat:', err);
@@ -322,7 +327,8 @@
 
 <!-- Create Project Modal -->
 {#if showCreateProject}
-  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" role="dialog" aria-label="Create project" on:click|self={() => showCreateProject = false} on:keydown={(e) => e.key === 'Escape' && (showCreateProject = false)}>
+  <!-- svelte-ignore a11y_interactive_supports_focus -->
+  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" role="dialog" aria-label="Create project" on:click|self={() => showCreateProject = false}>
     <div class="bg-surface border border-border rounded-xl shadow-xl p-6 w-full max-w-md mx-4">
       <h2 class="text-xl font-semibold text-foreground mb-4">Create New Project</h2>
 
@@ -382,7 +388,8 @@
 
 <!-- Create Chat Modal -->
 {#if showCreateChat}
-  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" role="dialog" aria-label="Create chat" on:click|self={() => showCreateChat = false} on:keydown={(e) => e.key === 'Escape' && (showCreateChat = false)}>
+  <!-- svelte-ignore a11y_interactive_supports_focus -->
+  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" role="dialog" aria-label="Create chat" on:click|self={() => showCreateChat = false}>
     <div class="bg-surface border border-border rounded-xl shadow-xl p-6 w-full max-w-md mx-4">
       <h2 class="text-xl font-semibold text-foreground mb-4">Create New Chat</h2>
       <p class="text-sm text-muted mb-4">
@@ -431,7 +438,8 @@
 
 <!-- Settings Modal -->
 {#if showSettings}
-  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" role="dialog" aria-label="Settings" on:click|self={() => showSettings = false} on:keydown={(e) => e.key === 'Escape' && (showSettings = false)}>
+  <!-- svelte-ignore a11y_interactive_supports_focus -->
+  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" role="dialog" aria-label="Settings" on:click|self={() => showSettings = false}>
     <div class="bg-surface border border-border rounded-xl shadow-xl p-6 w-full max-w-lg mx-4">
       <div class="flex items-center justify-between mb-6">
         <h2 class="text-xl font-semibold text-foreground">Settings</h2>
@@ -494,7 +502,8 @@
 
 <!-- Profile Modal -->
 {#if showProfile}
-  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" role="dialog" aria-label="Profile" on:click|self={() => showProfile = false} on:keydown={(e) => e.key === 'Escape' && (showProfile = false)}>
+  <!-- svelte-ignore a11y_interactive_supports_focus -->
+  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" role="dialog" aria-label="Profile" on:click|self={() => showProfile = false}>
     <div class="bg-surface border border-border rounded-xl shadow-xl p-6 w-full max-w-sm mx-4">
       <div class="flex items-center justify-between mb-6">
         <h2 class="text-xl font-semibold text-foreground">Profile</h2>
@@ -508,7 +517,7 @@
       <div class="flex flex-col items-center mb-6">
         <div class="w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center mb-3">
           <svg class="w-10 h-10 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                   d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
           </svg>
         </div>
