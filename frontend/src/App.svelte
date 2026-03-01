@@ -5,8 +5,8 @@
   import ChatInterface from './lib/components/ChatInterface.svelte';
   import WorkspacePanel from './lib/components/WorkspacePanel.svelte';
   import { projects, currentProject, addProject, setProjects } from './lib/stores/projectStore';
-  import { chats, currentChat, messages, setChats, addChat, selectChat, clearChats } from './lib/stores/chatStore';
-  import { theme } from './lib/stores/uiStore.js';
+  import { chats, currentChat, messages, setChats, addChat, selectChat, clearChats, setMessages, addMessage, updateMessage } from './lib/stores/chatStore';
+  import { theme, loading, startStreaming, stopStreaming } from './lib/stores/uiStore.js';
   import { projectApi, chatApi, messageApi, healthApi } from './lib/utils/api.js';
 
   // Modal state
@@ -23,6 +23,9 @@
   // Settings state
   let apiKeyMasked = '••••••••';
   let serverStatus = 'checking...';
+
+  // Active stream controller
+  let activeStreamController = null;
 
   async function checkServerStatus() {
     try {
@@ -73,9 +76,7 @@
   async function loadMessages(projectId, chatId) {
     try {
       const response = await messageApi.list(projectId, chatId);
-      import('./lib/stores/chatStore').then(({ setMessages }) => {
-        setMessages(unwrap(response));
-      });
+      setMessages(unwrap(response));
     } catch (err) {
       console.error('Failed to load messages:', err);
     }
@@ -155,6 +156,102 @@
     }
   }
 
+  // Handle sending a message from ChatInterface
+  async function handleSendMessage(event) {
+    const { projectId, chatId, content, is_aside, pure_aside } = event.detail;
+
+    startStreaming(chatId, 'llm');
+
+    // Create a placeholder assistant message for streaming
+    const assistantMsgId = `streaming-${Date.now()}`;
+    addMessage({
+      id: assistantMsgId,
+      role: 'assistant',
+      content: '',
+      created_at: new Date().toISOString(),
+      status: 'streaming'
+    });
+
+    try {
+      activeStreamController = messageApi.stream(projectId, chatId, {
+        raw_text: content,
+        is_aside: is_aside || false,
+        pure_aside: pure_aside || false
+      }, {
+        onToken(token, fullContent) {
+          updateMessage(assistantMsgId, { content: fullContent });
+        },
+        onComplete(fullContent, metadata) {
+          // Replace streaming message with final content
+          updateMessage(assistantMsgId, {
+            content: fullContent,
+            status: 'complete'
+          });
+          stopStreaming();
+          loading.set(false);
+          activeStreamController = null;
+
+          // Reload messages to get server-side IDs
+          loadMessages(projectId, chatId);
+        },
+        onError(error) {
+          console.error('Stream error:', error);
+          updateMessage(assistantMsgId, {
+            content: error.message || 'Error generating response',
+            status: 'error'
+          });
+          stopStreaming();
+          loading.set(false);
+          activeStreamController = null;
+        }
+      });
+    } catch (error) {
+      console.error('Failed to start stream:', error);
+      updateMessage(assistantMsgId, {
+        content: 'Failed to send message: ' + (error.message || 'Unknown error'),
+        status: 'error'
+      });
+      stopStreaming();
+      loading.set(false);
+    }
+  }
+
+  // Handle cancel from ChatInterface
+  function handleCancel() {
+    if (activeStreamController) {
+      activeStreamController.abort();
+      activeStreamController = null;
+    }
+  }
+
+  // Handle fork from ChatInterface
+  async function handleFork(event) {
+    const { projectId, chatId, name, fromMessageId } = event.detail;
+    try {
+      const response = await chatApi.fork(projectId, chatId, { name, fromMessageId });
+      const forkedChat = response?.data || response;
+      addChat(forkedChat);
+      selectChat(forkedChat);
+    } catch (err) {
+      console.error('Failed to fork chat:', err);
+    }
+  }
+
+  // Handle message flag updates
+  async function handleFlagUpdate(event) {
+    const { messageId, flags } = event.detail;
+    if (!$currentProject || !$currentChat) return;
+    try {
+      const response = await messageApi.updateFlags(
+        $currentProject.id, $currentChat.id, messageId, flags
+      );
+      const updated = response?.data || response;
+      updateMessage(messageId, updated);
+    } catch (err) {
+      console.error('Failed to update flags:', err);
+    }
+  }
+
   // Open settings modal
   function handleSettings() {
     checkServerStatus();
@@ -190,7 +287,13 @@
       on:settings={handleSettings}
     />
     <main class="flex-1 overflow-auto">
-      <ChatInterface messages={$messages} />
+      <ChatInterface
+        messages={$messages}
+        on:send={handleSendMessage}
+        on:cancel={handleCancel}
+        on:fork={handleFork}
+        on:flagUpdate={handleFlagUpdate}
+      />
     </main>
     <WorkspacePanel files={[]} />
   </div>
@@ -198,7 +301,7 @@
 
 <!-- Create Project Modal -->
 {#if showCreateProject}
-  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" on:click|self={() => showCreateProject = false}>
+  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" role="dialog" aria-label="Create project" on:click|self={() => showCreateProject = false} on:keydown={(e) => e.key === 'Escape' && (showCreateProject = false)}>
     <div class="bg-surface border border-border rounded-xl shadow-xl p-6 w-full max-w-md mx-4">
       <h2 class="text-xl font-semibold text-foreground mb-4">Create New Project</h2>
 
@@ -220,7 +323,6 @@
             placeholder="My Project"
             class="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground placeholder-muted focus:outline-none focus:ring-2 focus:ring-primary"
             on:keydown={(e) => e.key === 'Enter' && submitCreateProject()}
-            autofocus
           />
         </div>
         <div>
@@ -259,7 +361,7 @@
 
 <!-- Create Chat Modal -->
 {#if showCreateChat}
-  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" on:click|self={() => showCreateChat = false}>
+  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" role="dialog" aria-label="Create chat" on:click|self={() => showCreateChat = false} on:keydown={(e) => e.key === 'Escape' && (showCreateChat = false)}>
     <div class="bg-surface border border-border rounded-xl shadow-xl p-6 w-full max-w-md mx-4">
       <h2 class="text-xl font-semibold text-foreground mb-4">Create New Chat</h2>
       <p class="text-sm text-muted mb-4">
@@ -283,7 +385,6 @@
           placeholder="New Chat"
           class="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground placeholder-muted focus:outline-none focus:ring-2 focus:ring-primary"
           on:keydown={(e) => e.key === 'Enter' && submitCreateChat()}
-          autofocus
         />
       </div>
 
@@ -309,11 +410,11 @@
 
 <!-- Settings Modal -->
 {#if showSettings}
-  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" on:click|self={() => showSettings = false}>
+  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" role="dialog" aria-label="Settings" on:click|self={() => showSettings = false} on:keydown={(e) => e.key === 'Escape' && (showSettings = false)}>
     <div class="bg-surface border border-border rounded-xl shadow-xl p-6 w-full max-w-lg mx-4">
       <div class="flex items-center justify-between mb-6">
         <h2 class="text-xl font-semibold text-foreground">Settings</h2>
-        <button on:click={() => showSettings = false} class="p-1 rounded hover:bg-surface-hover text-muted hover:text-foreground">
+        <button on:click={() => showSettings = false} class="p-1 rounded hover:bg-surface-hover text-muted hover:text-foreground" aria-label="Close settings">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
           </svg>
@@ -321,7 +422,6 @@
       </div>
 
       <div class="space-y-6">
-        <!-- Theme -->
         <div>
           <h3 class="text-sm font-medium text-foreground mb-2">Appearance</h3>
           <div class="flex items-center justify-between p-3 bg-background rounded-lg border border-border">
@@ -335,7 +435,6 @@
           </div>
         </div>
 
-        <!-- Server Status -->
         <div>
           <h3 class="text-sm font-medium text-foreground mb-2">Server Status</h3>
           <div class="space-y-2">
@@ -350,7 +449,6 @@
           </div>
         </div>
 
-        <!-- About -->
         <div>
           <h3 class="text-sm font-medium text-foreground mb-2">About</h3>
           <div class="p-3 bg-background rounded-lg border border-border">
@@ -375,11 +473,11 @@
 
 <!-- Profile Modal -->
 {#if showProfile}
-  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" on:click|self={() => showProfile = false}>
+  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" role="dialog" aria-label="Profile" on:click|self={() => showProfile = false} on:keydown={(e) => e.key === 'Escape' && (showProfile = false)}>
     <div class="bg-surface border border-border rounded-xl shadow-xl p-6 w-full max-w-sm mx-4">
       <div class="flex items-center justify-between mb-6">
         <h2 class="text-xl font-semibold text-foreground">Profile</h2>
-        <button on:click={() => showProfile = false} class="p-1 rounded hover:bg-surface-hover text-muted hover:text-foreground">
+        <button on:click={() => showProfile = false} class="p-1 rounded hover:bg-surface-hover text-muted hover:text-foreground" aria-label="Close profile">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
           </svg>
