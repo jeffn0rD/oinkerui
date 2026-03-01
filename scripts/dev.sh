@@ -43,7 +43,7 @@ NODE_PID=$!
 
 # Start frontend
 echo -e "${GREEN}Starting frontend dev server (port 5173)...${NC}"
-(cd "$PROJECT_ROOT/frontend" && npm run dev) &
+(cd "$PROJECT_ROOT/frontend" && npm run dev -- --host) &
 FRONTEND_PID=$!
 
 echo -e "${BLUE}All services started!${NC}"
