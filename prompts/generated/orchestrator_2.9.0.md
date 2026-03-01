@@ -15,8 +15,7 @@ You are the orchestrator for this task. Your responsibilities:
 5. Verify completion before finalizing
 
 ## Task Details
-- create project shows dialog, use 'create project' button from dialog gives message 'Failed to fetch' - cannot create a chat with '+' button -- you shouldn't need a project to create a chat - profile icon does nothing -- is this future feature? - settings icon does nothing - 'dark mode' link in lower left corner does nothing       - does not seem to be any way to add files to the workspace
-
+"No details specified"
 
 ## Task Additional Prompt 
 
