@@ -16,6 +16,7 @@
     "dev:python": "bash scripts/dev-python.sh",
     "build": "bash scripts/build.sh",
     "setup": "bash scripts/setup.sh",
+    "verify": "bash scripts/verify-install.sh",
     "test": "bash scripts/test.sh",
     "test:watch": "jest --watch",
     "lint": "bash scripts/lint.sh",

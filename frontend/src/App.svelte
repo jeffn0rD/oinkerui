@@ -27,6 +27,10 @@
   // Active stream controller
   let activeStreamController = null;
 
+  // Track what we've already loaded to prevent reactive re-triggers
+  let loadedChatsForProject = null;
+  let loadedMessagesForChat = null;
+
   async function checkServerStatus() {
     try {
       await healthApi.check();
@@ -53,12 +57,14 @@
     }
   });
 
-  // When current project changes, load its chats
-  $: if ($currentProject) {
+  // When current project changes, load its chats (with guard)
+  $: if ($currentProject && $currentProject.id !== loadedChatsForProject) {
     loadChats($currentProject.id);
   }
 
   async function loadChats(projectId) {
+    loadedChatsForProject = projectId;
+    loadedMessagesForChat = null;
     clearChats();
     try {
       const response = await chatApi.list(projectId);
@@ -68,17 +74,28 @@
     }
   }
 
-  // When current chat changes, load its messages
-  $: if ($currentChat && $currentProject) {
+  // When current chat changes, load its messages (with guard)
+  $: if ($currentChat && $currentProject && $currentChat.id !== loadedMessagesForChat) {
     loadMessages($currentProject.id, $currentChat.id);
   }
 
   async function loadMessages(projectId, chatId) {
+    loadedMessagesForChat = chatId;
     try {
       const response = await messageApi.list(projectId, chatId);
       setMessages(unwrap(response));
     } catch (err) {
       console.error('Failed to load messages:', err);
+    }
+  }
+
+  // Force reload messages (e.g., after streaming completes)
+  async function reloadMessages(projectId, chatId) {
+    try {
+      const response = await messageApi.list(projectId, chatId);
+      setMessages(unwrap(response));
+    } catch (err) {
+      console.error('Failed to reload messages:', err);
     }
   }
 
@@ -123,6 +140,7 @@
   // Handle chat selection from sidebar
   function handleChatSelect(event) {
     const chat = event.detail;
+    loadedMessagesForChat = null; // Allow loading messages for the new chat
     selectChat(chat);
   }
 
@@ -147,6 +165,7 @@
       });
       const chat = response?.data || response;
       addChat(chat);
+      loadedMessagesForChat = null; // Allow loading messages for the new chat
       selectChat(chat);
       showCreateChat = false;
     } catch (err) {
@@ -158,9 +177,10 @@
 
   // Handle sending a message from ChatInterface
   async function handleSendMessage(event) {
-    const { projectId, chatId, content, is_aside, pure_aside } = event.detail;
+    const { projectId, chatId, content, model, is_aside, pure_aside } = event.detail;
 
     startStreaming(chatId, 'llm');
+    loading.set(true);
 
     // Create a placeholder assistant message for streaming
     const assistantMsgId = `streaming-${Date.now()}`;
@@ -175,6 +195,7 @@
     try {
       activeStreamController = messageApi.stream(projectId, chatId, {
         raw_text: content,
+        model_id: model || undefined,
         is_aside: is_aside || false,
         pure_aside: pure_aside || false
       }, {
@@ -182,7 +203,6 @@
           updateMessage(assistantMsgId, { content: fullContent });
         },
         onComplete(fullContent, metadata) {
-          // Replace streaming message with final content
           updateMessage(assistantMsgId, {
             content: fullContent,
             status: 'complete'
@@ -192,7 +212,7 @@
           activeStreamController = null;
 
           // Reload messages to get server-side IDs
-          loadMessages(projectId, chatId);
+          reloadMessages(projectId, chatId);
         },
         onError(error) {
           console.error('Stream error:', error);
@@ -231,6 +251,7 @@
       const response = await chatApi.fork(projectId, chatId, { name, fromMessageId });
       const forkedChat = response?.data || response;
       addChat(forkedChat);
+      loadedMessagesForChat = null;
       selectChat(forkedChat);
     } catch (err) {
       console.error('Failed to fork chat:', err);

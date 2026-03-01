@@ -1,5 +1,5 @@
 <script>
-  import { createEventDispatcher } from 'svelte';
+  import { createEventDispatcher, onMount } from 'svelte';
   import MessageList from './MessageList.svelte';
   import MessageInput from './MessageInput.svelte';
   import CancelButton from './CancelButton.svelte';
@@ -7,26 +7,57 @@
   import { currentChat, messages } from '../stores/chatStore.js';
   import { currentProject } from '../stores/projectStore.js';
   import { loading, streaming, stopStreaming } from '../stores/uiStore.js';
-  import { chatApi, messageApi } from '../utils/api.js';
+  import { chatApi, messageApi, modelApi } from '../utils/api.js';
   
   const dispatch = createEventDispatcher();
   
   // Model selection
-  const AVAILABLE_MODELS = [
-    { id: 'openai/gpt-4', name: 'GPT-4', provider: 'OpenAI' },
-    { id: 'openai/gpt-4-turbo', name: 'GPT-4 Turbo', provider: 'OpenAI' },
-    { id: 'openai/gpt-3.5-turbo', name: 'GPT-3.5 Turbo', provider: 'OpenAI' },
-    { id: 'anthropic/claude-3.5-sonnet', name: 'Claude 3.5 Sonnet', provider: 'Anthropic' },
-    { id: 'anthropic/claude-3-haiku', name: 'Claude 3 Haiku', provider: 'Anthropic' },
-    { id: 'google/gemini-pro', name: 'Gemini Pro', provider: 'Google' },
-    { id: 'meta-llama/llama-3-70b-instruct', name: 'Llama 3 70B', provider: 'Meta' },
-  ];
-  
-  let selectedModel = 'openai/gpt-4';
+  let availableModels = [];
+  let selectedModel = 'openai/gpt-4o-mini';
+  let defaultModel = 'openai/gpt-4o-mini';
+  let allowCustom = true;
   let showModelDropdown = false;
   let showChatMenu = false;
+  let customModelInput = '';
+  let showCustomInput = false;
+  let modelsLoaded = false;
   
-  $: currentModelName = AVAILABLE_MODELS.find(m => m.id === selectedModel)?.name || selectedModel.split('/').pop();
+  // Fetch models from backend on mount
+  onMount(async () => {
+    try {
+      const response = await modelApi.list();
+      const data = response?.data || response;
+      if (data.models && Array.isArray(data.models)) {
+        availableModels = data.models;
+      }
+      if (data.default_model) {
+        defaultModel = data.default_model;
+        if (!modelsLoaded) {
+          selectedModel = data.default_model;
+        }
+      }
+      if (data.allow_custom !== undefined) {
+        allowCustom = data.allow_custom;
+      }
+      modelsLoaded = true;
+    } catch (err) {
+      console.warn('Failed to load models from server, using defaults:', err);
+      availableModels = [
+        { id: 'openai/gpt-4o', name: 'GPT-4o', provider: 'OpenAI' },
+        { id: 'openai/gpt-4o-mini', name: 'GPT-4o Mini', provider: 'OpenAI' },
+        { id: 'anthropic/claude-3.5-sonnet', name: 'Claude 3.5 Sonnet', provider: 'Anthropic' },
+      ];
+      modelsLoaded = true;
+    }
+  });
+  
+  $: currentModelName = (() => {
+    const found = availableModels.find(m => m.id === selectedModel);
+    if (found) return found.name;
+    // For custom models, show the full ID but truncated
+    if (selectedModel.length > 30) return '...' + selectedModel.slice(-27);
+    return selectedModel;
+  })();
   
   // Update model from chat settings if available
   $: if ($currentChat?.default_model) {
@@ -105,6 +136,36 @@
   function selectModel(modelId) {
     selectedModel = modelId;
     showModelDropdown = false;
+    showCustomInput = false;
+  }
+  
+  function submitCustomModel() {
+    const trimmed = customModelInput.trim();
+    if (trimmed) {
+      selectedModel = trimmed;
+      // Add to available models if not already there
+      if (!availableModels.find(m => m.id === trimmed)) {
+        const parts = trimmed.split('/');
+        availableModels = [...availableModels, {
+          id: trimmed,
+          name: parts.length > 1 ? parts.slice(1).join('/') : trimmed,
+          provider: parts[0] || 'Custom'
+        }];
+      }
+    }
+    showCustomInput = false;
+    showModelDropdown = false;
+    customModelInput = '';
+  }
+  
+  function handleCustomInputKeydown(event) {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      submitCustomModel();
+    } else if (event.key === 'Escape') {
+      showCustomInput = false;
+      customModelInput = '';
+    }
   }
   
   function handleClickOutside(event) {
@@ -146,8 +207,8 @@
           </button>
           
           {#if showModelDropdown}
-            <div class="absolute right-0 top-full mt-1 w-64 bg-surface border border-border rounded-lg shadow-xl z-50 py-1 max-h-80 overflow-y-auto">
-              {#each AVAILABLE_MODELS as model}
+            <div class="absolute right-0 top-full mt-1 w-72 bg-surface border border-border rounded-lg shadow-xl z-50 py-1 max-h-96 overflow-y-auto">
+              {#each availableModels as model}
                 <button
                   on:click|stopPropagation={() => selectModel(model.id)}
                   class="w-full text-left px-3 py-2 text-sm hover:bg-surface-hover transition-colors flex items-center justify-between
@@ -155,15 +216,53 @@
                 >
                   <div>
                     <div class="font-medium">{model.name}</div>
-                    <div class="text-xs text-muted">{model.provider}</div>
+                    <div class="text-xs text-muted">{model.provider} · {model.id}</div>
                   </div>
                   {#if selectedModel === model.id}
-                    <svg class="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="w-4 h-4 text-primary flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                     </svg>
                   {/if}
                 </button>
               {/each}
+              
+              {#if allowCustom}
+                <hr class="my-1 border-border" />
+                {#if showCustomInput}
+                  <div class="px-3 py-2" on:click|stopPropagation>
+                    <label class="block text-xs text-muted mb-1">Enter OpenRouter model ID:</label>
+                    <div class="flex gap-2">
+                      <input
+                        type="text"
+                        bind:value={customModelInput}
+                        on:keydown={handleCustomInputKeydown}
+                        placeholder="provider/model-name"
+                        class="flex-1 px-2 py-1.5 text-sm bg-background border border-border rounded text-foreground placeholder-muted focus:outline-none focus:ring-1 focus:ring-primary"
+                        autofocus
+                      />
+                      <button
+                        on:click|stopPropagation={submitCustomModel}
+                        class="px-3 py-1.5 text-xs bg-primary text-white rounded hover:bg-primary/90 transition-colors"
+                      >
+                        Use
+                      </button>
+                    </div>
+                    <p class="text-xs text-muted mt-1">
+                      e.g. anthropic/claude-3-opus, mistralai/mistral-large
+                    </p>
+                  </div>
+                {:else}
+                  <button
+                    on:click|stopPropagation={() => showCustomInput = true}
+                    class="w-full text-left px-3 py-2 text-sm hover:bg-surface-hover text-muted hover:text-foreground transition-colors flex items-center gap-2"
+                  >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                    </svg>
+                    Enter custom model...
+                  </button>
+                {/if}
+              {/if}
             </div>
           {/if}
         </div>

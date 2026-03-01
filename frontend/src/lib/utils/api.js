@@ -135,60 +135,23 @@ export const chatApi = {
       method: 'DELETE'
     }),
   
-  /**
-   * Fork a chat with optional message point and pruning
-   * @param {string} projectId - Project ID
-   * @param {string} chatId - Chat ID to fork
-   * @param {Object} options - Fork options
-   * @param {string} [options.fromMessageId] - Fork from this message
-   * @param {boolean} [options.prune] - Exclude discarded/excluded messages
-   * @param {string} [options.name] - Name for the forked chat
-   * @returns {Promise<Object>} Forked chat object
-   */
   fork: (projectId, chatId, options = {}) =>
     request(`/projects/${projectId}/chats/${chatId}/fork`, {
       method: 'POST',
       body: options
     }),
   
-  /**
-   * Cancel an active LLM request for a chat
-   * @param {string} projectId - Project ID
-   * @param {string} chatId - Chat ID
-   * @returns {Promise<Object>} Cancellation result
-   */
   cancel: (projectId, chatId) =>
     request(`/projects/${projectId}/chats/${chatId}/cancel`, {
       method: 'POST'
     }),
   
-  /**
-   * Get active request status for a chat
-   * @param {string} projectId - Project ID
-   * @param {string} chatId - Chat ID
-   * @returns {Promise<Object>} Status info
-   */
   getStatus: (projectId, chatId) =>
     request(`/projects/${projectId}/chats/${chatId}/status`),
   
-  /**
-   * Get active request info for a chat
-   * @param {string} projectId - Project ID
-   * @param {string} chatId - Chat ID
-   * @returns {Promise<Object>} Active request info
-   */
   getActiveRequest: (projectId, chatId) =>
     request(`/projects/${projectId}/chats/${chatId}/active-request`),
   
-  /**
-   * Get context preview for a chat
-   * @param {string} projectId - Project ID
-   * @param {string} chatId - Chat ID
-   * @param {Object} options - Preview options
-   * @param {string} [options.draftMessage] - Draft message to include
-   * @param {string} [options.modelId] - Model for token limits
-   * @returns {Promise<Object>} Context preview with token counts
-   */
   contextPreview: (projectId, chatId, options = {}) =>
     request(`/projects/${projectId}/chats/${chatId}/context-preview`, {
       method: 'POST',
@@ -213,30 +176,12 @@ export const messageApi = {
       body: data
     }),
   
-  /**
-   * Update message flags (pin, discard, include_in_context, aside)
-   * @param {string} projectId - Project ID
-   * @param {string} chatId - Chat ID
-   * @param {string} messageId - Message ID
-   * @param {Object} flags - Flags to update
-   * @returns {Promise<Object>} Updated message
-   */
   updateFlags: (projectId, chatId, messageId, flags) =>
     request(`/projects/${projectId}/chats/${chatId}/messages/${messageId}/flags`, {
       method: 'PATCH',
       body: flags
     }),
   
-  /**
-   * Requery - regenerate the last LLM response
-   * @param {string} projectId - Project ID
-   * @param {string} chatId - Chat ID
-   * @param {Object} options - Requery options
-   * @param {boolean} [options.keepPrevious] - Keep previous response as branch
-   * @param {string} [options.modelId] - Model override
-   * @param {number} [options.temperature] - Temperature override
-   * @returns {Promise<Object>} Requery result
-   */
   requery: (projectId, chatId, options = {}) =>
     request(`/projects/${projectId}/chats/${chatId}/requery`, {
       method: 'POST',
@@ -244,14 +189,24 @@ export const messageApi = {
     }),
   
   /**
-   * Stream a message response using Server-Sent Events
+   * Stream a message response using Server-Sent Events.
+   * 
+   * The backend sends NAMED SSE events:
+   *   event: user_message\ndata: {...}\n\n
+   *   event: chunk\ndata: {"content":"...", "accumulated":"...", "done":false}\n\n
+   *   event: done\ndata: {"message":{...}, "usage":{...}}\n\n
+   *   event: error\ndata: {"error":"..."}\n\n
+   *   event: cancelled\ndata: {"reason":"..."}\n\n
+   * 
+   * This parser handles both named events AND plain data-only lines for robustness.
+   * 
    * @param {string} projectId - Project ID
    * @param {string} chatId - Chat ID
-   * @param {Object} data - Message data
+   * @param {Object} data - Message data (raw_text, model_id, is_aside, pure_aside)
    * @param {Object} callbacks - Event callbacks
-   * @param {Function} callbacks.onToken - Called for each token
-   * @param {Function} callbacks.onComplete - Called when streaming completes
-   * @param {Function} callbacks.onError - Called on error
+   * @param {Function} callbacks.onToken - Called for each token: (token, fullContent)
+   * @param {Function} callbacks.onComplete - Called when streaming completes: (fullContent, metadata)
+   * @param {Function} callbacks.onError - Called on error: (error)
    * @returns {AbortController} Controller to cancel the stream
    */
   stream: (projectId, chatId, data, callbacks = {}) => {
@@ -280,6 +235,7 @@ export const messageApi = {
       const decoder = new TextDecoder();
       let buffer = '';
       let fullContent = '';
+      let currentEventType = null;
       
       try {
         while (true) {
@@ -288,63 +244,137 @@ export const messageApi = {
           
           buffer += decoder.decode(value, { stream: true });
           
-          // Process SSE events from buffer
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || ''; // Keep incomplete line in buffer
+          // Process complete SSE events from buffer
+          // SSE events are separated by double newlines
+          const parts = buffer.split('\n\n');
+          buffer = parts.pop() || ''; // Keep incomplete event in buffer
           
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const data = line.slice(6);
-              
-              if (data === '[DONE]') {
-                if (callbacks.onComplete) {
-                  callbacks.onComplete(fullContent);
-                }
-                return;
+          for (const part of parts) {
+            if (!part.trim()) continue;
+            
+            const lines = part.split('\n');
+            let eventType = null;
+            let eventData = null;
+            
+            for (const line of lines) {
+              if (line.startsWith('event: ')) {
+                eventType = line.slice(7).trim();
+              } else if (line.startsWith('data: ')) {
+                eventData = line.slice(6);
+              } else if (line.startsWith('data:')) {
+                eventData = line.slice(5);
               }
+            }
+            
+            // If no event type, fall back to tracking state
+            if (!eventType && currentEventType) {
+              eventType = currentEventType;
+            }
+            
+            if (eventData === null) continue;
+            
+            // Handle [DONE] sentinel
+            if (eventData.trim() === '[DONE]') {
+              if (callbacks.onComplete) {
+                callbacks.onComplete(fullContent);
+              }
+              return;
+            }
+            
+            try {
+              const parsed = JSON.parse(eventData);
               
-              try {
-                const parsed = JSON.parse(data);
-                
-                if (parsed.error) {
-                  if (callbacks.onError) {
-                    callbacks.onError(new ApiError(parsed.error, 500));
+              // Route based on event type
+              switch (eventType) {
+                case 'user_message':
+                  // User message saved on server - we already show it locally
+                  break;
+                  
+                case 'chunk':
+                  // Streaming token chunk
+                  if (parsed.content) {
+                    fullContent = parsed.accumulated || (fullContent + parsed.content);
+                    if (callbacks.onToken) {
+                      callbacks.onToken(parsed.content, fullContent);
+                    }
                   }
-                  return;
-                }
-                
-                if (parsed.token) {
-                  fullContent += parsed.token;
-                  if (callbacks.onToken) {
-                    callbacks.onToken(parsed.token, fullContent);
+                  break;
+                  
+                case 'done':
+                  // Stream complete
+                  if (parsed.message?.content) {
+                    fullContent = parsed.message.content;
                   }
-                }
-                
-                if (parsed.done) {
                   if (callbacks.onComplete) {
                     callbacks.onComplete(fullContent, parsed);
                   }
                   return;
-                }
-              } catch (e) {
-                // Non-JSON data line, treat as token
-                fullContent += data;
+                  
+                case 'error':
+                  if (callbacks.onError) {
+                    callbacks.onError(new ApiError(
+                      parsed.error || 'Stream error',
+                      500,
+                      parsed
+                    ));
+                  }
+                  return;
+                  
+                case 'cancelled':
+                  if (callbacks.onComplete) {
+                    const cancelContent = parsed.message?.content || fullContent;
+                    callbacks.onComplete(cancelContent, { cancelled: true });
+                  }
+                  return;
+                  
+                default:
+                  // Unknown or no event type - try to handle generically
+                  if (parsed.error) {
+                    if (callbacks.onError) {
+                      callbacks.onError(new ApiError(parsed.error, 500));
+                    }
+                    return;
+                  }
+                  if (parsed.token) {
+                    fullContent += parsed.token;
+                    if (callbacks.onToken) {
+                      callbacks.onToken(parsed.token, fullContent);
+                    }
+                  }
+                  if (parsed.content && !eventType) {
+                    fullContent = parsed.accumulated || (fullContent + parsed.content);
+                    if (callbacks.onToken) {
+                      callbacks.onToken(parsed.content, fullContent);
+                    }
+                  }
+                  if (parsed.done) {
+                    if (callbacks.onComplete) {
+                      callbacks.onComplete(fullContent, parsed);
+                    }
+                    return;
+                  }
+                  break;
+              }
+            } catch (e) {
+              // Non-JSON data line - treat as raw token
+              if (eventData.trim()) {
+                fullContent += eventData;
                 if (callbacks.onToken) {
-                  callbacks.onToken(data, fullContent);
+                  callbacks.onToken(eventData, fullContent);
                 }
               }
             }
           }
         }
         
-        // Stream ended without [DONE]
+        // Stream ended without explicit done event
         if (callbacks.onComplete) {
           callbacks.onComplete(fullContent);
         }
       } catch (error) {
         if (error.name === 'AbortError') {
           if (callbacks.onComplete) {
-            callbacks.onComplete(fullContent);
+            callbacks.onComplete(fullContent, { cancelled: true });
           }
         } else if (callbacks.onError) {
           callbacks.onError(error);
@@ -361,18 +391,22 @@ export const messageApi = {
 };
 
 // =============================================================================
+// Model API
+// =============================================================================
+
+export const modelApi = {
+  /**
+   * List available models from the server
+   * @returns {Promise<Object>} Model list with defaults and custom entries
+   */
+  list: () => request('/models'),
+};
+
+// =============================================================================
 // Template API
 // =============================================================================
 
 export const templateApi = {
-  /**
-   * List available templates
-   * @param {Object} options - Filter options
-   * @param {string} [options.projectId] - Include project templates
-   * @param {string} [options.category] - Filter by category
-   * @param {string} [options.search] - Search in name/description
-   * @returns {Promise<Object>} Template list
-   */
   list: (options = {}) => {
     const params = new URLSearchParams();
     if (options.projectId) params.set('projectId', options.projectId);
@@ -382,37 +416,17 @@ export const templateApi = {
     return request(`/templates${qs ? '?' + qs : ''}`);
   },
 
-  /**
-   * Get a single template by ID
-   * @param {string} templateId - Template ID
-   * @param {string} [projectId] - Project ID
-   * @returns {Promise<Object>} Template details
-   */
   get: (templateId, projectId) => {
     const qs = projectId ? `?projectId=${projectId}` : '';
     return request(`/templates/${templateId}${qs}`);
   },
 
-  /**
-   * Resolve a template with variables
-   * @param {string} templateId - Template ID
-   * @param {Object} variables - Template variables
-   * @param {Object} options - Resolution options
-   * @returns {Promise<Object>} Resolved template
-   */
   resolve: (templateId, variables = {}, options = {}) =>
     request('/templates/resolve', {
       method: 'POST',
       body: { templateId, variables, ...options },
     }),
 
-  /**
-   * Render an inline template string
-   * @param {string} template - Template string
-   * @param {Object} variables - Template variables
-   * @param {Object} options - Render options
-   * @returns {Promise<Object>} Rendered result
-   */
   renderInline: (template, variables = {}, options = {}) =>
     request('/templates/render-inline', {
       method: 'POST',
@@ -425,17 +439,7 @@ export const templateApi = {
 // =============================================================================
 
 export const commandApi = {
-  /**
-   * List all available commands
-   * @returns {Promise<Object>} Command list
-   */
   list: () => request('/commands'),
-  
-  /**
-   * Get details for a specific command
-   * @param {string} commandName - Command name
-   * @returns {Promise<Object>} Command details
-   */
   get: (commandName) => request(`/commands/${commandName}`)
 };
 
