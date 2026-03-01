@@ -1,7 +1,12 @@
 #!/bin/bash
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+cd "$PROJECT_ROOT"
+
 echo "Setting up OinkerUI development environment..."
+echo "Project root: $PROJECT_ROOT"
 
 # Install Node.js dependencies
 echo "Installing Node.js dependencies..."
@@ -9,8 +14,7 @@ npm install
 
 # Install frontend dependencies
 echo "Installing frontend dependencies..."
-cd frontend && npm install
-cd ..
+(cd frontend && npm install)
 
 # Set up Python virtual environment
 echo "Setting up Python virtual environment..."

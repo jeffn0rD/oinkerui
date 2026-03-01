@@ -12,15 +12,39 @@ OinkerUI is a full-stack application that combines:
 
 ## Features
 
+### Core Functionality
 - 🤖 **LLM Integration**: Chat with AI assistants via OpenRouter
 - 💬 **Multi-Chat Support**: Multiple conversation threads per project
 - 🔄 **Context Management**: Intelligent context construction from project files
-- 📝 **Template System**: Jinja2 templates for code generation
-- 🔧 **Code Execution**: Sandboxed Python code execution
 - 📦 **Git Integration**: Automatic commits and version tracking
 - 🎨 **Modern UI**: Clean, responsive interface built with Svelte
 
-## Quick Start
+### Advanced Features
+- 📝 **Prompt Templates**: Pre-built and custom Jinja2 templates for code generation
+  - Code review, concept explanation, test generation, refactoring, summarization
+  - Variable substitution with live preview
+  - Template categories and search
+- 🧪 **Code Execution**: Sandboxed Python and shell code execution
+  - Timeout protection
+  - Output capture and file modification tracking
+  - Virtual environment management
+- 🚩 **Message Flags**: Advanced message context control
+  - Pin important messages (blue indicator)
+  - Mark as aside (yellow indicator) - excluded from context
+  - Mark as pure aside (pink indicator) - system + current message only
+  - Discard messages (strikethrough) - hidden from context
+- ⏹️ **Request Cancellation**: Cancel in-progress LLM requests with timeout configuration
+- 🔢 **Token Counting**: Accurate token counting with tiktoken
+- 📊 **Diff Generation**: Generate unified diffs for code changes
+- 🎯 **Slash Commands**: Quick commands for common actions
+  - `/aside` - Send as aside message
+  - `/aside-pure` - Send as pure aside message
+- ⌨️ **Keyboard Shortcuts**: Efficient workflow with keyboard navigation
+  - `Ctrl+T` - Open template selector
+  - `Ctrl+Enter` - Send as aside
+  - `Ctrl+Alt+Enter` - Send as pure aside
+
+## Installation
 
 ### Prerequisites
 
@@ -29,7 +53,7 @@ OinkerUI is a full-stack application that combines:
 - Git
 - OpenRouter API key
 
-### Installation
+### Linux / macOS
 
 ```bash
 # Clone the repository
@@ -41,9 +65,146 @@ npm run setup
 
 # Configure environment
 # Edit .env and add your OPENROUTER_API_KEY
+cp .env.example .env
+# Edit .env and set OPENROUTER_API_KEY=your_key_here
+
+# Start development environment
+npm run dev
 ```
 
-### Development
+### Windows
+
+#### Using PowerShell
+
+```powershell
+# Clone the repository
+git clone https://github.com/jeffn0rD/oinkerui.git
+cd oinkerui
+
+# Run setup script
+npm run setup
+
+# Configure environment
+# Edit .env and add your OPENROUTER_API_KEY
+Copy-Item .env.example .env
+# Edit .env and set OPENROUTER_API_KEY=your_key_here
+
+# Start development environment
+npm run dev
+```
+
+#### Using Command Prompt (cmd)
+
+```cmd
+# Clone the repository
+git clone https://github.com/jeffn0rD/oinkerui.git
+cd oinkerui
+
+# Run setup script
+npm run setup
+
+# Configure environment
+# Edit .env and add your OPENROUTER_API_KEY
+copy .env.example .env
+REM Edit .env and set OPENROUTER_API_KEY=your_key_here
+
+# Start development environment
+npm run dev
+```
+
+#### Using Git Bash (Recommended)
+
+```bash
+# Clone the repository
+git clone https://github.com/jeffn0rD/oinkerui.git
+cd oinkerui
+
+# Run setup script
+npm run setup
+
+# Configure environment
+# Edit .env and add your OPENROUTER_API_KEY
+cp .env.example .env
+# Edit .env and set OPENROUTER_API_KEY=your_key_here
+
+# Start development environment
+npm run dev
+```
+
+**Note for Windows Users**: If you encounter line ending issues with shell scripts, configure Git to use Unix line endings:
+
+```bash
+git config --global core.autocrlf input
+git rm --cached -r .
+git reset --hard
+```
+
+### Docker
+
+#### Using Docker Compose (Recommended)
+
+```bash
+# Clone the repository
+git clone https://github.com/jeffn0rD/oinkerui.git
+cd oinkerui
+
+# Build and start all services
+docker-compose up --build
+
+# Or run in detached mode
+docker-compose up -d --build
+
+# View logs
+docker-compose logs -f
+
+# Stop services
+docker-compose down
+```
+
+#### Using Docker CLI
+
+```bash
+# Clone the repository
+git clone https://github.com/jeffn0rD/oinkerui.git
+cd oinkerui
+
+# Build the image
+docker build -t oinkerui .
+
+# Run the container
+docker run -it -p 5173:5173 -p 3000:3000 -p 8000:8000 \
+  -e OPENROUTER_API_KEY=your_key_here \
+  oinkerui
+
+# Or with environment file
+docker run -it -p 5173:5173 -p 3000:3000 -p 8000:8000 \
+  --env-file .env \
+  oinkerui
+```
+
+#### Docker Environment Variables
+
+Create a `.env` file in the project root:
+
+```env
+OPENROUTER_API_KEY=your_openrouter_api_key_here
+PORT=3000
+FRONTEND_PORT=5173
+PYTHON_PORT=8000
+```
+
+#### Docker Troubleshooting
+
+If you encounter line ending issues in Docker:
+
+```bash
+# Fix line endings in shell scripts
+find scripts -name "*.sh" -exec sed -i 's/\r$//' {} \;
+```
+
+## Development
+
+### Starting Services
 
 ```bash
 # Start all services (frontend + Node.js + Python)
@@ -59,6 +220,28 @@ npm run dev:python    # http://localhost:8000
 
 ```bash
 npm run build
+```
+
+### Running Tests
+
+```bash
+# Run all tests
+npm run test
+
+# Run specific test suites
+npm run test:backend
+npm run test:frontend
+npm run test:python
+```
+
+### Code Quality
+
+```bash
+# Run linters
+npm run lint
+
+# Format code
+npm run format
 ```
 
 ## Documentation
