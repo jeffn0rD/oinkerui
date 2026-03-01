@@ -53,6 +53,7 @@ current:
       - does not seem to be any way to add files to the workspace
     prompt: 
     
+- task:
     id: 2.9.0
     name: Phase 2 Integration and Testing
     goal: Integrate all Phase 2 components and implement comprehensive end-to-end tests.
