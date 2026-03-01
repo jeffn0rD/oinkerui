@@ -1,0 +1,51 @@
+task_id: "2.8.9"
+task_name: "UI unresponsive icons and links"
+task_goal: "All UI actionable features (icons, links) work"
+status: completed
+completed_at: "2026-03-01"
+
+issues_fixed:
+  - issue: "Create project shows 'Failed to fetch'"
+    root_cause: "API client used hardcoded http://localhost:3000/api instead of relative /api path, bypassing Vite proxy"
+    fix: "Changed API_BASE_URL default to '/api' in frontend/src/lib/utils/api.js"
+    
+  - issue: "API response format mismatch"
+    root_cause: "Backend wraps responses in { success, data } but frontend expected raw arrays/objects"
+    fix: "Added unwrap() helper in App.svelte to extract response.data"
+    
+  - issue: "Dark mode toggle does nothing"
+    root_cause: "Sidebar used theme.update() but custom theme store only exposes subscribe/set/toggle"
+    fix: "Changed Sidebar to use theme.toggle() which properly updates localStorage and DOM classes"
+    
+  - issue: "Profile icon does nothing"
+    root_cause: "Header button had no click handler or event dispatch"
+    fix: "Added createEventDispatcher to Header, dispatches 'profile' event, App.svelte shows Profile modal"
+    
+  - issue: "Settings icon does nothing"
+    root_cause: "Header and Sidebar settings buttons had no click handlers"
+    fix: "Both dispatch 'settings' event, App.svelte shows Settings modal with theme toggle, server status, about info"
+    
+  - issue: "WorkspacePanel is empty shell"
+    root_cause: "Component only rendered a static list with no project awareness"
+    fix: "Enhanced to show project info, chat info, file list, and collapsible panel"
+
+files_modified:
+  - frontend/src/lib/utils/api.js
+  - frontend/src/App.svelte
+  - frontend/src/lib/components/Header.svelte
+  - frontend/src/lib/components/Sidebar.svelte
+  - frontend/src/lib/components/WorkspacePanel.svelte
+
+files_created:
+  - verify/task_2.8.9_ui_fixes.py
+  - log/task_2.8.9_summary.yaml
+
+verification:
+  script: verify/task_2.8.9_ui_fixes.py
+  checks_passed: 41
+  checks_total: 41
+  
+tests:
+  backend_node: "311 passed (14 suites)"
+  backend_python: "66 passed"
+  frontend: "7 passed (2 suites)"

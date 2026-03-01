@@ -6,22 +6,45 @@
   import WorkspacePanel from './lib/components/WorkspacePanel.svelte';
   import { projects, currentProject, addProject, setProjects } from './lib/stores/projectStore';
   import { chats, currentChat, messages, setChats, addChat, selectChat, clearChats } from './lib/stores/chatStore';
-  import { projectApi, chatApi, messageApi } from './lib/utils/api.js';
+  import { theme } from './lib/stores/uiStore.js';
+  import { projectApi, chatApi, messageApi, healthApi } from './lib/utils/api.js';
 
   // Modal state
   let showCreateProject = false;
   let showCreateChat = false;
+  let showSettings = false;
+  let showProfile = false;
   let newProjectName = '';
   let newProjectDescription = '';
   let newChatName = '';
   let modalError = '';
   let modalLoading = false;
 
+  // Settings state
+  let apiKeyMasked = '••••••••';
+  let serverStatus = 'checking...';
+
+  async function checkServerStatus() {
+    try {
+      await healthApi.check();
+      serverStatus = 'Connected';
+    } catch {
+      serverStatus = 'Disconnected';
+    }
+  }
+
+  // Helper to unwrap API responses - backend wraps in { success, data }
+  function unwrap(response) {
+    if (response && response.data !== undefined) return response.data;
+    if (Array.isArray(response)) return response;
+    return response || [];
+  }
+
   // Load projects on startup
   onMount(async () => {
     try {
-      const data = await projectApi.list();
-      setProjects(data.projects || data || []);
+      const response = await projectApi.list();
+      setProjects(unwrap(response));
     } catch (err) {
       console.error('Failed to load projects:', err);
     }
@@ -35,8 +58,8 @@
   async function loadChats(projectId) {
     clearChats();
     try {
-      const data = await chatApi.list(projectId);
-      setChats(data.chats || data || []);
+      const response = await chatApi.list(projectId);
+      setChats(unwrap(response));
     } catch (err) {
       console.error('Failed to load chats:', err);
     }
@@ -49,9 +72,9 @@
 
   async function loadMessages(projectId, chatId) {
     try {
-      const data = await messageApi.list(projectId, chatId);
+      const response = await messageApi.list(projectId, chatId);
       import('./lib/stores/chatStore').then(({ setMessages }) => {
-        setMessages(data.messages || data || []);
+        setMessages(unwrap(response));
       });
     } catch (err) {
       console.error('Failed to load messages:', err);
@@ -81,10 +104,11 @@
     modalLoading = true;
     modalError = '';
     try {
-      const project = await projectApi.create({
+      const response = await projectApi.create({
         name: newProjectName.trim(),
         description: newProjectDescription.trim()
       });
+      const project = response?.data || response;
       addProject(project);
       currentProject.set(project);
       showCreateProject = false;
@@ -117,9 +141,10 @@
     modalLoading = true;
     modalError = '';
     try {
-      const chat = await chatApi.create($currentProject.id, {
+      const response = await chatApi.create($currentProject.id, {
         name: newChatName.trim() || undefined
       });
+      const chat = response?.data || response;
       addChat(chat);
       selectChat(chat);
       showCreateChat = false;
@@ -130,11 +155,24 @@
     }
   }
 
+  // Open settings modal
+  function handleSettings() {
+    checkServerStatus();
+    showSettings = true;
+  }
+
+  // Open profile modal
+  function handleProfile() {
+    showProfile = true;
+  }
+
   // Close modals on Escape key
   function handleKeydown(event) {
     if (event.key === 'Escape') {
       showCreateProject = false;
       showCreateChat = false;
+      showSettings = false;
+      showProfile = false;
     }
   }
 </script>
@@ -142,13 +180,14 @@
 <svelte:window on:keydown={handleKeydown} />
 
 <div class="h-screen flex flex-col">
-  <Header />
+  <Header on:settings={handleSettings} on:profile={handleProfile} />
   <div class="flex-1 flex overflow-hidden">
     <Sidebar
       on:projectSelect={handleProjectSelect}
       on:projectCreate={handleProjectCreate}
       on:chatSelect={handleChatSelect}
       on:chatCreate={handleChatCreate}
+      on:settings={handleSettings}
     />
     <main class="flex-1 overflow-auto">
       <ChatInterface messages={$messages} />
@@ -262,6 +301,119 @@
           disabled={modalLoading}
         >
           {modalLoading ? 'Creating...' : 'Create Chat'}
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- Settings Modal -->
+{#if showSettings}
+  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" on:click|self={() => showSettings = false}>
+    <div class="bg-surface border border-border rounded-xl shadow-xl p-6 w-full max-w-lg mx-4">
+      <div class="flex items-center justify-between mb-6">
+        <h2 class="text-xl font-semibold text-foreground">Settings</h2>
+        <button on:click={() => showSettings = false} class="p-1 rounded hover:bg-surface-hover text-muted hover:text-foreground">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <div class="space-y-6">
+        <!-- Theme -->
+        <div>
+          <h3 class="text-sm font-medium text-foreground mb-2">Appearance</h3>
+          <div class="flex items-center justify-between p-3 bg-background rounded-lg border border-border">
+            <span class="text-sm text-foreground">Theme</span>
+            <button
+              on:click={() => theme.toggle()}
+              class="px-3 py-1.5 text-sm rounded-lg bg-surface-hover text-foreground hover:bg-primary/10 transition-colors"
+            >
+              {$theme === 'dark' ? '🌙 Dark' : '☀️ Light'}
+            </button>
+          </div>
+        </div>
+
+        <!-- Server Status -->
+        <div>
+          <h3 class="text-sm font-medium text-foreground mb-2">Server Status</h3>
+          <div class="space-y-2">
+            <div class="flex items-center justify-between p-3 bg-background rounded-lg border border-border">
+              <span class="text-sm text-foreground">API Server</span>
+              <span class="text-sm {serverStatus === 'Connected' ? 'text-green-500' : 'text-red-500'}">{serverStatus}</span>
+            </div>
+            <div class="flex items-center justify-between p-3 bg-background rounded-lg border border-border">
+              <span class="text-sm text-foreground">API Key</span>
+              <span class="text-sm text-muted">{apiKeyMasked}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- About -->
+        <div>
+          <h3 class="text-sm font-medium text-foreground mb-2">About</h3>
+          <div class="p-3 bg-background rounded-lg border border-border">
+            <p class="text-sm text-foreground font-medium">OinkerUI</p>
+            <p class="text-xs text-muted mt-1">LLM-assisted development workbench</p>
+            <p class="text-xs text-muted mt-1">Powered by OpenRouter</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex justify-end mt-6">
+        <button
+          on:click={() => showSettings = false}
+          class="px-4 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- Profile Modal -->
+{#if showProfile}
+  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" on:click|self={() => showProfile = false}>
+    <div class="bg-surface border border-border rounded-xl shadow-xl p-6 w-full max-w-sm mx-4">
+      <div class="flex items-center justify-between mb-6">
+        <h2 class="text-xl font-semibold text-foreground">Profile</h2>
+        <button on:click={() => showProfile = false} class="p-1 rounded hover:bg-surface-hover text-muted hover:text-foreground">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <div class="flex flex-col items-center mb-6">
+        <div class="w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center mb-3">
+          <svg class="w-10 h-10 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                  d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+          </svg>
+        </div>
+        <h3 class="text-lg font-medium text-foreground">Local User</h3>
+        <p class="text-sm text-muted">OinkerUI Developer</p>
+      </div>
+
+      <div class="space-y-3">
+        <div class="flex items-center justify-between p-3 bg-background rounded-lg border border-border">
+          <span class="text-sm text-muted">Projects</span>
+          <span class="text-sm text-foreground font-medium">{$projects.length}</span>
+        </div>
+        <div class="flex items-center justify-between p-3 bg-background rounded-lg border border-border">
+          <span class="text-sm text-muted">Active Chats</span>
+          <span class="text-sm text-foreground font-medium">{$chats.length}</span>
+        </div>
+      </div>
+
+      <div class="flex justify-end mt-6">
+        <button
+          on:click={() => showProfile = false}
+          class="px-4 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+        >
+          Close
         </button>
       </div>
     </div>
