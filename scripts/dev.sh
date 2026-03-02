@@ -23,6 +23,14 @@ if [ ! -f .env ]; then
     exit 1
 fi
 
+# Load port configuration from .env
+NODE_PORT=$(grep -E '^NODE_PORT=' .env 2>/dev/null | cut -d'=' -f2 | tr -d '[:space:]')
+PYTHON_PORT=$(grep -E '^PYTHON_PORT=' .env 2>/dev/null | cut -d'=' -f2 | tr -d '[:space:]')
+FRONTEND_PORT=$(grep -E '^FRONTEND_PORT=' .env 2>/dev/null | cut -d'=' -f2 | tr -d '[:space:]')
+NODE_PORT=${NODE_PORT:-3000}
+PYTHON_PORT=${PYTHON_PORT:-8000}
+FRONTEND_PORT=${FRONTEND_PORT:-5173}
+
 # Function to cleanup on exit
 cleanup() {
     echo -e "\n${RED}Shutting down services...${NC}"
@@ -31,25 +39,25 @@ cleanup() {
 trap cleanup EXIT
 
 # Start Python backend
-echo -e "${GREEN}Starting Python tools backend (port 8000)...${NC}"
+echo -e "${GREEN}Starting Python tools backend (port ${PYTHON_PORT})...${NC}"
 source venv/bin/activate 2>/dev/null || true
-(cd backend_python && PYTHONPATH="$PROJECT_ROOT/backend_python:$PYTHONPATH" python src/main.py) &
+(cd "$PROJECT_ROOT" && PYTHONPATH="$PROJECT_ROOT/backend_python:$PYTHONPATH" python backend_python/src/main.py) &
 PYTHON_PID=$!
 
 # Start Node.js backend
-echo -e "${GREEN}Starting Node.js backend (port 3000)...${NC}"
+echo -e "${GREEN}Starting Node.js backend (port ${NODE_PORT})...${NC}"
 (cd "$PROJECT_ROOT" && npm run dev:backend) &
 NODE_PID=$!
 
 # Start frontend
-echo -e "${GREEN}Starting frontend dev server (port 5173)...${NC}"
+echo -e "${GREEN}Starting frontend dev server (port ${FRONTEND_PORT})...${NC}"
 (cd "$PROJECT_ROOT/frontend" && npm run dev -- --host) &
 FRONTEND_PID=$!
 
 echo -e "${BLUE}All services started!${NC}"
-echo -e "Frontend: ${GREEN}http://localhost:5173${NC}"
-echo -e "Node.js API: ${GREEN}http://localhost:3000${NC}"
-echo -e "Python Tools: ${GREEN}http://localhost:8000${NC}"
+echo -e "Frontend: ${GREEN}http://localhost:${FRONTEND_PORT}${NC}"
+echo -e "Node.js API: ${GREEN}http://localhost:${NODE_PORT}${NC}"
+echo -e "Python Tools: ${GREEN}http://localhost:${PYTHON_PORT}${NC}"
 echo -e "\nPress Ctrl+C to stop all services"
 
 # Wait for all background processes

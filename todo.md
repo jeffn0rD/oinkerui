@@ -1,21 +1,22 @@
-# Task Execution Progress - All Complete ✅
+# Fix: Browser Hang + Port Configuration
 
-## Task 2.5.0: Implement Python Tools Backend ✅ COMPLETE
-- [x] FastAPI app with Jinja2 template rendering, code execution, utilities
-- [x] 66 Python tests, 77/77 verification checks
-- [x] Committed and pushed (8b8aeff)
+## Issue 1: Browser hangs on page load
+- [ ] Examine frontend entry point and App.svelte for infinite loops
+- [ ] Check Vite config and dev server setup
+- [ ] Check if the issue is SSR vs client-side rendering
+- [ ] Test by starting the servers and loading in browser
+- [ ] Fix the root cause
 
-## Task 2.6.0: Implement Prompt Templates System ✅ COMPLETE
-- [x] Global templates, backend service, routes, frontend TemplateSelector
-- [x] 22 backend tests, 45/45 verification checks
-- [x] Committed and pushed (2630dd7)
+## Issue 2: Port configuration from .env not respected
+- [ ] Examine .env and .env.example for port variables
+- [ ] Check how backend reads port config
+- [ ] Check how Python backend reads port config
+- [ ] Check how frontend Vite proxy reads port config
+- [ ] Check dev scripts for hardcoded ports
+- [ ] Fix all port references to use .env values
 
-## Task 2.7.0: Implement Message Flag UI Controls ✅ COMPLETE
-- [x] MessageFlagControls component, visual indicators, optimistic updates
-- [x] 44/44 verification checks
-- [x] Committed and pushed (8dfb86a)
-
-## Task 2.8.0: Implement Aside and Pure Aside Functionality ✅ COMPLETE
-- [x] Frontend aside mode UI, keyboard shortcuts, context tests
-- [x] 3 aside context tests, 43/43 verification checks
-- [x] Committed and pushed (d94f930)
+## Verification
+- [ ] Start all servers with custom ports and verify they work
+- [ ] Verify browser loads without hanging
+- [ ] Run tests to ensure nothing is broken
+- [ ] Commit and push

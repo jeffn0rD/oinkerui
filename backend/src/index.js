@@ -13,18 +13,7 @@ function buildApp(opts = {}) {
     credentials: true
   });
 
-  // Only serve static files if frontend/dist exists (production mode)
-  const distPath = path.join(__dirname, '../../frontend/dist');
-  if (fs.existsSync(distPath)) {
-    fastify.register(require('@fastify/static'), {
-      root: distPath,
-      prefix: '/',
-    });
-  } else {
-    fastify.log.info('Frontend dist not found - running in API-only mode (use Vite dev server for frontend)');
-  }
-
-  // Register routes
+  // Register API routes FIRST (before static file serving)
   fastify.register(require('./routes/projects'));
   fastify.register(require('./routes/chats'));
   fastify.register(require('./routes/messages'));
@@ -37,17 +26,43 @@ function buildApp(opts = {}) {
     return { status: 'ok', timestamp: new Date().toISOString() };
   });
 
+  // Only serve static files if frontend/dist exists (production mode)
+  const distPath = path.join(__dirname, '../../frontend/dist');
+  if (fs.existsSync(distPath)) {
+    fastify.register(require('@fastify/static'), {
+      root: distPath,
+      prefix: '/',
+      wildcard: false,  // Don't catch all routes - let API routes take priority
+    });
+
+    // SPA fallback: serve index.html for non-API, non-file routes
+    fastify.setNotFoundHandler((request, reply) => {
+      // Don't intercept API routes
+      if (request.url.startsWith('/api/')) {
+        reply.code(404).send({ error: 'Not found', message: `Route ${request.method} ${request.url} not found` });
+        return;
+      }
+      // Serve index.html for SPA client-side routing
+      reply.sendFile('index.html');
+    });
+  } else {
+    fastify.log.info('Frontend dist not found - running in API-only mode (use Vite dev server for frontend)');
+  }
+
   return fastify;
 }
 
 // Start server only if not in test mode
 if (require.main === module) {
+  const config = require('./config');
   const app = buildApp();
   
   const start = async () => {
     try {
-      await app.listen({ port: 3000, host: '0.0.0.0' });
-      console.log('Server listening on http://localhost:3000');
+      const port = config.server.port;
+      const host = config.server.host;
+      await app.listen({ port, host });
+      console.log(`Server listening on http://${host === '0.0.0.0' ? 'localhost' : host}:${port}`);
     } catch (err) {
       app.log.error(err);
       process.exit(1);

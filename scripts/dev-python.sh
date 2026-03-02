@@ -6,4 +6,4 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 cd "$PROJECT_ROOT"
 
 source venv/bin/activate 2>/dev/null || true
-cd backend_python && PYTHONPATH="$PROJECT_ROOT/backend_python:$PYTHONPATH" python src/main.py
+PYTHONPATH="$PROJECT_ROOT/backend_python:$PYTHONPATH" python backend_python/src/main.py
