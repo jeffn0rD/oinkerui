@@ -1,37 +1,29 @@
 <script>
-  import { createEventDispatcher } from 'svelte';
   import { chats, currentChat } from '../stores/chatStore.js';
   import { currentProject } from '../stores/projectStore.js';
-  
-  const dispatch = createEventDispatcher();
-  
+
+  let { onSelect = () => {}, onCreate = () => {} } = $props();
+
   function selectChat(chat) {
     currentChat.set(chat);
-    dispatch('select', chat);
+    onSelect(chat);
   }
-  
-  function createChat() {
-    dispatch('create');
-  }
-  
+
   function formatDate(dateString) {
     if (!dateString) return '';
     const date = new Date(dateString);
     const now = new Date();
     const diff = now - date;
     
-    // Less than 24 hours
     if (diff < 86400000) {
       return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     }
-    // Less than 7 days
     if (diff < 604800000) {
       return date.toLocaleDateString([], { weekday: 'short' });
     }
-    // Otherwise show date
     return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
   }
-  
+
   function getStatusIcon(status) {
     switch (status) {
       case 'active': return '💬';
@@ -46,7 +38,7 @@
   <div class="flex items-center justify-between p-4 border-b border-border">
     <h2 class="text-lg font-semibold text-foreground">Chats</h2>
     <button 
-      on:click={createChat}
+      onclick={onCreate}
       class="p-2 rounded-lg hover:bg-surface-hover transition-colors"
       title="New Chat"
       disabled={!$currentProject}
@@ -65,7 +57,7 @@
     <div class="flex-1 overflow-y-auto p-2 space-y-1">
       {#each $chats as chat (chat.id)}
         <button
-          on:click={() => selectChat(chat)}
+          onclick={() => selectChat(chat)}
           class="w-full text-left p-3 rounded-lg transition-colors
                  {$currentChat?.id === chat.id 
                    ? 'bg-primary/10 border border-primary/30' 
@@ -96,7 +88,7 @@
           </svg>
           <p class="text-sm">No chats yet</p>
           <button 
-            on:click={createChat}
+            onclick={onCreate}
             class="mt-2 text-primary hover:underline text-sm"
           >
             Start a new chat
@@ -106,7 +98,3 @@
     </div>
   {/if}
 </div>
-
-<style>
-  /* Component-specific styles if needed */
-</style>

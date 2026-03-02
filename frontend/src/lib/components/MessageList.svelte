@@ -1,32 +1,31 @@
 <script>
-  import { afterUpdate, tick, createEventDispatcher } from 'svelte';
+  import { tick } from 'svelte';
   import { messages } from '../stores/chatStore.js';
   import { currentProject } from '../stores/projectStore.js';
   import { currentChat } from '../stores/chatStore.js';
   import { messageApi } from '../utils/api.js';
   import Message from './Message.svelte';
-  
-  export let autoScroll = true;
-  
-  const dispatch = createEventDispatcher();
-  
-  let container;
-  let shouldScroll = true;
-  
-  // Auto-scroll to bottom when new messages arrive
-  afterUpdate(async () => {
+
+  let { autoScroll = true, onFlagChange = null } = $props();
+
+  let container = $state(null);
+  let shouldScroll = $state(true);
+
+  // Auto-scroll when messages change
+  $effect(() => {
+    // Track messages to trigger effect
+    const _msgs = $messages;
     if (autoScroll && shouldScroll && container) {
-      await tick();
-      // Check container still exists after tick (component might have unmounted)
-      if (container) {
-        container.scrollTop = container.scrollHeight;
-      }
+      tick().then(() => {
+        if (container) {
+          container.scrollTop = container.scrollHeight;
+        }
+      });
     }
   });
-  
+
   function handleScroll() {
     if (!container) return;
-    // Check if user has scrolled up
     const isAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
     shouldScroll = isAtBottom;
   }
@@ -54,12 +53,14 @@
     );
 
     try {
-      // API call
       await messageApi.updateFlags(projectId, chatId, messageId, {
         [flagName]: newValue,
       });
 
-      dispatch('flagChanged', { messageId, flag: flagName, value: newValue });
+      // Notify parent if callback provided
+      if (onFlagChange) {
+        onFlagChange({ messageId, flag: flagName, value: newValue });
+      }
     } catch (err) {
       // Rollback on error
       messages.update(msgs =>
@@ -78,7 +79,7 @@
 
 <div 
   bind:this={container}
-  on:scroll={handleScroll}
+  onscroll={handleScroll}
   class="flex-1 overflow-y-auto p-4 space-y-4 bg-background"
 >
   {#each $messages as message, index (message.id || index)}
@@ -96,7 +97,7 @@
   
   {#if !shouldScroll && $messages.length > 0}
     <button
-      on:click={() => { shouldScroll = true; container.scrollTop = container.scrollHeight; }}
+      onclick={() => { shouldScroll = true; container.scrollTop = container.scrollHeight; }}
       class="fixed bottom-24 right-8 p-3 bg-primary text-white rounded-full shadow-lg hover:bg-primary-hover transition-colors"
       title="Scroll to bottom"
     >
@@ -108,7 +109,6 @@
 </div>
 
 <style>
-  /* Smooth scrolling */
   div {
     scroll-behavior: smooth;
   }

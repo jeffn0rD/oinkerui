@@ -1,18 +1,13 @@
 <script>
-  import { createEventDispatcher } from 'svelte';
   import { projects, currentProject } from '../stores/projectStore.js';
-  
-  const dispatch = createEventDispatcher();
-  
+
+  let { onSelect = () => {}, onCreate = () => {} } = $props();
+
   function selectProject(project) {
     currentProject.set(project);
-    dispatch('select', project);
+    onSelect(project);
   }
-  
-  function createProject() {
-    dispatch('create');
-  }
-  
+
   function getStatusColor(status) {
     switch (status) {
       case 'active': return 'bg-green-500';
@@ -27,7 +22,7 @@
   <div class="flex items-center justify-between p-4 border-b border-border">
     <h2 class="text-lg font-semibold text-foreground">Projects</h2>
     <button 
-      on:click={createProject}
+      onclick={onCreate}
       class="p-2 rounded-lg hover:bg-surface-hover transition-colors"
       title="New Project"
     >
@@ -40,7 +35,7 @@
   <div class="flex-1 overflow-y-auto p-2 space-y-1">
     {#each $projects as project (project.id)}
       <button
-        on:click={() => selectProject(project)}
+        onclick={() => selectProject(project)}
         class="w-full text-left p-3 rounded-lg transition-colors
                {$currentProject?.id === project.id 
                  ? 'bg-primary/10 border border-primary/30' 
@@ -69,7 +64,7 @@
         </svg>
         <p class="text-sm">No projects yet</p>
         <button 
-          on:click={createProject}
+          onclick={onCreate}
           class="mt-2 text-primary hover:underline text-sm"
         >
           Create your first project
@@ -78,7 +73,3 @@
     {/each}
   </div>
 </div>
-
-<style>
-  /* Component-specific styles if needed */
-</style>

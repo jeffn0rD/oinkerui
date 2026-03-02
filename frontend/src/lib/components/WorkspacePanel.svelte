@@ -2,9 +2,9 @@
   import { currentProject } from '../stores/projectStore.js';
   import { currentChat } from '../stores/chatStore.js';
   
-  export let files = [];
+  let { files = [] } = $props();
   
-  let collapsed = false;
+  let collapsed = $state(false);
   
   function togglePanel() {
     collapsed = !collapsed;
@@ -18,7 +18,7 @@
       <h2 class="text-sm font-semibold text-foreground px-2">Workspace</h2>
     {/if}
     <button
-      on:click={togglePanel}
+      onclick={togglePanel}
       class="p-1.5 rounded-lg hover:bg-surface-hover text-muted hover:text-foreground transition-colors"
       title={collapsed ? 'Expand workspace' : 'Collapse workspace'}
     >

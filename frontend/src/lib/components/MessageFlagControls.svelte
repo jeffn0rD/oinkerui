@@ -1,15 +1,8 @@
 <script>
-  import { createEventDispatcher } from 'svelte';
+  let { message, onFlagChange = () => {}, disabled = false, compact = true } = $props();
 
-  export let message;
-  export let onFlagChange = () => {};
-  export let disabled = false;
-  export let compact = true;
-
-  const dispatch = createEventDispatcher();
-
-  let isUpdating = false;
-  let pendingFlags = {};
+  let isUpdating = $state(false);
+  let pendingFlags = $state({});
 
   // Flag definitions
   const flags = [
@@ -59,25 +52,17 @@
     const currentValue = getFlagValue(flagKey);
     const newValue = !currentValue;
 
-    // Optimistic update
     pendingFlags = { ...pendingFlags, [flagKey]: newValue };
     isUpdating = true;
 
     try {
       await onFlagChange(message.id, flagKey, newValue);
-      dispatch('flagChanged', {
-        messageId: message.id,
-        flag: flagKey,
-        value: newValue,
-      });
     } catch (err) {
-      // Rollback on error
       const { [flagKey]: _, ...rest } = pendingFlags;
       pendingFlags = rest;
       console.error(`Failed to update flag ${flagKey}:`, err);
     } finally {
       isUpdating = false;
-      // Clear pending flag after success
       const { [flagKey]: _, ...rest } = pendingFlags;
       pendingFlags = rest;
     }
@@ -99,8 +84,8 @@
   {#each flags as flag}
     {@const isActive = getFlagValue(flag.key)}
     <button
-      on:click={() => toggleFlag(flag.key)}
-      on:keydown={(e) => handleKeydown(e, flag.key)}
+      onclick={() => toggleFlag(flag.key)}
+      onkeydown={(e) => handleKeydown(e, flag.key)}
       class="p-1 rounded transition-colors
              {disabled ? 'opacity-40 cursor-not-allowed' : 'hover:bg-surface-hover cursor-pointer'}
              {isActive ? flag.activeClass : 'text-muted'}"

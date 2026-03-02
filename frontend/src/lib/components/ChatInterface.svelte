@@ -1,5 +1,5 @@
 <script>
-  import { createEventDispatcher, onMount } from 'svelte';
+  import { onMount } from 'svelte';
   import MessageList from './MessageList.svelte';
   import MessageInput from './MessageInput.svelte';
   import CancelButton from './CancelButton.svelte';
@@ -8,21 +8,20 @@
   import { currentProject } from '../stores/projectStore.js';
   import { loading, streaming, stopStreaming } from '../stores/uiStore.js';
   import { chatApi, messageApi, modelApi } from '../utils/api.js';
-  
-  const dispatch = createEventDispatcher();
-  
+
+  let { onSend = () => {}, onCancel = () => {}, onFork = () => {}, onFlagUpdate = () => {} } = $props();
+
   // Model selection
-  let availableModels = [];
-  let selectedModel = 'openai/gpt-4o-mini';
-  let defaultModel = 'openai/gpt-4o-mini';
-  let allowCustom = true;
-  let showModelDropdown = false;
-  let showChatMenu = false;
-  let customModelInput = '';
-  let showCustomInput = false;
-  let modelsLoaded = false;
-  
-  // Fetch models from backend on mount
+  let availableModels = $state([]);
+  let selectedModel = $state('openai/gpt-4o-mini');
+  let defaultModel = $state('openai/gpt-4o-mini');
+  let allowCustom = $state(true);
+  let showModelDropdown = $state(false);
+  let showChatMenu = $state(false);
+  let customModelInput = $state('');
+  let showCustomInput = $state(false);
+  let modelsLoaded = $state(false);
+
   onMount(async () => {
     try {
       const response = await modelApi.list();
@@ -50,28 +49,29 @@
       modelsLoaded = true;
     }
   });
-  
-  $: currentModelName = (() => {
+
+  let currentModelName = $derived((() => {
     const found = availableModels.find(m => m.id === selectedModel);
     if (found) return found.name;
-    // For custom models, show the full ID but truncated
     if (selectedModel.length > 30) return '...' + selectedModel.slice(-27);
     return selectedModel;
-  })();
-  
+  })());
+
   // Update model from chat settings if available
-  $: if ($currentChat?.default_model) {
-    selectedModel = $currentChat.default_model;
-  }
-  
-  async function handleSendMessage(event) {
-    const { content, is_aside, pure_aside } = event.detail;
+  $effect(() => {
+    if ($currentChat?.default_model) {
+      selectedModel = $currentChat.default_model;
+    }
+  });
+
+  function handleSendMessage(detail) {
+    const { content, is_aside, pure_aside } = detail;
     
     if (!$currentProject || !$currentChat) {
       console.error('No project or chat selected');
       return;
     }
-    
+
     // Add user message to UI immediately
     const userMessage = {
       id: `temp-${Date.now()}`,
@@ -81,12 +81,11 @@
       is_aside: is_aside || false,
       pure_aside: pure_aside || false,
     };
-    
+
     messages.update(msgs => [...msgs, userMessage]);
     loading.set(true);
-    
-    // Dispatch event for parent to handle streaming
-    dispatch('send', {
+
+    onSend({
       projectId: $currentProject.id,
       chatId: $currentChat.id,
       content,
@@ -95,55 +94,54 @@
       pure_aside: pure_aside || false,
     });
   }
-  
+
   async function handleCancel() {
     if (!$currentProject || !$currentChat) return;
-    
+
     try {
       await chatApi.cancel($currentProject.id, $currentChat.id);
       stopStreaming();
       loading.set(false);
-      dispatch('cancel');
+      onCancel();
     } catch (error) {
       console.error('Failed to cancel request:', error);
     }
   }
-  
+
   function handleFork() {
     if (!$currentProject || !$currentChat) return;
-    dispatch('fork', {
+    onFork({
       projectId: $currentProject.id,
       chatId: $currentChat.id,
       name: `Fork of ${$currentChat.name}`,
     });
     showChatMenu = false;
   }
-  
-  function handleForkFromMessage(event) {
+
+  function handleForkFromMessage(messageId) {
     if (!$currentProject || !$currentChat) return;
-    dispatch('fork', {
+    onFork({
       projectId: $currentProject.id,
       chatId: $currentChat.id,
       name: `Fork of ${$currentChat.name}`,
-      fromMessageId: event.detail.messageId,
+      fromMessageId: messageId,
     });
   }
-  
-  function handleFlagUpdate(event) {
-    dispatch('flagUpdate', event.detail);
+
+  function handleFlagUpdate(detail) {
+    onFlagUpdate(detail);
   }
-  
+
   function selectModel(modelId) {
     selectedModel = modelId;
     showModelDropdown = false;
     showCustomInput = false;
   }
-  
+
   function submitCustomModel() {
     const trimmed = customModelInput.trim();
     if (trimmed) {
       selectedModel = trimmed;
-      // Add to available models if not already there
       if (!availableModels.find(m => m.id === trimmed)) {
         const parts = trimmed.split('/');
         availableModels = [...availableModels, {
@@ -157,7 +155,7 @@
     showModelDropdown = false;
     customModelInput = '';
   }
-  
+
   function handleCustomInputKeydown(event) {
     if (event.key === 'Enter') {
       event.preventDefault();
@@ -167,14 +165,14 @@
       customModelInput = '';
     }
   }
-  
+
   function handleClickOutside(event) {
     if (showModelDropdown) showModelDropdown = false;
     if (showChatMenu) showChatMenu = false;
   }
 </script>
 
-<svelte:window on:click={handleClickOutside} />
+<svelte:window onclick={handleClickOutside} />
 
 <div class="flex flex-col h-full bg-background">
   <!-- Chat header -->
@@ -193,7 +191,7 @@
         <!-- Model selector -->
         <div class="relative">
           <button
-            on:click|stopPropagation={() => showModelDropdown = !showModelDropdown}
+            onclick={(e) => { e.stopPropagation(); showModelDropdown = !showModelDropdown; }}
             class="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border border-border hover:bg-surface-hover text-foreground transition-colors"
             title="Select model"
           >
@@ -210,7 +208,7 @@
             <div class="absolute right-0 top-full mt-1 w-72 bg-surface border border-border rounded-lg shadow-xl z-50 py-1 max-h-96 overflow-y-auto">
               {#each availableModels as model}
                 <button
-                  on:click|stopPropagation={() => selectModel(model.id)}
+                  onclick={(e) => { e.stopPropagation(); selectModel(model.id); }}
                   class="w-full text-left px-3 py-2 text-sm hover:bg-surface-hover transition-colors flex items-center justify-between
                          {selectedModel === model.id ? 'bg-primary/10 text-primary' : 'text-foreground'}"
                 >
@@ -229,19 +227,19 @@
               {#if allowCustom}
                 <hr class="my-1 border-border" />
                 {#if showCustomInput}
-                  <div class="px-3 py-2" on:click|stopPropagation>
+                  <div class="px-3 py-2" onclick={(e) => e.stopPropagation()}>
                     <label class="block text-xs text-muted mb-1">Enter OpenRouter model ID:</label>
                     <div class="flex gap-2">
                       <input
                         type="text"
                         bind:value={customModelInput}
-                        on:keydown={handleCustomInputKeydown}
+                        onkeydown={handleCustomInputKeydown}
                         placeholder="provider/model-name"
                         class="flex-1 px-2 py-1.5 text-sm bg-background border border-border rounded text-foreground placeholder-muted focus:outline-none focus:ring-1 focus:ring-primary"
                         autofocus
                       />
                       <button
-                        on:click|stopPropagation={submitCustomModel}
+                        onclick={(e) => { e.stopPropagation(); submitCustomModel(); }}
                         class="px-3 py-1.5 text-xs bg-primary text-white rounded hover:bg-primary/90 transition-colors"
                       >
                         Use
@@ -253,7 +251,7 @@
                   </div>
                 {:else}
                   <button
-                    on:click|stopPropagation={() => showCustomInput = true}
+                    onclick={(e) => { e.stopPropagation(); showCustomInput = true; }}
                     class="w-full text-left px-3 py-2 text-sm hover:bg-surface-hover text-muted hover:text-foreground transition-colors flex items-center gap-2"
                   >
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -266,19 +264,19 @@
             </div>
           {/if}
         </div>
-        
-        <!-- Cancel button - shows during active streaming -->
+
+        <!-- Cancel button -->
         <CancelButton 
           isActive={$streaming.isActive && $streaming.chatId === $currentChat?.id}
           requestType={$streaming.requestType}
           size="sm"
-          on:cancel={handleCancel}
+          onCancel={handleCancel}
         />
-        
+
         <!-- Chat menu -->
         <div class="relative">
           <button 
-            on:click|stopPropagation={() => showChatMenu = !showChatMenu}
+            onclick={(e) => { e.stopPropagation(); showChatMenu = !showChatMenu; }}
             class="p-2 rounded-lg hover:bg-surface-hover text-muted hover:text-foreground transition-colors"
             title="Chat options"
           >
@@ -290,7 +288,7 @@
           {#if showChatMenu}
             <div class="absolute right-0 top-full mt-1 w-48 bg-surface border border-border rounded-lg shadow-xl z-50 py-1">
               <button
-                on:click|stopPropagation={handleFork}
+                onclick={(e) => { e.stopPropagation(); handleFork(); }}
                 class="w-full text-left px-3 py-2 text-sm hover:bg-surface-hover text-foreground transition-colors flex items-center gap-2"
               >
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -299,7 +297,7 @@
                 Fork Chat
               </button>
               <button
-                on:click|stopPropagation={() => { showChatMenu = false; }}
+                onclick={(e) => { e.stopPropagation(); showChatMenu = false; }}
                 class="w-full text-left px-3 py-2 text-sm hover:bg-surface-hover text-foreground transition-colors flex items-center gap-2"
                 disabled
               >
@@ -310,7 +308,7 @@
               </button>
               <hr class="my-1 border-border" />
               <button
-                on:click|stopPropagation={() => { showChatMenu = false; }}
+                onclick={(e) => { e.stopPropagation(); showChatMenu = false; }}
                 class="w-full text-left px-3 py-2 text-sm hover:bg-surface-hover text-red-500 transition-colors flex items-center gap-2"
                 disabled
               >
@@ -325,16 +323,11 @@
       </div>
     </div>
   {/if}
-  
+
   <!-- Messages area -->
   <div class="flex-1 overflow-hidden">
     {#if $currentChat}
-      <MessageList 
-        on:pin={(e) => handleFlagUpdate({ detail: { messageId: e.detail.messageId, flags: { is_pinned: e.detail.pinned } } })}
-        on:discard={(e) => handleFlagUpdate({ detail: { messageId: e.detail.messageId, flags: { is_discarded: e.detail.discarded } } })}
-        on:flagUpdate={handleFlagUpdate}
-        on:fork={handleForkFromMessage}
-      />
+      <MessageList onFlagChange={handleFlagUpdate} />
     {:else}
       <div class="flex flex-col items-center justify-center h-full text-muted">
         <svg class="w-20 h-20 mb-4 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -346,19 +339,18 @@
       </div>
     {/if}
   </div>
-  
+
   <!-- Input area -->
   {#if $currentChat}
     <div class="border-t border-border bg-surface">
-      <!-- Context size display (compact) -->
       <div class="flex items-center justify-between px-4 pt-2">
         <ContextSizeDisplay compact={true} />
         {#if $streaming.isActive}
-          <CancelButton on:cancel={handleCancel} size="sm" />
+          <CancelButton onCancel={handleCancel} size="sm" />
         {/if}
       </div>
       <MessageInput 
-        on:send={handleSendMessage}
+        onSend={handleSendMessage}
         disabled={$currentChat.status !== 'active'}
         projectId={$currentProject?.id || ''}
         placeholder={$currentChat.status !== 'active' 
@@ -368,7 +360,3 @@
     </div>
   {/if}
 </div>
-
-<style>
-  /* Component-specific styles */
-</style>

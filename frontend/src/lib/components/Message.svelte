@@ -1,72 +1,51 @@
 <script>
-  import { createEventDispatcher } from 'svelte';
   import MessageFlagControls from './MessageFlagControls.svelte';
-  
-  export let message;
-  export let onFlagChange = () => {};
-  
-  const dispatch = createEventDispatcher();
-  
-  // Determine if this is a user or assistant message
-  $: isUser = message.role === 'user';
-  $: isAssistant = message.role === 'assistant';
-  $: isSystem = message.role === 'system';
-  
+
+  let { message, onFlagChange = () => {} } = $props();
+
+  // Determine message type
+  let isUser = $derived(message.role === 'user');
+  let isAssistant = $derived(message.role === 'assistant');
+  let isSystem = $derived(message.role === 'system');
+
   // Flag states
-  $: isPinned = !!message.is_pinned;
-  $: isAside = !!message.is_aside;
-  $: isPureAside = !!message.pure_aside;
-  $: isDiscarded = !!message.is_discarded;
-  $: isExcluded = message.include_in_context === false;
-  
-  // Format timestamp
+  let isPinned = $derived(!!message.is_pinned);
+  let isAside = $derived(!!message.is_aside);
+  let isPureAside = $derived(!!message.pure_aside);
+  let isDiscarded = $derived(!!message.is_discarded);
+  let isExcluded = $derived(message.include_in_context === false);
+
   function formatTime(dateString) {
     if (!dateString) return '';
     const date = new Date(dateString);
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   }
-  
-  // Simple markdown-like formatting
+
   function formatContent(content) {
     if (!content) return '';
     
-    // Escape HTML
     let formatted = content
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;');
     
-    // Code blocks (```code```)
     formatted = formatted.replace(/```(\w*)\n?([\s\S]*?)```/g, (match, lang, code) => {
       return `<pre class="code-block"><code class="language-${lang || 'text'}">${code.trim()}</code></pre>`;
     });
     
-    // Inline code (`code`)
     formatted = formatted.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>');
-    
-    // Bold (**text**)
     formatted = formatted.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-    
-    // Italic (*text*)
     formatted = formatted.replace(/\*([^*]+)\*/g, '<em>$1</em>');
-    
-    // Line breaks
     formatted = formatted.replace(/\n/g, '<br>');
     
     return formatted;
   }
-  
+
   function handleCopy() {
     navigator.clipboard.writeText(message.content);
-    dispatch('copy', message);
-  }
-  
-  async function handleFlagChange(messageId, flagName, newValue) {
-    await onFlagChange(messageId, flagName, newValue);
-    dispatch('flagChanged', { messageId, flag: flagName, value: newValue });
   }
 
-  let showControls = false;
+  let showControls = $state(false);
 </script>
 
 <div 
@@ -78,8 +57,8 @@
   class:is-excluded={isExcluded}
   role="article"
   aria-label="{message.role} message"
-  on:mouseenter={() => showControls = true}
-  on:mouseleave={() => showControls = false}
+  onmouseenter={() => showControls = true}
+  onmouseleave={() => showControls = false}
 >
   <!-- Avatar -->
   <div class="flex-shrink-0">
@@ -105,7 +84,7 @@
       {#if showControls || isPinned || isAside || isDiscarded || isExcluded}
         <MessageFlagControls
           {message}
-          onFlagChange={handleFlagChange}
+          {onFlagChange}
           compact={true}
         />
       {/if}
@@ -169,10 +148,9 @@
         </span>
       {/if}
       
-      <!-- Action buttons -->
       <div class="message-actions opacity-0 transition-opacity flex gap-1">
         <button 
-          on:click={handleCopy}
+          onclick={handleCopy}
           class="p-1 rounded hover:bg-surface-hover text-muted hover:text-foreground"
           title="Copy"
           aria-label="Copy message"

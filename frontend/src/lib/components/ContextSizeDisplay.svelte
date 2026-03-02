@@ -4,22 +4,15 @@
    * 
    * Shows real-time context size estimation with a progress bar
    * indicating tokens used vs model maximum.
-   * 
-   * Color coding:
-   * - Green: <70% usage
-   * - Yellow: 70-90% usage
-   * - Red: >90% usage
-   * 
-   * Spec: spec/functions/frontend_svelte/context_size_display.yaml
    */
   
   import { tokenStats, contextMessages, pinnedMessages, toggleContextPanel, contextDisplay } from '../stores/contextStore.js';
   
-  export let compact = false;
+  let { compact = false } = $props();
   
   // Determine color based on usage percentage
-  $: usageColor = getUsageColor($tokenStats.usagePercent);
-  $: barWidth = Math.min(100, $tokenStats.usagePercent);
+  let usageColor = $derived(getUsageColor($tokenStats.usagePercent));
+  let barWidth = $derived(Math.min(100, $tokenStats.usagePercent));
   
   function getUsageColor(percent) {
     if (percent >= 90) return { bg: 'bg-red-500', text: 'text-red-500', light: 'bg-red-100 dark:bg-red-900/30' };
@@ -39,7 +32,7 @@
   <!-- Compact mode: just the bar and numbers -->
   <button 
     class="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-surface-hover transition-colors text-xs"
-    on:click={toggleContextPanel}
+    onclick={toggleContextPanel}
     title="Context: {$tokenStats.total} / {$tokenStats.available} tokens ({$tokenStats.usagePercent}%)"
   >
     <div class="w-16 h-1.5 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
@@ -119,7 +112,7 @@
     <!-- Toggle expand -->
     <button 
       class="w-full mt-2 text-xs text-muted hover:text-foreground transition-colors text-center"
-      on:click={toggleContextPanel}
+      onclick={toggleContextPanel}
     >
       {$contextDisplay.isExpanded ? '▲ Less' : '▼ More'}
     </button>

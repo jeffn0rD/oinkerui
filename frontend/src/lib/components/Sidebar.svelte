@@ -1,40 +1,23 @@
 <script>
-  import { createEventDispatcher } from 'svelte';
   import ProjectList from './ProjectList.svelte';
   import ChatList from './ChatList.svelte';
   import { sidebarCollapsed, theme } from '../stores/uiStore.js';
-  
-  const dispatch = createEventDispatcher();
-  
-  let activeTab = 'projects';
-  
+
+  let { onProjectSelect = () => {}, onProjectCreate = () => {}, onChatSelect = () => {}, onChatCreate = () => {}, onSettings = () => {} } = $props();
+
+  let activeTab = $state('projects');
+
   function toggleSidebar() {
     sidebarCollapsed.update(v => !v);
   }
-  
+
   function toggleTheme() {
     theme.toggle();
   }
-  
-  function handleProjectSelect(event) {
+
+  function handleProjectSelect(project) {
     activeTab = 'chats';
-    dispatch('projectSelect', event.detail);
-  }
-  
-  function handleProjectCreate() {
-    dispatch('projectCreate');
-  }
-  
-  function handleChatSelect(event) {
-    dispatch('chatSelect', event.detail);
-  }
-  
-  function handleChatCreate() {
-    dispatch('chatCreate');
-  }
-  
-  function handleSettings() {
-    dispatch('settings');
+    onProjectSelect(project);
   }
 </script>
 
@@ -48,7 +31,7 @@
       <h1 class="text-xl font-bold text-foreground">OinkerUI</h1>
     {/if}
     <button 
-      on:click={toggleSidebar}
+      onclick={toggleSidebar}
       class="p-2 rounded-lg hover:bg-surface-hover text-muted hover:text-foreground transition-colors"
       title={$sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
     >
@@ -64,7 +47,7 @@
     <!-- Tab navigation -->
     <div class="flex border-b border-border">
       <button
-        on:click={() => activeTab = 'projects'}
+        onclick={() => activeTab = 'projects'}
         class="flex-1 py-3 text-sm font-medium transition-colors
                {activeTab === 'projects' 
                  ? 'text-primary border-b-2 border-primary' 
@@ -73,7 +56,7 @@
         Projects
       </button>
       <button
-        on:click={() => activeTab = 'chats'}
+        onclick={() => activeTab = 'chats'}
         class="flex-1 py-3 text-sm font-medium transition-colors
                {activeTab === 'chats' 
                  ? 'text-primary border-b-2 border-primary' 
@@ -87,13 +70,13 @@
     <div class="flex-1 overflow-hidden">
       {#if activeTab === 'projects'}
         <ProjectList 
-          on:select={handleProjectSelect}
-          on:create={handleProjectCreate}
+          onSelect={handleProjectSelect}
+          onCreate={onProjectCreate}
         />
       {:else}
         <ChatList 
-          on:select={handleChatSelect}
-          on:create={handleChatCreate}
+          onSelect={onChatSelect}
+          onCreate={onChatCreate}
         />
       {/if}
     </div>
@@ -101,7 +84,7 @@
     <!-- Collapsed state - icon buttons -->
     <div class="flex flex-col items-center py-4 space-y-4">
       <button
-        on:click={() => { sidebarCollapsed.set(false); activeTab = 'projects'; }}
+        onclick={() => { sidebarCollapsed.set(false); activeTab = 'projects'; }}
         class="p-3 rounded-lg hover:bg-surface-hover text-muted hover:text-foreground transition-colors"
         title="Projects"
       >
@@ -111,7 +94,7 @@
         </svg>
       </button>
       <button
-        on:click={() => { sidebarCollapsed.set(false); activeTab = 'chats'; }}
+        onclick={() => { sidebarCollapsed.set(false); activeTab = 'chats'; }}
         class="p-3 rounded-lg hover:bg-surface-hover text-muted hover:text-foreground transition-colors"
         title="Chats"
       >
@@ -128,7 +111,7 @@
     {#if !$sidebarCollapsed}
       <div class="flex items-center justify-between">
         <button
-          on:click={toggleTheme}
+          onclick={toggleTheme}
           class="flex items-center gap-2 p-2 rounded-lg hover:bg-surface-hover text-muted hover:text-foreground transition-colors"
           title="Toggle theme"
         >
@@ -148,7 +131,7 @@
         </button>
         
         <button
-          on:click={handleSettings}
+          onclick={onSettings}
           class="p-2 rounded-lg hover:bg-surface-hover text-muted hover:text-foreground transition-colors"
           title="Settings"
         >
@@ -162,7 +145,7 @@
     {:else}
       <div class="flex flex-col items-center space-y-2">
         <button
-          on:click={toggleTheme}
+          onclick={toggleTheme}
           class="p-2 rounded-lg hover:bg-surface-hover text-muted hover:text-foreground transition-colors"
           title="Toggle theme"
         >
@@ -182,7 +165,3 @@
     {/if}
   </div>
 </aside>
-
-<style>
-  /* Component-specific styles */
-</style>

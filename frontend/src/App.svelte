@@ -10,22 +10,22 @@
   import { projectApi, chatApi, messageApi, healthApi } from './lib/utils/api.js';
 
   // Modal state
-  let showCreateProject = false;
-  let showCreateChat = false;
-  let showSettings = false;
-  let showProfile = false;
-  let newProjectName = '';
-  let newProjectDescription = '';
-  let newChatName = '';
-  let modalError = '';
-  let modalLoading = false;
+  let showCreateProject = $state(false);
+  let showCreateChat = $state(false);
+  let showSettings = $state(false);
+  let showProfile = $state(false);
+  let newProjectName = $state('');
+  let newProjectDescription = $state('');
+  let newChatName = $state('');
+  let modalError = $state('');
+  let modalLoading = $state(false);
 
   // Settings state
-  let apiKeyMasked = '••••••••';
-  let serverStatus = 'checking...';
+  let apiKeyMasked = $state('••••••••');
+  let serverStatus = $state('checking...');
 
   // Active stream controller
-  let activeStreamController = null;
+  let activeStreamController = $state(null);
 
   async function checkServerStatus() {
     try {
@@ -36,7 +36,7 @@
     }
   }
 
-  // Helper to unwrap API responses - backend wraps in { success, data }
+  // Helper to unwrap API responses
   function unwrap(response) {
     if (response && response.data !== undefined) return response.data;
     if (Array.isArray(response)) return response;
@@ -53,20 +53,41 @@
     }
   });
 
-  // Track last loaded IDs to avoid duplicate loads
+  // =========================================================================
+  // Reactive data loading - using $effect instead of store subscriptions
+  // to properly integrate with Svelte 5 reactivity
+  // =========================================================================
   let _lastProjectId = null;
   let _lastChatId = null;
 
-  // When current project changes, load its chats
-  $: if ($currentProject) {
-    const pid = $currentProject.id;
-    if (pid !== _lastProjectId) {
+  // Watch currentProject changes
+  $effect(() => {
+    const project = $currentProject;
+    const pid = project?.id;
+    if (pid && pid !== _lastProjectId) {
       _lastProjectId = pid;
-      _loadChats(pid);
+      loadChatsForProject(pid);
+    } else if (!pid) {
+      _lastProjectId = null;
     }
-  }
+  });
 
-  async function _loadChats(projectId) {
+  // Watch currentChat changes
+  $effect(() => {
+    const chat = $currentChat;
+    const cid = chat?.id;
+    if (cid && cid !== _lastChatId) {
+      _lastChatId = cid;
+      const pid = _lastProjectId;
+      if (pid) {
+        loadMessagesForChat(pid, cid);
+      }
+    } else if (!cid) {
+      _lastChatId = null;
+    }
+  });
+
+  async function loadChatsForProject(projectId) {
     clearChats();
     try {
       const response = await chatApi.list(projectId);
@@ -76,16 +97,7 @@
     }
   }
 
-  // When current chat changes, load its messages
-  $: if ($currentChat && $currentProject) {
-    const cid = $currentChat.id;
-    if (cid !== _lastChatId) {
-      _lastChatId = cid;
-      _loadMessages($currentProject.id, cid);
-    }
-  }
-
-  async function _loadMessages(projectId, chatId) {
+  async function loadMessagesForChat(projectId, chatId) {
     try {
       const response = await messageApi.list(projectId, chatId);
       setMessages(unwrap(response));
@@ -94,7 +106,6 @@
     }
   }
 
-  // Force reload messages (e.g., after streaming completes)
   async function reloadMessages(projectId, chatId) {
     try {
       const response = await messageApi.list(projectId, chatId);
@@ -104,13 +115,14 @@
     }
   }
 
-  // Handle project selection from sidebar
-  function handleProjectSelect(event) {
-    const project = event.detail;
+  // =========================================================================
+  // Event handlers (called directly by child components via callback props)
+  // =========================================================================
+
+  function handleProjectSelect(project) {
     currentProject.set(project);
   }
 
-  // Handle project create button
   function handleProjectCreate() {
     newProjectName = '';
     newProjectDescription = '';
@@ -118,7 +130,6 @@
     showCreateProject = true;
   }
 
-  // Submit new project
   async function submitCreateProject() {
     if (!newProjectName.trim()) {
       modalError = 'Project name is required';
@@ -142,14 +153,11 @@
     }
   }
 
-  // Handle chat selection from sidebar
-  function handleChatSelect(event) {
-    const chat = event.detail;
+  function handleChatSelect(chat) {
     _lastChatId = null; // Reset so messages load for new selection
     selectChat(chat);
   }
 
-  // Handle chat create button
   function handleChatCreate() {
     if (!$currentProject) {
       alert('Please select a project first');
@@ -160,7 +168,6 @@
     showCreateChat = true;
   }
 
-  // Submit new chat
   async function submitCreateChat() {
     modalLoading = true;
     modalError = '';
@@ -181,13 +188,11 @@
   }
 
   // Handle sending a message from ChatInterface
-  async function handleSendMessage(event) {
-    const { projectId, chatId, content, model, is_aside, pure_aside } = event.detail;
+  function handleSendMessage(detail) {
+    const { projectId, chatId, content, model, is_aside, pure_aside } = detail;
 
     startStreaming(chatId, 'llm');
-    loading.set(true);
 
-    // Create a placeholder assistant message for streaming
     const assistantMsgId = `streaming-${Date.now()}`;
     addMessage({
       id: assistantMsgId,
@@ -215,8 +220,6 @@
           stopStreaming();
           loading.set(false);
           activeStreamController = null;
-
-          // Reload messages to get server-side IDs
           reloadMessages(projectId, chatId);
         },
         onError(error) {
@@ -241,7 +244,6 @@
     }
   }
 
-  // Handle cancel from ChatInterface
   function handleCancel() {
     if (activeStreamController) {
       activeStreamController.abort();
@@ -249,9 +251,8 @@
     }
   }
 
-  // Handle fork from ChatInterface
-  async function handleFork(event) {
-    const { projectId, chatId, name, fromMessageId } = event.detail;
+  async function handleFork(detail) {
+    const { projectId, chatId, name, fromMessageId } = detail;
     try {
       const response = await chatApi.fork(projectId, chatId, { name, fromMessageId });
       const forkedChat = response?.data || response;
@@ -263,9 +264,8 @@
     }
   }
 
-  // Handle message flag updates
-  async function handleFlagUpdate(event) {
-    const { messageId, flags } = event.detail;
+  async function handleFlagUpdate(detail) {
+    const { messageId, flags } = detail;
     if (!$currentProject || !$currentChat) return;
     try {
       const response = await messageApi.updateFlags(
@@ -278,18 +278,15 @@
     }
   }
 
-  // Open settings modal
   function handleSettings() {
     checkServerStatus();
     showSettings = true;
   }
 
-  // Open profile modal
   function handleProfile() {
     showProfile = true;
   }
 
-  // Close modals on Escape key
   function handleKeydown(event) {
     if (event.key === 'Escape') {
       showCreateProject = false;
@@ -300,25 +297,24 @@
   }
 </script>
 
-<svelte:window on:keydown={handleKeydown} />
+<svelte:window onkeydown={handleKeydown} />
 
 <div class="h-screen flex flex-col">
-  <Header on:settings={handleSettings} on:profile={handleProfile} />
+  <Header onSettings={handleSettings} onProfile={handleProfile} />
   <div class="flex-1 flex overflow-hidden">
     <Sidebar
-      on:projectSelect={handleProjectSelect}
-      on:projectCreate={handleProjectCreate}
-      on:chatSelect={handleChatSelect}
-      on:chatCreate={handleChatCreate}
-      on:settings={handleSettings}
+      onProjectSelect={handleProjectSelect}
+      onProjectCreate={handleProjectCreate}
+      onChatSelect={handleChatSelect}
+      onChatCreate={handleChatCreate}
+      onSettings={handleSettings}
     />
     <main class="flex-1 overflow-auto">
       <ChatInterface
-        messages={$messages}
-        on:send={handleSendMessage}
-        on:cancel={handleCancel}
-        on:fork={handleFork}
-        on:flagUpdate={handleFlagUpdate}
+        onSend={handleSendMessage}
+        onCancel={handleCancel}
+        onFork={handleFork}
+        onFlagUpdate={handleFlagUpdate}
       />
     </main>
     <WorkspacePanel files={[]} />
@@ -327,8 +323,7 @@
 
 <!-- Create Project Modal -->
 {#if showCreateProject}
-  <!-- svelte-ignore a11y_interactive_supports_focus -->
-  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" role="dialog" aria-label="Create project" on:click|self={() => showCreateProject = false}>
+  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" role="dialog" aria-label="Create project" onclick={(e) => { if (e.target === e.currentTarget) showCreateProject = false; }}>
     <div class="bg-surface border border-border rounded-xl shadow-xl p-6 w-full max-w-md mx-4">
       <h2 class="text-xl font-semibold text-foreground mb-4">Create New Project</h2>
 
@@ -349,7 +344,7 @@
             bind:value={newProjectName}
             placeholder="My Project"
             class="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground placeholder-muted focus:outline-none focus:ring-2 focus:ring-primary"
-            on:keydown={(e) => e.key === 'Enter' && submitCreateProject()}
+            onkeydown={(e) => e.key === 'Enter' && submitCreateProject()}
           />
         </div>
         <div>
@@ -368,14 +363,14 @@
 
       <div class="flex justify-end gap-3 mt-6">
         <button
-          on:click={() => showCreateProject = false}
+          onclick={() => showCreateProject = false}
           class="px-4 py-2 text-sm text-muted hover:text-foreground transition-colors"
           disabled={modalLoading}
         >
           Cancel
         </button>
         <button
-          on:click={submitCreateProject}
+          onclick={submitCreateProject}
           class="px-4 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
           disabled={modalLoading}
         >
@@ -388,8 +383,7 @@
 
 <!-- Create Chat Modal -->
 {#if showCreateChat}
-  <!-- svelte-ignore a11y_interactive_supports_focus -->
-  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" role="dialog" aria-label="Create chat" on:click|self={() => showCreateChat = false}>
+  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" role="dialog" aria-label="Create chat" onclick={(e) => { if (e.target === e.currentTarget) showCreateChat = false; }}>
     <div class="bg-surface border border-border rounded-xl shadow-xl p-6 w-full max-w-md mx-4">
       <h2 class="text-xl font-semibold text-foreground mb-4">Create New Chat</h2>
       <p class="text-sm text-muted mb-4">
@@ -412,20 +406,20 @@
           bind:value={newChatName}
           placeholder="New Chat"
           class="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground placeholder-muted focus:outline-none focus:ring-2 focus:ring-primary"
-          on:keydown={(e) => e.key === 'Enter' && submitCreateChat()}
+          onkeydown={(e) => e.key === 'Enter' && submitCreateChat()}
         />
       </div>
 
       <div class="flex justify-end gap-3 mt-6">
         <button
-          on:click={() => showCreateChat = false}
+          onclick={() => showCreateChat = false}
           class="px-4 py-2 text-sm text-muted hover:text-foreground transition-colors"
           disabled={modalLoading}
         >
           Cancel
         </button>
         <button
-          on:click={submitCreateChat}
+          onclick={submitCreateChat}
           class="px-4 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
           disabled={modalLoading}
         >
@@ -438,12 +432,11 @@
 
 <!-- Settings Modal -->
 {#if showSettings}
-  <!-- svelte-ignore a11y_interactive_supports_focus -->
-  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" role="dialog" aria-label="Settings" on:click|self={() => showSettings = false}>
+  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" role="dialog" aria-label="Settings" onclick={(e) => { if (e.target === e.currentTarget) showSettings = false; }}>
     <div class="bg-surface border border-border rounded-xl shadow-xl p-6 w-full max-w-lg mx-4">
       <div class="flex items-center justify-between mb-6">
         <h2 class="text-xl font-semibold text-foreground">Settings</h2>
-        <button on:click={() => showSettings = false} class="p-1 rounded hover:bg-surface-hover text-muted hover:text-foreground" aria-label="Close settings">
+        <button onclick={() => showSettings = false} class="p-1 rounded hover:bg-surface-hover text-muted hover:text-foreground" aria-label="Close settings">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
           </svg>
@@ -456,7 +449,7 @@
           <div class="flex items-center justify-between p-3 bg-background rounded-lg border border-border">
             <span class="text-sm text-foreground">Theme</span>
             <button
-              on:click={() => theme.toggle()}
+              onclick={() => theme.toggle()}
               class="px-3 py-1.5 text-sm rounded-lg bg-surface-hover text-foreground hover:bg-primary/10 transition-colors"
             >
               {$theme === 'dark' ? '🌙 Dark' : '☀️ Light'}
@@ -490,7 +483,7 @@
 
       <div class="flex justify-end mt-6">
         <button
-          on:click={() => showSettings = false}
+          onclick={() => showSettings = false}
           class="px-4 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
         >
           Close
@@ -502,12 +495,11 @@
 
 <!-- Profile Modal -->
 {#if showProfile}
-  <!-- svelte-ignore a11y_interactive_supports_focus -->
-  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" role="dialog" aria-label="Profile" on:click|self={() => showProfile = false}>
+  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" role="dialog" aria-label="Profile" onclick={(e) => { if (e.target === e.currentTarget) showProfile = false; }}>
     <div class="bg-surface border border-border rounded-xl shadow-xl p-6 w-full max-w-sm mx-4">
       <div class="flex items-center justify-between mb-6">
         <h2 class="text-xl font-semibold text-foreground">Profile</h2>
-        <button on:click={() => showProfile = false} class="p-1 rounded hover:bg-surface-hover text-muted hover:text-foreground" aria-label="Close profile">
+        <button onclick={() => showProfile = false} class="p-1 rounded hover:bg-surface-hover text-muted hover:text-foreground" aria-label="Close profile">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
           </svg>
@@ -538,7 +530,7 @@
 
       <div class="flex justify-end mt-6">
         <button
-          on:click={() => showProfile = false}
+          onclick={() => showProfile = false}
           class="px-4 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
         >
           Close
@@ -547,7 +539,3 @@
     </div>
   </div>
 {/if}
-
-<style>
-  /* Component-specific styles */
-</style>

@@ -1,45 +1,41 @@
 <script>
-  import { createEventDispatcher } from 'svelte';
+  import { onMount } from 'svelte';
   import { loading } from '../stores/uiStore.js';
   import TemplateSelector from './TemplateSelector.svelte';
-  
-  export let placeholder = 'Type your message...';
-  export let disabled = false;
-  export let projectId = '';
-  
-  const dispatch = createEventDispatcher();
-  
-  let message = '';
-  let textarea;
-  let isComposing = false;
-  let showTemplateSelector = false;
-  let asideMode = 'normal'; // 'normal', 'aside', 'pure_aside'
-  
+
+  let { placeholder = 'Type your message...', disabled = false, projectId = '', onSend = () => {} } = $props();
+
+  let message = $state('');
+  let textarea = $state(null);
+  let isComposing = $state(false);
+  let showTemplateSelector = $state(false);
+  let asideMode = $state('normal'); // 'normal', 'aside', 'pure_aside'
+
+  let asideModeLabel = $derived(asideMode === 'aside' ? 'Aside' : asideMode === 'pure_aside' ? 'Pure Aside' : '');
+  let asideModeColor = $derived(asideMode === 'aside' ? 'text-yellow-500' : asideMode === 'pure_aside' ? 'text-pink-500' : '');
+
   function handleSubmit(overrideAside) {
     const mode = overrideAside || asideMode;
     if (message.trim() && !$loading && !disabled) {
-      dispatch('send', {
+      onSend({
         content: message.trim(),
         is_aside: mode === 'aside' || mode === 'pure_aside',
         pure_aside: mode === 'pure_aside',
       });
       message = '';
       asideMode = 'normal';
-      // Reset textarea height
       if (textarea) {
         textarea.style.height = 'auto';
       }
     }
   }
-  
+
   function handleKeydown(event) {
-    // Don't submit during IME composition
     if (isComposing) return;
     
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
       
-      // Ctrl+Shift+Enter = aside, Ctrl+Alt+Enter = pure aside
       if (event.ctrlKey && event.altKey) {
         handleSubmit('pure_aside');
       } else if (event.ctrlKey) {
@@ -49,32 +45,29 @@
       }
     }
     
-    // Ctrl+T to open template selector
     if ((event.ctrlKey || event.metaKey) && event.key === 't') {
       event.preventDefault();
       showTemplateSelector = true;
     }
   }
-  
+
   function handleInput() {
-    // Auto-resize textarea
     if (textarea) {
       textarea.style.height = 'auto';
       textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px';
     }
   }
-  
+
   function handleCompositionStart() {
     isComposing = true;
   }
-  
+
   function handleCompositionEnd() {
     isComposing = false;
   }
-  
+
   function handleTemplateSelect(content) {
     message = content;
-    // Resize textarea
     if (textarea) {
       textarea.style.height = 'auto';
       requestAnimationFrame(() => {
@@ -91,17 +84,12 @@
     else if (asideMode === 'aside') asideMode = 'pure_aside';
     else asideMode = 'normal';
   }
-  
-  // Focus textarea on mount
-  import { onMount } from 'svelte';
+
   onMount(() => {
     if (textarea) {
       textarea.focus();
     }
   });
-
-  $: asideModeLabel = asideMode === 'aside' ? 'Aside' : asideMode === 'pure_aside' ? 'Pure Aside' : '';
-  $: asideModeColor = asideMode === 'aside' ? 'text-yellow-500' : asideMode === 'pure_aside' ? 'text-pink-500' : '';
 </script>
 
 <div class="border-t border-border bg-surface p-4">
@@ -123,7 +111,7 @@
           {/if}
         </span>
         <button
-          on:click={() => asideMode = 'normal'}
+          onclick={() => asideMode = 'normal'}
           class="text-xs text-muted hover:text-foreground transition-colors"
           title="Cancel aside mode"
         >
@@ -147,7 +135,7 @@
       
       <!-- Template button -->
       <button
-        on:click={() => showTemplateSelector = true}
+        onclick={() => showTemplateSelector = true}
         class="p-2 rounded-lg hover:bg-surface-hover text-muted hover:text-foreground transition-colors"
         title="Prompt Templates (Ctrl+T)"
         disabled={$loading || disabled}
@@ -160,7 +148,7 @@
 
       <!-- Aside mode toggle button -->
       <button
-        on:click={cycleAsideMode}
+        onclick={cycleAsideMode}
         class="p-2 rounded-lg hover:bg-surface-hover transition-colors
                {asideMode !== 'normal' ? asideModeColor : 'text-muted hover:text-foreground'}"
         title="Toggle aside mode (Normal → Aside → Pure Aside)"
@@ -177,10 +165,10 @@
         <textarea
           bind:this={textarea}
           bind:value={message}
-          on:keydown={handleKeydown}
-          on:input={handleInput}
-          on:compositionstart={handleCompositionStart}
-          on:compositionend={handleCompositionEnd}
+          onkeydown={handleKeydown}
+          oninput={handleInput}
+          oncompositionstart={handleCompositionStart}
+          oncompositionend={handleCompositionEnd}
           placeholder={asideMode === 'aside' ? 'Type aside message...' : asideMode === 'pure_aside' ? 'Type pure aside message...' : placeholder}
           disabled={$loading || disabled}
           class="w-full resize-none rounded-xl border px-4 py-3 pr-12
@@ -195,7 +183,7 @@
         
         <!-- Send button -->
         <button
-          on:click={() => handleSubmit()}
+          onclick={() => handleSubmit()}
           disabled={!message.trim() || $loading || disabled}
           class="absolute right-2 bottom-2 p-2 rounded-lg
                  {message.trim() && !$loading && !disabled

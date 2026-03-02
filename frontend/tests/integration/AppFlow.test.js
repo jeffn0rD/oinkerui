@@ -40,6 +40,22 @@ vi.mock('../../src/lib/stores/uiStore.js', () => {
   };
 });
 
+vi.mock('../../src/lib/stores/contextStore.js', () => {
+  const { writable, derived } = require('svelte/store');
+  const tokenStats = writable({ total: 0, available: 32000, usagePercent: 0, system: 0, messages: 0, remaining: 32000 });
+  const contextMessages = writable([]);
+  const pinnedMessages = writable([]);
+  const contextDisplay = writable({ isExpanded: false });
+  return {
+    tokenStats,
+    contextMessages,
+    pinnedMessages,
+    contextDisplay,
+    contextConfig: writable({ maxTokens: 32000, reservedTokens: 1000, tokenEstimateRatio: 4 }),
+    toggleContextPanel: vi.fn()
+  };
+});
+
 vi.mock('../../src/lib/utils/api.js', () => ({
   projectApi: {
     list: vi.fn().mockResolvedValue([]),
@@ -59,6 +75,9 @@ vi.mock('../../src/lib/utils/api.js', () => ({
   },
   templateApi: {
     list: vi.fn().mockResolvedValue([])
+  },
+  modelApi: {
+    list: vi.fn().mockResolvedValue({ models: [], default_model: 'openai/gpt-4o-mini', allow_custom: true })
   }
 }));
 
@@ -76,7 +95,7 @@ describe('App Integration', () => {
     chats.set([]);
   });
 
-  it('renders the main layout with header, sidebar, and workspace', () => {
+  it('renders the main layout with header, sidebar, and workspace', async () => {
     render(App);
     // Should have the OinkerUI text (appears in header breadcrumb and sidebar)
     const oinkerElements = screen.getAllByText('OinkerUI');
@@ -84,8 +103,10 @@ describe('App Integration', () => {
     // Should have Projects tab (may appear multiple times)
     const projectElements = screen.getAllByText('Projects');
     expect(projectElements.length).toBeGreaterThan(0);
-    // Should have Connected status
-    expect(screen.getByText('Connected')).toBeInTheDocument();
+    // Should have Connected status (async health check)
+    await vi.waitFor(() => {
+      expect(screen.getByText('Connected')).toBeInTheDocument();
+    });
   });
 
   it('loads projects on mount', async () => {

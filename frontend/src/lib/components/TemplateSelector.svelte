@@ -1,32 +1,33 @@
 <script>
-  import { onMount, createEventDispatcher } from 'svelte';
+  import { onMount } from 'svelte';
   import { templateApi } from '../utils/api.js';
 
-  export let isOpen = false;
-  export let projectId = '';
-  export let onSelect = () => {};
-  export let onClose = () => {};
+  let { isOpen = false, projectId = '', onSelect = () => {}, onClose = () => {} } = $props();
 
-  const dispatch = createEventDispatcher();
+  let templates = $state([]);
+  let selectedTemplate = $state(null);
+  let variables = $state({});
+  let preview = $state('');
+  let isLoading = $state(false);
+  let isRendering = $state(false);
+  let error = $state('');
+  let searchQuery = $state('');
+  let selectedCategory = $state('');
+  let categories = $state([]);
 
-  let templates = [];
-  let selectedTemplate = null;
-  let variables = {};
-  let preview = '';
-  let isLoading = false;
-  let isRendering = false;
-  let error = '';
-  let searchQuery = '';
-  let selectedCategory = '';
-  let categories = [];
+  let filteredTemplates = $derived(templates);
 
-  $: if (isOpen) {
-    loadTemplates();
-  }
+  $effect(() => {
+    if (isOpen) {
+      loadTemplates();
+    }
+  });
 
-  $: if (!isOpen) {
-    resetState();
-  }
+  $effect(() => {
+    if (!isOpen) {
+      resetState();
+    }
+  });
 
   async function loadTemplates() {
     isLoading = true;
@@ -87,14 +88,12 @@
   function handleInsert() {
     if (preview) {
       onSelect(preview);
-      dispatch('select', { content: preview, templateId: selectedTemplate?.id });
       handleClose();
     }
   }
 
   function handleClose() {
     onClose();
-    dispatch('close');
   }
 
   function resetState() {
@@ -119,9 +118,6 @@
   function handleCategoryChange() {
     loadTemplates();
   }
-
-  // Filter templates by category in the UI
-  $: filteredTemplates = templates;
 </script>
 
 {#if isOpen}
@@ -131,18 +127,16 @@
     role="dialog"
     aria-modal="true"
     aria-label="Template Selector"
-    on:keydown={handleKeydown}
+    onkeydown={handleKeydown}
   >
-    <!-- svelte-ignore a11y_click_events_have_key_events -->
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div class="absolute inset-0" on:click={handleClose}></div>
+    <div class="absolute inset-0" onclick={handleClose} role="none"></div>
     
     <div class="relative bg-surface border border-border rounded-xl shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden">
       <!-- Header -->
       <div class="flex items-center justify-between px-5 py-4 border-b border-border">
         <h2 class="text-lg font-semibold text-foreground">Prompt Templates</h2>
         <button
-          on:click={handleClose}
+          onclick={handleClose}
           class="p-1.5 rounded-lg hover:bg-surface-hover text-muted hover:text-foreground transition-colors"
           aria-label="Close"
         >
@@ -157,14 +151,14 @@
         <input
           type="text"
           bind:value={searchQuery}
-          on:input={handleSearchInput}
+          oninput={handleSearchInput}
           placeholder="Search templates..."
           class="flex-1 px-3 py-2 rounded-lg border border-border bg-background text-foreground placeholder-muted text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
         />
         {#if categories.length > 1}
           <select
             bind:value={selectedCategory}
-            on:change={handleCategoryChange}
+            onchange={handleCategoryChange}
             class="px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
           >
             <option value="">All categories</option>
@@ -196,7 +190,7 @@
               <div class="space-y-2">
                 {#each filteredTemplates as template}
                   <button
-                    on:click={() => selectTemplate(template)}
+                    onclick={() => selectTemplate(template)}
                     class="w-full text-left p-3 rounded-lg border border-border hover:border-primary/50 hover:bg-surface-hover transition-colors"
                   >
                     <div class="flex items-center justify-between mb-1">
@@ -227,7 +221,7 @@
             <!-- Back button + template name -->
             <div class="px-4 py-3 border-b border-border flex items-center gap-2">
               <button
-                on:click={() => { selectedTemplate = null; preview = ''; }}
+                onclick={() => { selectedTemplate = null; preview = ''; }}
                 class="p-1 rounded hover:bg-surface-hover text-muted hover:text-foreground transition-colors"
                 aria-label="Back to list"
               >
@@ -257,7 +251,7 @@
                           <textarea
                             id="var-{v.name}"
                             bind:value={variables[v.name]}
-                            on:input={handleVariableChange}
+                            oninput={handleVariableChange}
                             placeholder={v.default || v.name}
                             class="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 resize-y"
                             rows="3"
@@ -267,7 +261,7 @@
                             id="var-{v.name}"
                             type="text"
                             bind:value={variables[v.name]}
-                            on:input={handleVariableChange}
+                            oninput={handleVariableChange}
                             placeholder={v.default || v.name}
                             class="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
                           />
@@ -296,13 +290,13 @@
             <!-- Insert Button -->
             <div class="px-4 py-3 border-t border-border flex justify-end gap-2">
               <button
-                on:click={() => { selectedTemplate = null; preview = ''; }}
+                onclick={() => { selectedTemplate = null; preview = ''; }}
                 class="px-4 py-2 rounded-lg border border-border text-sm text-muted hover:text-foreground hover:bg-surface-hover transition-colors"
               >
                 Back
               </button>
               <button
-                on:click={handleInsert}
+                onclick={handleInsert}
                 disabled={!preview || isRendering}
                 class="px-4 py-2 rounded-lg bg-primary text-white text-sm hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
